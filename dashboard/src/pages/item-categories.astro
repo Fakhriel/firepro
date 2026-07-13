@@ -1,0 +1,128 @@
+---
+import DashboardLayout from "../layouts/DashboardLayout.astro";
+import PageHeader from "../components/PageHeader.astro";
+---
+
+<DashboardLayout title="Item Categories" activeNav="item-categories">
+  <PageHeader heading="Item Categories" sub="Kelola kategori barang" crumbs={[{ label: "Gudang" }, { label: "Item Categories" }]}>
+    <button id="btn-add-cat" type="button" class="btn-primary text-xs gap-1.5">
+      <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Tambah Kategori
+    </button>
+  </PageHeader>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+    <!-- Placeholder category cards -->
+    {Array.from({ length: 3 }).map((_, i) => (
+      <div class="panel p-5 flex items-start justify-between group hover:brutal-shadow transition-all duration-200">
+        <div>
+          <div class="w-28 h-4 bg-hairline animate-pulse rounded-sm mb-2"></div>
+          <div class="w-16 h-3 bg-hairline/60 animate-pulse rounded-sm"></div>
+        </div>
+        <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button type="button" class="p-1.5 text-smoke hover:text-ink transition-colors">
+            <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </button>
+          <button type="button" class="p-1.5 text-smoke hover:text-signal transition-colors">
+            <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
+              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6"/><path d="M14 11v6"/>
+              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    ))}
+  </div>
+
+  <!-- Table -->
+  <div class="panel overflow-hidden">
+    <div class="overflow-x-auto">
+      <table id="item-categories-table" class="data-table">
+        <thead>
+          <tr>
+            <th class="w-10">#</th>
+            <th>Nama Kategori</th>
+            <th class="hidden sm:table-cell">Slug</th>
+            <th class="hidden md:table-cell">Jumlah Barang</th>
+            <th>Status</th>
+            <th class="text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="item-categories-body"></tbody>
+      </table>
+    </div>
+    <div id="item-categories-empty" class="empty-state min-h-44">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+        <line x1="7" y1="7" x2="7.01" y2="7"/>
+      </svg>
+      <p>Belum ada kategori</p>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div id="cat-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-ink/50">
+    <div class="bg-paper border-2 border-ink w-full max-w-md brutal-shadow">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+        <h2 id="cat-modal-title" class="font-display text-xl text-ink">Tambah Kategori</h2>
+        <button id="cat-modal-close" type="button" class="text-smoke hover:text-ink p-1">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="field-label" for="cat-name">Nama Kategori</label>
+          <input id="cat-name" type="text" placeholder="Material Bangunan" class="field-input" />
+        </div>
+        <div>
+          <label class="field-label" for="cat-slug">Slug</label>
+          <input id="cat-slug" type="text" placeholder="material-bangunan" class="field-input" />
+        </div>
+        <div>
+          <label class="field-label" for="cat-desc">Deskripsi (opsional)</label>
+          <textarea id="cat-desc" rows="2" placeholder="Deskripsi kategori…" class="field-input resize-none"></textarea>
+        </div>
+        <div>
+          <label class="field-label" for="cat-status">Status</label>
+          <select id="cat-status" class="field-input">
+            <option value="active">Aktif</option>
+            <option value="inactive">Nonaktif</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex gap-3 px-5 py-4 border-t border-hairline">
+        <button id="cat-modal-cancel" type="button" class="btn-secondary text-sm flex-1">Batal</button>
+        <button id="cat-modal-save" type="button" class="btn-primary text-sm flex-1">Simpan</button>
+      </div>
+    </div>
+  </div>
+</DashboardLayout>
+
+<script>
+  function openModal(id: string) { document.getElementById(id)?.classList.replace("hidden", "flex"); }
+  function closeModal(id: string) { document.getElementById(id)?.classList.replace("flex", "hidden"); }
+
+  document.getElementById("btn-add-cat")?.addEventListener("click", () => openModal("cat-modal"));
+  document.getElementById("cat-modal-close")?.addEventListener("click", () => closeModal("cat-modal"));
+  document.getElementById("cat-modal-cancel")?.addEventListener("click", () => closeModal("cat-modal"));
+
+  // Auto-generate slug dari nama
+  document.getElementById("cat-name")?.addEventListener("input", (e) => {
+    const val = (e.target as HTMLInputElement).value;
+    const slug = val.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    (document.getElementById("cat-slug") as HTMLInputElement).value = slug;
+  });
+
+  document.getElementById("cat-modal-save")?.addEventListener("click", () => {
+    window.showToast?.("Kategori berhasil disimpan");
+    closeModal("cat-modal");
+  });
+</script>

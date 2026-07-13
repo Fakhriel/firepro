@@ -1,0 +1,154 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base title="Login — FIREPRO Admin">
+  <div class="min-h-screen bg-paper flex items-center justify-center px-4">
+    <div class="w-full max-w-sm">
+
+      <!-- Brand -->
+      <div class="mb-8 text-center">
+        <a href="/" class="font-display text-4xl text-ink">FIREPRO</a>
+        <p class="font-mono text-[10px] uppercase tracking-widest text-smoke mt-1">Admin Dashboard</p>
+      </div>
+
+      <!-- Card -->
+      <div class="panel brutal-shadow p-7">
+        <h1 class="font-display text-2xl text-ink mb-1">Masuk</h1>
+        <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-6">Akses terbatas — admin only</p>
+
+        <!-- Error alert -->
+        <div id="login-error" class="hidden mb-4 border-2 border-signal bg-signal/5 px-3 py-2.5">
+          <p class="font-mono text-xs text-signal" id="login-error-msg">Username atau password salah.</p>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="field-label" for="username">Username</label>
+            <input
+              id="username"
+              type="text"
+              placeholder="superadmin"
+              autocomplete="username"
+              class="field-input"
+            />
+          </div>
+
+          <div>
+            <label class="field-label" for="password">Password</label>
+            <div class="relative">
+              <input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                autocomplete="current-password"
+                class="field-input pr-10"
+              />
+              <button
+                id="toggle-pw"
+                type="button"
+                aria-label="Tampilkan password"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-smoke hover:text-ink transition-colors"
+              >
+                <svg id="eye-icon" viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <button
+            id="login-btn"
+            type="button"
+            class="btn-primary w-full mt-2"
+          >
+            <span id="login-btn-text">Masuk</span>
+            <svg id="login-spinner" class="hidden w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" stroke-opacity=".25"/>
+              <path d="M21 12a9 9 0 0 0-9-9" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <p class="text-center font-mono text-[9px] text-smoke/60 mt-5 uppercase tracking-widest">
+        © 2026 FIREPRO — Fire Alarm Control
+      </p>
+    </div>
+  </div>
+</Base>
+
+<script>
+  import { loginAdmin, getAdminAuth } from "../lib/auth";
+
+  // Kalau sudah login, redirect ke dashboard
+  if (getAdminAuth().isAuthenticated) {
+    window.location.replace("/");
+  }
+
+  const usernameEl  = document.getElementById("username") as HTMLInputElement;
+  const passwordEl  = document.getElementById("password") as HTMLInputElement;
+  const loginBtn    = document.getElementById("login-btn") as HTMLButtonElement;
+  const btnText     = document.getElementById("login-btn-text") as HTMLSpanElement;
+  const spinner     = document.querySelector<SVGSVGElement>("#login-spinner");
+  const errorBox    = document.getElementById("login-error") as HTMLDivElement;
+  const errorMsg    = document.getElementById("login-error-msg") as HTMLParagraphElement;
+  const togglePw    = document.getElementById("toggle-pw") as HTMLButtonElement;
+  const eyeIcon     = document.querySelector<SVGSVGElement>("#eye-icon");
+
+  // Toggle password visibility
+  togglePw.addEventListener("click", () => {
+    const isHidden = passwordEl.type === "password";
+    passwordEl.type = isHidden ? "text" : "password";
+    if (eyeIcon) {
+      eyeIcon.innerHTML = isHidden
+        ? `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>`
+        : `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
+    }
+  });
+
+  function showError(msg: string): void {
+    errorMsg.textContent = msg;
+    errorBox.classList.remove("hidden");
+  }
+
+  function setLoading(on: boolean): void {
+    loginBtn.disabled = on;
+    btnText.textContent = on ? "Memverifikasi…" : "Masuk";
+    spinner?.classList.toggle("hidden", !on);
+  }
+
+  async function doLogin(): Promise<void> {
+    const username = usernameEl.value.trim();
+    const password = passwordEl.value;
+
+    errorBox.classList.add("hidden");
+
+    if (!username || !password) {
+      showError("Username dan password wajib diisi.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await loginAdmin(username, password);
+      window.location.replace("/");
+    } catch (err) {
+      showError(err instanceof Error ? err.message : "Username atau password salah.");
+      passwordEl.value = "";
+      passwordEl.focus();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  loginBtn.addEventListener("click", doLogin);
+
+  [usernameEl, passwordEl].forEach((el) => {
+    el.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Enter") doLogin();
+    });
+  });
+</script>

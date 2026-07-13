@@ -1,0 +1,481 @@
+---
+import DashboardLayout from "../layouts/DashboardLayout.astro";
+import PageHeader from "../components/PageHeader.astro";
+import StatCard from "../components/StatCard.astro";
+---
+
+<DashboardLayout title="Maintenance" activeNav="maintenance">
+  <PageHeader heading="Maintenance" sub="Jadwal perawatan sistem proteksi kebakaran" crumbs={[{ label: "Operasional" }, { label: "Maintenance" }]}>
+    <button id="btn-export-maintenance" type="button" class="btn-secondary text-xs gap-1.5">
+      <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="1.75">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/>
+        <line x1="9" y1="15" x2="15" y2="15"/>
+      </svg>
+      Export PDF
+    </button>
+    <button id="btn-add-maintenance" type="button" class="btn-primary text-xs gap-1.5">
+      <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Jadwalkan
+    </button>
+  </PageHeader>
+
+  <!-- Stat cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-maintenance-active" label="Jadwal Aktif" accent />
+    <StatCard id="stat-maintenance-due-soon" label="Jatuh Tempo Minggu Ini" />
+    <StatCard id="stat-maintenance-overdue" label="Terlambat" />
+    <StatCard id="stat-maintenance-completed" label="Selesai Bulan Ini" />
+  </div>
+
+  <!-- Filter -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-5">
+    <input id="search-maintenance" type="search" placeholder="Cari klien / lokasi / peralatan…" class="field-input sm:max-w-xs" />
+    <select id="filter-maintenance-status" class="field-input sm:w-40">
+      <option value="">Semua Status</option>
+      <option value="scheduled">Terjadwal</option>
+      <option value="due_soon">Segera Jatuh Tempo</option>
+      <option value="overdue">Terlambat</option>
+      <option value="completed">Selesai</option>
+    </select>
+  </div>
+
+  <!-- Table -->
+  <div class="panel overflow-hidden">
+    <div class="overflow-x-auto">
+      <table id="maintenance-table" class="data-table">
+        <thead>
+          <tr>
+            <th>Klien / Lokasi</th>
+            <th class="hidden sm:table-cell">Peralatan</th>
+            <th class="hidden md:table-cell">Terakhir Servis</th>
+            <th>Jadwal Berikutnya</th>
+            <th class="hidden md:table-cell">Teknisi</th>
+            <th>Status</th>
+            <th class="text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="maintenance-body"></tbody>
+      </table>
+    </div>
+
+    <div id="maintenance-empty" class="empty-state min-h-56 hidden">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L2 19l3 3 7.3-7.3a4 4 0 0 0 5.4-5.4L14 12l-2-2 2.7-3.7z"/>
+      </svg>
+      <p>Belum ada jadwal maintenance — buat jadwal pertama</p>
+    </div>
+
+    <div class="flex items-center justify-between px-4 py-3 border-t border-hairline">
+      <span data-maintenance-count class="font-mono text-[10px] text-smoke">0 jadwal</span>
+      <div class="flex items-center gap-1">
+        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>←</button>
+        <span class="font-mono text-xs px-3 py-1.5 border border-hairline">1</span>
+        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>→</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Jadwalkan / Edit Maintenance -->
+  <div id="maintenance-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-ink/50">
+    <div class="bg-paper border-2 border-ink w-full max-w-lg max-h-[90vh] overflow-y-auto brutal-shadow">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink sticky top-0 bg-paper">
+        <h2 id="maintenance-modal-title" class="font-display text-xl text-ink">Jadwalkan Maintenance</h2>
+        <button id="maintenance-modal-close" type="button" class="text-smoke hover:text-ink transition-colors p-1">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <input type="hidden" id="maintenance-id" />
+
+        <div id="maintenance-form-error" class="hidden border-2 border-signal bg-signal/5 px-3 py-2.5">
+          <p class="font-mono text-xs text-signal" id="maintenance-form-error-msg"></p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="field-label" for="maintenance-client">Nama Klien</label>
+            <input id="maintenance-client" type="text" placeholder="PT Sinar Abadi" class="field-input" />
+          </div>
+          <div>
+            <label class="field-label" for="maintenance-location">Lokasi</label>
+            <input id="maintenance-location" type="text" placeholder="Gedung A, Lt. 1-5" class="field-input" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="field-label" for="maintenance-equipment">Peralatan</label>
+            <input id="maintenance-equipment" type="text" placeholder="Fire Alarm System, APAR, Hydrant" class="field-input" />
+          </div>
+          <div>
+            <label class="field-label" for="maintenance-last">Terakhir Servis</label>
+            <input id="maintenance-last" type="date" class="field-input" />
+          </div>
+          <div>
+            <label class="field-label" for="maintenance-next">Jadwal Berikutnya</label>
+            <input id="maintenance-next" type="date" class="field-input" />
+          </div>
+          <div>
+            <label class="field-label" for="maintenance-technician">Teknisi</label>
+            <input id="maintenance-technician" type="text" placeholder="Nama teknisi" class="field-input" />
+          </div>
+          <div>
+            <label class="field-label" for="maintenance-status">Status</label>
+            <select id="maintenance-status" class="field-input">
+              <option value="scheduled">Terjadwal</option>
+              <option value="due_soon">Segera Jatuh Tempo</option>
+              <option value="overdue">Terlambat</option>
+              <option value="completed">Selesai</option>
+            </select>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="field-label" for="maintenance-notes">Catatan</label>
+            <textarea id="maintenance-notes" rows="3" placeholder="Catatan pengecekan, kondisi alat, dsb." class="field-input"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-3 px-5 py-4 border-t border-hairline sticky bottom-0 bg-paper">
+        <button id="maintenance-modal-cancel" type="button" class="btn-secondary text-sm flex-1">Batal</button>
+        <button id="maintenance-modal-save" type="button" class="btn-primary text-sm flex-1">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Konfirmasi Hapus -->
+  <div id="maintenance-delete-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-ink/50">
+    <div class="bg-paper border-2 border-ink w-full max-w-sm brutal-shadow">
+      <div class="p-5 space-y-2">
+        <h2 class="font-display text-xl text-ink">Hapus Jadwal?</h2>
+        <p class="font-mono text-xs text-smoke">Tindakan ini tidak bisa dibatalkan.</p>
+      </div>
+      <div class="flex gap-3 px-5 py-4 border-t border-hairline">
+        <button id="maintenance-delete-cancel" type="button" class="btn-secondary text-sm flex-1">Batal</button>
+        <button id="maintenance-delete-confirm" type="button" class="btn-danger text-sm flex-1">Hapus</button>
+      </div>
+    </div>
+  </div>
+</DashboardLayout>
+
+<script>
+  import { exportTableToPDF } from "../lib/export";
+  import { adminApiFetch } from "../lib/auth";
+  import { escapeHtml } from "../lib/escapeHtml";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface MaintenanceSchedule {
+    id: string;
+    client: string;
+    location: string;
+    equipment: string;
+    lastService: string;
+    nextService: string;
+    technician: string;
+    notes: string;
+    status: "scheduled" | "due_soon" | "overdue" | "completed";
+  }
+
+  let schedules: MaintenanceSchedule[] = [];
+
+  const STATUS_LABELS: Record<string, string> = {
+    scheduled: "Terjadwal", due_soon: "Segera Jatuh Tempo", overdue: "Terlambat", completed: "Selesai",
+  };
+  const STATUS_CLASSES: Record<string, string> = {
+    scheduled: "border-ink text-ink",
+    due_soon: "border-amber text-amber",
+    overdue: "border-signal text-signal",
+    completed: "border-armed bg-armed text-paper",
+  };
+
+  const tbody = document.getElementById("maintenance-body") as HTMLTableSectionElement;
+  const emptyState = document.getElementById("maintenance-empty") as HTMLDivElement;
+  const table = document.getElementById("maintenance-table") as HTMLTableElement;
+  const countLabel = document.querySelector<HTMLSpanElement>("[data-maintenance-count]");
+
+  let scheduleBeingDeleted: MaintenanceSchedule | null = null;
+
+  function formatDate(iso: string): string {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+  }
+
+  function renderTable(list: MaintenanceSchedule[]): void {
+    tbody.innerHTML = "";
+    const isEmpty = list.length === 0;
+    table.classList.toggle("hidden", isEmpty);
+    emptyState.classList.toggle("hidden", !isEmpty);
+    if (countLabel) countLabel.textContent = `${list.length} jadwal`;
+
+    list.forEach((m) => {
+      const statusLabel = STATUS_LABELS[m.status] ?? m.status;
+      const statusClass = STATUS_CLASSES[m.status] ?? "border-smoke text-smoke";
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="text-xs">
+          <p class="font-semibold text-ink">${escapeHtml(m.client)}</p>
+          <p class="font-mono text-[10px] text-smoke">${escapeHtml(m.location)}</p>
+        </td>
+        <td class="hidden sm:table-cell text-xs text-smoke">${escapeHtml(m.equipment)}</td>
+        <td class="hidden md:table-cell font-mono text-xs text-smoke">${formatDate(m.lastService)}</td>
+        <td class="font-mono text-xs">${formatDate(m.nextService)}</td>
+        <td class="hidden md:table-cell text-xs text-smoke">${escapeHtml(m.technician)}</td>
+        <td>
+          <span class="font-mono text-[10px] uppercase tracking-wide px-2 py-0.5 border-2 ${statusClass}">
+            ${statusLabel}
+          </span>
+        </td>
+        <td class="text-right">
+          <button type="button" data-edit="${m.id}" class="text-smoke hover:text-ink p-1" title="Edit">
+            <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </button>
+          <button type="button" data-delete="${m.id}" class="text-smoke hover:text-signal p-1" title="Hapus">
+            <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6"/><path d="M14 11v6"/>
+            </svg>
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll<HTMLButtonElement>("[data-edit]").forEach((btn) => {
+      btn.addEventListener("click", () => openEditModal(btn.dataset.edit!));
+    });
+    tbody.querySelectorAll<HTMLButtonElement>("[data-delete]").forEach((btn) => {
+      btn.addEventListener("click", () => openDeleteModal(btn.dataset.delete!));
+    });
+  }
+
+  function applyFilters(): void {
+    const keyword = (document.getElementById("search-maintenance") as HTMLInputElement)?.value
+      .trim().toLowerCase() ?? "";
+    const status = (document.getElementById("filter-maintenance-status") as HTMLSelectElement)?.value ?? "";
+
+    const filtered = schedules.filter((m) => {
+      const haystack = `${m.client} ${m.location} ${m.equipment}`.toLowerCase();
+      if (keyword && !haystack.includes(keyword)) return false;
+      if (status && m.status !== status) return false;
+      return true;
+    });
+    renderTable(filtered);
+  }
+
+  function setStatValue(cardId: string, value: string): void {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
+    if (!valueEl) {
+      const skeleton = card.querySelector(".animate-pulse")?.parentElement;
+      valueEl = document.createElement("p");
+      const isAccent = card.classList.contains("bg-ink");
+      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
+      if (skeleton) {
+        skeleton.replaceWith(valueEl);
+      } else {
+        card.appendChild(valueEl);
+      }
+    }
+    valueEl.textContent = value;
+  }
+
+  function updateStats(list: MaintenanceSchedule[]): void {
+    const active = list.filter((m) => m.status !== "completed").length;
+    const dueSoon = list.filter((m) => m.status === "due_soon").length;
+    const overdue = list.filter((m) => m.status === "overdue").length;
+    const completed = list.filter((m) => m.status === "completed").length;
+
+    setStatValue("stat-maintenance-active", String(active));
+    setStatValue("stat-maintenance-due-soon", String(dueSoon));
+    setStatValue("stat-maintenance-overdue", String(overdue));
+    setStatValue("stat-maintenance-completed", String(completed));
+  }
+
+  function showFormError(msg: string): void {
+    const box = document.getElementById("maintenance-form-error");
+    const msgEl = document.getElementById("maintenance-form-error-msg");
+    if (msgEl) msgEl.textContent = msg;
+    box?.classList.remove("hidden");
+  }
+
+  function hideFormError(): void {
+    document.getElementById("maintenance-form-error")?.classList.add("hidden");
+  }
+
+  async function loadMaintenance(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/maintenance/admin`);
+      const json = await res.json();
+
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat data maintenance", "error");
+        schedules = [];
+        renderTable([]);
+        updateStats([]);
+        return;
+      }
+
+      schedules = json.data ?? [];
+      applyFilters();
+      updateStats(schedules);
+    } catch (err) {
+      console.error("[loadMaintenance] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+      schedules = [];
+      renderTable([]);
+      updateStats([]);
+    }
+  }
+
+  function openModal(id: string) { document.getElementById(id)?.classList.replace("hidden", "flex"); }
+  function closeModal(id: string) { document.getElementById(id)?.classList.replace("flex", "hidden"); }
+
+  function resetForm(): void {
+    hideFormError();
+    (document.getElementById("maintenance-id") as HTMLInputElement).value = "";
+    (document.getElementById("maintenance-client") as HTMLInputElement).value = "";
+    (document.getElementById("maintenance-location") as HTMLInputElement).value = "";
+    (document.getElementById("maintenance-equipment") as HTMLInputElement).value = "";
+    (document.getElementById("maintenance-last") as HTMLInputElement).value = "";
+    (document.getElementById("maintenance-next") as HTMLInputElement).value = "";
+    (document.getElementById("maintenance-technician") as HTMLInputElement).value = "";
+    (document.getElementById("maintenance-notes") as HTMLTextAreaElement).value = "";
+    (document.getElementById("maintenance-status") as HTMLSelectElement).value = "scheduled";
+  }
+
+  function openAddModal(): void {
+    resetForm();
+    (document.getElementById("maintenance-modal-title") as HTMLElement).textContent = "Jadwalkan Maintenance";
+    openModal("maintenance-modal");
+  }
+
+  function openEditModal(id: string): void {
+    const m = schedules.find((item) => item.id === id);
+    if (!m) return;
+    (document.getElementById("maintenance-modal-title") as HTMLElement).textContent = "Edit Jadwal Maintenance";
+    (document.getElementById("maintenance-id") as HTMLInputElement).value = m.id;
+    (document.getElementById("maintenance-client") as HTMLInputElement).value = m.client;
+    (document.getElementById("maintenance-location") as HTMLInputElement).value = m.location;
+    (document.getElementById("maintenance-equipment") as HTMLInputElement).value = m.equipment;
+    (document.getElementById("maintenance-last") as HTMLInputElement).value = m.lastService;
+    (document.getElementById("maintenance-next") as HTMLInputElement).value = m.nextService;
+    (document.getElementById("maintenance-technician") as HTMLInputElement).value = m.technician;
+    (document.getElementById("maintenance-notes") as HTMLTextAreaElement).value = m.notes;
+    (document.getElementById("maintenance-status") as HTMLSelectElement).value = m.status;
+    openModal("maintenance-modal");
+  }
+
+  function openDeleteModal(id: string): void {
+    scheduleBeingDeleted = schedules.find((item) => item.id === id) ?? null;
+    openModal("maintenance-delete-modal");
+  }
+
+  async function saveSchedule(): Promise<void> {
+    hideFormError();
+    const id = (document.getElementById("maintenance-id") as HTMLInputElement).value;
+    const client = (document.getElementById("maintenance-client") as HTMLInputElement).value.trim();
+    const location = (document.getElementById("maintenance-location") as HTMLInputElement).value.trim();
+    const equipment = (document.getElementById("maintenance-equipment") as HTMLInputElement).value.trim();
+    const lastService = (document.getElementById("maintenance-last") as HTMLInputElement).value;
+    const nextService = (document.getElementById("maintenance-next") as HTMLInputElement).value;
+    const technician = (document.getElementById("maintenance-technician") as HTMLInputElement).value.trim();
+    const notes = (document.getElementById("maintenance-notes") as HTMLTextAreaElement).value.trim();
+    const status = (document.getElementById("maintenance-status") as HTMLSelectElement).value as MaintenanceSchedule["status"];
+
+    if (!client || !location || !equipment || !nextService) {
+      showFormError("Lengkapi semua kolom wajib.");
+      return;
+    }
+
+    const payload = { client, location, equipment, lastService, nextService, technician, notes, status };
+
+    const saveBtn = document.getElementById("maintenance-modal-save") as HTMLButtonElement;
+    const originalLabel = saveBtn.textContent;
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Menyimpan…";
+
+    try {
+      const res = await adminApiFetch(
+        id ? `${apiUrl}/api/maintenance/${id}` : `${apiUrl}/api/maintenance`,
+        {
+          method: id ? "PATCH" : "POST",
+          body: JSON.stringify(payload),
+        }
+      );
+      const json = await res.json();
+
+      if (!res.ok) {
+        showFormError(json.error ?? "Gagal menyimpan jadwal maintenance.");
+        return;
+      }
+
+      window.showToast?.(json.message ?? (id ? "Jadwal berhasil diperbarui" : "Jadwal maintenance berhasil dibuat"));
+      closeModal("maintenance-modal");
+      await loadMaintenance();
+    } catch (err) {
+      console.error("[saveSchedule] gagal fetch backend:", err);
+      showFormError("Tidak bisa terhubung ke server. Coba lagi.");
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = originalLabel;
+    }
+  }
+
+  async function confirmDelete(): Promise<void> {
+    if (!scheduleBeingDeleted) return;
+
+    const confirmBtn = document.getElementById("maintenance-delete-confirm") as HTMLButtonElement;
+    const originalLabel = confirmBtn.textContent;
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = "Menghapus…";
+
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/maintenance/${scheduleBeingDeleted.id}`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal menghapus jadwal", "error");
+        return;
+      }
+
+      window.showToast?.(json.message ?? "Jadwal berhasil dihapus");
+      closeModal("maintenance-delete-modal");
+      await loadMaintenance();
+    } catch (err) {
+      console.error("[confirmDelete] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    } finally {
+      scheduleBeingDeleted = null;
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = originalLabel;
+    }
+  }
+
+  document.getElementById("btn-add-maintenance")?.addEventListener("click", openAddModal);
+  document.getElementById("maintenance-modal-close")?.addEventListener("click", () => closeModal("maintenance-modal"));
+  document.getElementById("maintenance-modal-cancel")?.addEventListener("click", () => closeModal("maintenance-modal"));
+  document.getElementById("maintenance-modal-save")?.addEventListener("click", saveSchedule);
+
+  document.getElementById("maintenance-delete-cancel")?.addEventListener("click", () => closeModal("maintenance-delete-modal"));
+  document.getElementById("maintenance-delete-confirm")?.addEventListener("click", confirmDelete);
+
+  document.getElementById("search-maintenance")?.addEventListener("input", applyFilters);
+  document.getElementById("filter-maintenance-status")?.addEventListener("change", applyFilters);
+
+  document.getElementById("btn-export-maintenance")?.addEventListener("click", () => {
+    exportTableToPDF("maintenance-table", { title: "Jadwal Maintenance", subtitle: "Data perawatan sistem proteksi kebakaran FIREPRO" });
+  });
+
+  loadMaintenance();
+</script>
