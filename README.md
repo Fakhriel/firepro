@@ -53,15 +53,14 @@ Implemented so far:
 
 ### In Progress
 
-The current priority is completing the authentication module.
+The current focus is stabilizing the application before production use.
 
-At the moment:
+Remaining tasks:
 
-- The frontend login flow is not working because the required authentication endpoints are not fully connected.
-- Admin CRUD operations are still incomplete.
-- A dedicated login rate limiter has been prepared but is not yet applied.
-- Role-based authorization (`admin` and `superadmin`) has not been implemented.
-- Since authentication is incomplete, the dashboard cannot be fully tested end-to-end.
+- Finish Admin CRUD module
+- Implement Role-Based Access Control (RBAC)
+- Manual end-to-end testing of the dashboard
+- Add automated tests
 
 ---
 
