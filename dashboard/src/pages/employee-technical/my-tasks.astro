@@ -1,0 +1,136 @@
+---
+import EmployeeLayout from "../../layouts/EmployeeLayout.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import StatCard from "../../components/StatCard.astro";
+---
+
+<EmployeeLayout title="My Tasks" activeNav="my-tasks">
+  <PageHeader heading="My Tasks" sub="Tugas lapangan yang ditugaskan kepada Anda" crumbs={[{ label: "Kerja Lapangan" }, { label: "My Tasks" }]} />
+
+  <!-- Stat cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-tasks-total" label="Total Tugas" accent />
+    <StatCard id="stat-tasks-progress" label="Sedang Dikerjakan" />
+    <StatCard id="stat-tasks-done" label="Selesai" />
+    <StatCard id="stat-tasks-overdue" label="Lewat Tenggat" />
+  </div>
+
+  <!-- Filter -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-5">
+    <input id="search-tasks" type="search" placeholder="Cari lokasi / deskripsi tugas…" class="field-input sm:max-w-xs" />
+    <select id="filter-tasks-status" class="field-input sm:w-48">
+      <option value="">Semua Status</option>
+      <option value="todo">Belum Dikerjakan</option>
+      <option value="in_progress">Sedang Berjalan</option>
+      <option value="done">Selesai</option>
+    </select>
+  </div>
+
+  <!-- Table -->
+  <div class="panel overflow-hidden">
+    <div class="overflow-x-auto">
+      <table id="tasks-table" class="data-table">
+        <thead>
+          <tr>
+            <th>Lokasi / Titik Kerja</th>
+            <th class="hidden sm:table-cell">Deskripsi Tugas</th>
+            <th class="hidden md:table-cell">Tenggat</th>
+            <th>Status</th>
+            <th class="text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="tasks-body"></tbody>
+      </table>
+    </div>
+
+    <div id="tasks-empty" class="empty-state min-h-56">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M9 6h11M9 12h11M9 18h11"/>
+        <path d="M4.5 6l1 1 2-2M4.5 12l1 1 2-2M4.5 18l1 1 2-2"/>
+      </svg>
+      <p>Belum ada tugas yang ditugaskan kepada Anda</p>
+    </div>
+
+    <div class="flex items-center justify-between px-4 py-3 border-t border-hairline">
+      <span data-tasks-count class="font-mono text-[10px] text-smoke">0 tugas</span>
+      <div class="flex items-center gap-1">
+        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>←</button>
+        <span class="font-mono text-xs px-3 py-1.5 border border-hairline">1</span>
+        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>→</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Task detail / update modal (prototype UI only) -->
+  <div id="task-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
+    <div class="panel w-full max-w-lg bg-paper">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+        <h3 class="font-display text-lg text-ink leading-none">Update Tugas</h3>
+        <button id="task-modal-close" type="button" class="text-smoke hover:text-ink transition-colors" aria-label="Tutup">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="field-label" for="task-status-select">Status Pekerjaan</label>
+          <select id="task-status-select" class="field-input">
+            <option value="todo">Belum Dikerjakan</option>
+            <option value="in_progress">Sedang Berjalan</option>
+            <option value="done">Selesai</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" for="task-note">Catatan</label>
+          <textarea id="task-note" rows="3" class="field-input resize-none" placeholder="Catatan pekerjaan…"></textarea>
+        </div>
+        <div>
+          <label class="field-label" for="task-photo">Upload Foto Pekerjaan</label>
+          <label for="task-photo" class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-hairline hover:border-ink transition-colors py-8 cursor-pointer text-center">
+            <svg viewBox="0 0 24 24" fill="none" class="w-6 h-6 text-smoke" stroke="currentColor" stroke-width="1.5">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+            <span class="font-mono text-[10px] text-smoke uppercase tracking-widest">Klik untuk pilih foto</span>
+            <input id="task-photo" type="file" accept="image/*" capture="environment" multiple class="hidden" />
+          </label>
+          <p id="task-photo-filename" class="font-mono text-[10px] text-smoke mt-1.5"></p>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
+        <button id="task-modal-cancel" type="button" class="btn-secondary text-xs">Batal</button>
+        <button id="task-modal-save" type="button" class="btn-primary text-xs">Simpan</button>
+      </div>
+    </div>
+  </div>
+</EmployeeLayout>
+
+<script>
+  // Prototype UI only — belum terhubung ke endpoint tasks employee.
+  function openModal(): void {
+    document.getElementById("task-modal")?.classList.remove("hidden");
+    document.getElementById("task-modal")?.classList.add("flex");
+  }
+  function closeModal(): void {
+    document.getElementById("task-modal")?.classList.add("hidden");
+    document.getElementById("task-modal")?.classList.remove("flex");
+  }
+
+  document.getElementById("task-modal-close")?.addEventListener("click", closeModal);
+  document.getElementById("task-modal-cancel")?.addEventListener("click", closeModal);
+  document.getElementById("task-modal-save")?.addEventListener("click", () => {
+    closeModal();
+    window.showToast?.("Update tugas tersimpan (prototype)", "success");
+  });
+
+  document.getElementById("task-photo")?.addEventListener("change", (e) => {
+    const input = e.target as HTMLInputElement;
+    const label = document.getElementById("task-photo-filename");
+    if (label) {
+      label.textContent = input.files && input.files.length > 0
+        ? `${input.files.length} foto dipilih`
+        : "";
+    }
+  });
+</script>

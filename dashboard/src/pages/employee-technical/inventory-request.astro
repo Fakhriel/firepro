@@ -1,0 +1,116 @@
+---
+import EmployeeLayout from "../../layouts/EmployeeLayout.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import StatCard from "../../components/StatCard.astro";
+---
+
+<EmployeeLayout title="Inventory Request" activeNav="inventory-request">
+  <PageHeader heading="Inventory Request" sub="Ajukan permintaan alat & material kerja" crumbs={[{ label: "Kerja Lapangan" }, { label: "Inventory Request" }]} />
+
+  <!-- Stat cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-request-total" label="Total Request" accent />
+    <StatCard id="stat-request-pending" label="Menunggu Persetujuan" />
+    <StatCard id="stat-request-approved" label="Disetujui" />
+    <StatCard id="stat-request-rejected" label="Ditolak" />
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6 mb-8">
+    <!-- Form -->
+    <form id="inventory-request-form" class="panel lg:col-span-2 h-fit">
+      <div class="px-5 py-4 border-b-2 border-ink">
+        <h3 class="font-display text-lg text-ink leading-none">Ajukan Permintaan</h3>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Alat / material yang dibutuhkan</p>
+      </div>
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="field-label" for="request-item">Nama Alat / Material</label>
+          <input id="request-item" type="text" class="field-input" placeholder="Contoh: APAR 3kg, detector asap" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="field-label" for="request-qty">Jumlah</label>
+            <input id="request-qty" type="number" min="1" value="1" class="field-input" />
+          </div>
+          <div>
+            <label class="field-label" for="request-urgency">Urgensi</label>
+            <select id="request-urgency" class="field-input">
+              <option value="normal">Normal</option>
+              <option value="urgent">Mendesak</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="field-label" for="request-note">Catatan</label>
+          <textarea id="request-note" rows="3" class="field-input resize-none" placeholder="Keterangan tambahan (opsional)…"></textarea>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
+        <button type="reset" class="btn-secondary text-xs">Reset</button>
+        <button type="submit" class="btn-primary text-xs">Ajukan Request</button>
+      </div>
+    </form>
+
+    <!-- Info panel -->
+    <div class="panel lg:col-span-3">
+      <div class="px-5 py-4 border-b-2 border-ink">
+        <h3 class="font-display text-lg text-ink leading-none">Alur Persetujuan</h3>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Status permintaan Anda</p>
+      </div>
+      <div class="p-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="flex flex-col items-center text-center gap-2 border border-hairline px-4 py-5">
+          <span class="badge badge-inactive">Pending</span>
+          <p class="text-xs text-smoke">Menunggu ditinjau admin gudang</p>
+        </div>
+        <div class="flex flex-col items-center text-center gap-2 border border-hairline px-4 py-5">
+          <span class="badge badge-active">Disetujui</span>
+          <p class="text-xs text-smoke">Alat sedang disiapkan / diambil</p>
+        </div>
+        <div class="flex flex-col items-center text-center gap-2 border border-hairline px-4 py-5">
+          <span class="badge" style="color: var(--color-signal); border-color: var(--color-signal);">Ditolak</span>
+          <p class="text-xs text-smoke">Perlu koordinasi ulang dengan admin</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="panel overflow-hidden">
+    <div class="px-5 py-4 border-b-2 border-ink">
+      <h3 class="font-display text-lg text-ink leading-none">Riwayat Permintaan</h3>
+      <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Semua request yang pernah diajukan</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table id="request-table" class="data-table">
+        <thead>
+          <tr>
+            <th>Alat / Material</th>
+            <th class="hidden sm:table-cell">Jumlah</th>
+            <th class="hidden sm:table-cell">Urgensi</th>
+            <th class="hidden md:table-cell">Tanggal</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="request-body"></tbody>
+      </table>
+    </div>
+    <div id="request-empty" class="empty-state min-h-52">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+      </svg>
+      <p>Belum ada permintaan yang diajukan</p>
+    </div>
+  </div>
+</EmployeeLayout>
+
+<script>
+  // Prototype UI only — belum terhubung ke endpoint inventory request.
+  document.getElementById("inventory-request-form")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    window.showToast?.("Permintaan alat terkirim (prototype)", "success");
+    (e.target as HTMLFormElement).reset();
+  });
+</script>
