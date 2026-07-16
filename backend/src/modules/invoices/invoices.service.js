@@ -70,6 +70,9 @@ function validateInput(body, { partial = false } = {}) {
   if (!partial || clientId !== undefined) {
     if (!clientId) throw badRequest('clientId wajib diisi.');
   }
+  if (!partial || projectId !== undefined) {
+    if (!projectId) throw badRequest('projectId wajib diisi.');
+  }
   if (!partial || amount !== undefined) {
     if (amount === undefined || amount === null || Number.isNaN(Number(amount)) || Number(amount) < 0) {
       throw badRequest('amount wajib diisi dan harus angka >= 0.');
@@ -84,7 +87,7 @@ function validateInput(body, { partial = false } = {}) {
 
   return {
     ...(clientId !== undefined && { clientId }),
-    ...(projectId !== undefined && { projectId: projectId ?? null }),
+    ...(projectId !== undefined && { projectId }),
     ...(amount !== undefined && { amount: Number(amount) }),
     ...(status !== undefined && { status }),
     ...(issuedDate !== undefined && { issuedDate }),
