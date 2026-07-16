@@ -33,10 +33,11 @@ const Invoice = sequelize.define('Invoice', {
   tableName: 'invoices',
 });
 
-Invoice.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
+Invoice.belongsTo(Client, { foreignKey: { name: 'clientId', allowNull: false }, as: 'client' });
 Client.hasMany(Invoice, { foreignKey: 'clientId', as: 'invoices' });
 
-Invoice.belongsTo(Project, { foreignKey: 'projectId', as: 'project' });
+
+Invoice.belongsTo(Project, { foreignKey: { name: 'projectId', allowNull: false }, as: 'project' });
 Project.hasMany(Invoice, { foreignKey: 'projectId', as: 'invoices' });
 
 module.exports = { Invoice };
