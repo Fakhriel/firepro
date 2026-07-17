@@ -1,0 +1,137 @@
+---
+import SupervisorLayout from "../../layouts/SupervisorLayout.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import StatCard from "../../components/StatCard.astro";
+---
+
+<SupervisorLayout title="Maintenance" activeNav="maintenance">
+  <PageHeader heading="Maintenance" sub="Jadwal perawatan sistem proteksi kebakaran" crumbs={[{ label: "Fokus Lapangan" }, { label: "Maintenance" }]} />
+
+  <!-- Stat cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-maintenance-active" label="Jadwal Aktif" accent />
+    <StatCard id="stat-maintenance-due-soon" label="Jatuh Tempo Minggu Ini" />
+    <StatCard id="stat-maintenance-overdue" label="Terlambat" />
+    <StatCard id="stat-maintenance-completed" label="Selesai Bulan Ini" />
+  </div>
+
+  <!-- Filter -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-5">
+    <input id="search-maintenance" type="search" placeholder="Cari klien / lokasi / peralatan…" class="field-input sm:max-w-xs" />
+    <select id="filter-maintenance-status" class="field-input sm:w-44">
+      <option value="">Semua Status</option>
+      <option value="scheduled">Terjadwal</option>
+      <option value="due_soon">Segera Jatuh Tempo</option>
+      <option value="overdue">Terlambat</option>
+      <option value="completed">Selesai</option>
+    </select>
+  </div>
+
+  <!-- Table -->
+  <div class="panel overflow-hidden">
+    <div class="overflow-x-auto">
+      <table id="maintenance-table" class="data-table">
+        <thead>
+          <tr>
+            <th>Klien / Lokasi</th>
+            <th class="hidden sm:table-cell">Peralatan</th>
+            <th class="hidden md:table-cell">Jadwal Berikutnya</th>
+            <th class="hidden md:table-cell">Teknisi</th>
+            <th>Status</th>
+            <th class="text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="maintenance-body"></tbody>
+      </table>
+    </div>
+    <div id="maintenance-empty" class="empty-state min-h-56">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+      </svg>
+      <p>Belum ada jadwal maintenance</p>
+    </div>
+    <div class="flex items-center justify-between px-4 py-3 border-t border-hairline">
+      <span data-maintenance-count class="font-mono text-[10px] text-smoke">0 jadwal</span>
+      <div class="flex items-center gap-1">
+        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>←</button>
+        <span class="font-mono text-xs px-3 py-1.5 border border-hairline">1</span>
+        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>→</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail / assign modal -->
+  <div id="maintenance-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
+    <div class="panel w-full max-w-lg bg-paper">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+        <h3 class="font-display text-lg text-ink leading-none">Detail Maintenance</h3>
+        <button id="maintenance-modal-close" type="button" class="text-smoke hover:text-ink transition-colors" aria-label="Tutup">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="field-label" for="maintenance-technician-select">Assign Teknisi</label>
+          <select id="maintenance-technician-select" class="field-input">
+            <option value="">Pilih teknisi…</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" for="maintenance-note">Catatan Pekerjaan</label>
+          <textarea id="maintenance-note" rows="3" class="field-input resize-none" placeholder="Catatan hasil pemeriksaan / servis…"></textarea>
+        </div>
+        <div>
+          <label class="field-label" for="maintenance-photo">Upload Dokumentasi</label>
+          <label for="maintenance-photo" class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-hairline hover:border-ink transition-colors py-8 cursor-pointer text-center">
+            <svg viewBox="0 0 24 24" fill="none" class="w-6 h-6 text-smoke" stroke="currentColor" stroke-width="1.5">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+            <span class="font-mono text-[10px] text-smoke uppercase tracking-widest">Klik untuk pilih foto</span>
+            <input id="maintenance-photo" type="file" accept="image/*" capture="environment" multiple class="hidden" />
+          </label>
+          <p id="maintenance-photo-filename" class="font-mono text-[10px] text-smoke mt-1.5"></p>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
+        <button id="maintenance-modal-cancel" type="button" class="btn-secondary text-xs">Batal</button>
+        <button id="maintenance-mark-done" type="button" class="btn-primary text-xs gap-1.5" style="background-color: var(--color-armed, #1f7a4d); border-color: var(--color-armed, #1f7a4d);">
+          Tandai Selesai
+        </button>
+      </div>
+    </div>
+  </div>
+</SupervisorLayout>
+
+<script>
+  // Prototype UI only — belum terhubung ke endpoint maintenance.
+  const modal = document.getElementById("maintenance-modal");
+  function openModal(): void {
+    modal?.classList.remove("hidden");
+    modal?.classList.add("flex");
+  }
+  function closeModal(): void {
+    modal?.classList.add("hidden");
+    modal?.classList.remove("flex");
+  }
+  document.getElementById("maintenance-modal-close")?.addEventListener("click", closeModal);
+  document.getElementById("maintenance-modal-cancel")?.addEventListener("click", closeModal);
+  document.getElementById("maintenance-mark-done")?.addEventListener("click", () => {
+    closeModal();
+    window.showToast?.("Maintenance ditandai selesai (prototype)", "success");
+  });
+
+  document.getElementById("maintenance-photo")?.addEventListener("change", (e) => {
+    const input = e.target as HTMLInputElement;
+    const label = document.getElementById("maintenance-photo-filename");
+    if (label) {
+      label.textContent = input.files && input.files.length > 0
+        ? `${input.files.length} foto dipilih`
+        : "";
+    }
+  });
+
+  document.getElementById("maintenance-body")?.addEventListener("click", () => openModal());
+</script>

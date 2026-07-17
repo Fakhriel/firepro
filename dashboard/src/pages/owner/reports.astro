@@ -1,0 +1,113 @@
+---
+import OwnerLayout from "../../layouts/OwnerLayout.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import StatCard from "../../components/StatCard.astro";
+---
+
+<OwnerLayout title="Reports" activeNav="reports">
+  <PageHeader heading="Reports" sub="Laporan ROI — monitoring performa bisnis" crumbs={[{ label: "Gudang & Analitik" }, { label: "Reports" }]}>
+    <select id="report-period" class="field-input text-xs w-40">
+      <option value="this_month">Bulan Ini</option>
+      <option value="last_month">Bulan Lalu</option>
+      <option value="this_quarter">Kuartal Ini</option>
+      <option value="this_year">Tahun Ini</option>
+    </select>
+    <button id="btn-export-report" type="button" class="btn-primary text-xs gap-1.5">
+      <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/>
+        <line x1="9" y1="15" x2="15" y2="15"/>
+      </svg>
+      Export Laporan
+    </button>
+  </PageHeader>
+
+  <!-- Stat cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-report-revenue" label="Total Revenue" accent />
+    <StatCard id="stat-report-cost" label="Total Biaya" />
+    <StatCard id="stat-report-profit" label="Gross Profit" />
+    <StatCard id="stat-report-roi" label="ROI %" />
+  </div>
+
+  <!-- Chart -->
+  <div class="panel mb-8">
+    <div class="px-5 py-4 border-b-2 border-ink">
+      <h3 class="font-display text-lg text-ink leading-none">Omzet vs Biaya vs Laba</h3>
+      <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Tren 12 bulan terakhir</p>
+    </div>
+    <div id="report-chart-empty" class="empty-state min-h-64">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+      </svg>
+      <p>Grafik akan tampil setelah data terhubung</p>
+    </div>
+  </div>
+
+  <!-- Breakdown per project -->
+  <div class="panel overflow-hidden mb-8">
+    <div class="px-5 py-4 border-b-2 border-ink">
+      <h3 class="font-display text-lg text-ink leading-none">Profitabilitas per Proyek</h3>
+      <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Kontribusi laba tiap proyek</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table id="project-profit-table" class="data-table">
+        <thead>
+          <tr>
+            <th>Proyek</th>
+            <th class="hidden sm:table-cell">Klien</th>
+            <th>Omzet</th>
+            <th>Biaya</th>
+            <th>Laba</th>
+            <th class="hidden md:table-cell">Margin</th>
+          </tr>
+        </thead>
+        <tbody id="project-profit-body"></tbody>
+      </table>
+    </div>
+    <div id="project-profit-empty" class="empty-state min-h-52">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M5.5 8H18.5L19.5 21H4.5L5.5 8Z"/>
+        <path d="M8.5 8V6C8.5 4.067 9.567 3 12 3C14.433 3 15.5 4.067 15.5 6V8"/>
+      </svg>
+      <p>Belum ada data profitabilitas proyek</p>
+    </div>
+  </div>
+
+  <!-- Cashflow breakdown -->
+  <div class="panel overflow-hidden">
+    <div class="px-5 py-4 border-b-2 border-ink">
+      <h3 class="font-display text-lg text-ink leading-none">Rincian Transaksi</h3>
+      <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Pemasukan & pengeluaran periode ini</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table id="report-table" class="data-table">
+        <thead>
+          <tr>
+            <th>Tanggal</th>
+            <th>Kategori</th>
+            <th class="hidden sm:table-cell">Keterangan</th>
+            <th>Jumlah</th>
+          </tr>
+        </thead>
+        <tbody id="report-body"></tbody>
+      </table>
+    </div>
+    <div id="report-empty" class="empty-state min-h-52">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      </svg>
+      <p>Belum ada transaksi tercatat</p>
+    </div>
+  </div>
+</OwnerLayout>
+
+<script>
+  // Prototype UI only — belum terhubung ke endpoint reports.
+  document.getElementById("btn-export-report")?.addEventListener("click", () => {
+    window.showToast?.("Laporan diekspor (prototype)", "success");
+  });
+  document.getElementById("report-period")?.addEventListener("change", () => {
+    window.showToast?.("Periode laporan diperbarui (prototype)", "info");
+  });
+</script>

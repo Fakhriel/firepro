@@ -1,0 +1,245 @@
+---
+import SupervisorLayout from "../../layouts/SupervisorLayout.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import StatCard from "../../components/StatCard.astro";
+---
+
+<SupervisorLayout title="Projects" activeNav="projects">
+  <PageHeader heading="Projects" sub="Proyek lapangan yang perlu diawasi" crumbs={[{ label: "Fokus Lapangan" }, { label: "Projects" }]} />
+
+  <!-- Stat cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-projects-total" label="Total Proyek" accent />
+    <StatCard id="stat-projects-running" label="Sedang Berjalan" />
+    <StatCard id="stat-projects-approval" label="Menunggu Approval" />
+    <StatCard id="stat-projects-done" label="Selesai Bulan Ini" />
+  </div>
+
+  <!-- Filter -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-5">
+    <input id="search-projects" type="search" placeholder="Cari nama proyek / lokasi…" class="field-input sm:max-w-xs" />
+    <select id="filter-status" class="field-input sm:w-44">
+      <option value="">Semua Status</option>
+      <option value="planning">Perencanaan</option>
+      <option value="in_progress">Berjalan</option>
+      <option value="pending_approval">Menunggu Approval</option>
+      <option value="completed">Selesai</option>
+      <option value="on_hold">Ditunda</option>
+    </select>
+  </div>
+
+  <!-- Table -->
+  <div class="panel overflow-hidden">
+    <div class="overflow-x-auto">
+      <table id="projects-table" class="data-table">
+        <thead>
+          <tr>
+            <th>Nama Proyek</th>
+            <th class="hidden sm:table-cell">Lokasi</th>
+            <th class="hidden md:table-cell">Teknisi</th>
+            <th>Progres</th>
+            <th>Status</th>
+            <th class="text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="projects-body"></tbody>
+      </table>
+    </div>
+    <div id="projects-empty" class="empty-state min-h-56">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M5.5 8H18.5L19.5 21H4.5L5.5 8Z"/>
+        <path d="M8.5 8V6C8.5 4.067 9.567 3 12 3C14.433 3 15.5 4.067 15.5 6V8"/>
+      </svg>
+      <p>Belum ada proyek yang ditugaskan ke tim Anda</p>
+    </div>
+    <div class="flex items-center justify-between px-4 py-3 border-t border-hairline">
+      <span data-projects-count class="font-mono text-[10px] text-smoke">0 proyek</span>
+      <div class="flex items-center gap-1">
+        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>←</button>
+        <span class="font-mono text-xs px-3 py-1.5 border border-hairline">1</span>
+        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>→</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Project Detail Drawer -->
+  <div id="project-drawer" class="fixed inset-y-0 right-0 z-50 w-full sm:w-[440px] bg-paper border-l-2 border-ink translate-x-full transition-transform duration-300 ease-out flex flex-col">
+    <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink shrink-0">
+      <h2 class="font-display text-xl text-ink">Detail Proyek</h2>
+      <button id="drawer-close" type="button" class="text-smoke hover:text-ink p-1">
+        <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-5">
+      <div class="empty-state min-h-40">
+        <p>Pilih proyek untuk melihat detail</p>
+      </div>
+
+      <!-- Static prototype sections (selalu ada, siap diisi data nanti) -->
+      <div class="space-y-6 mt-6">
+        <div>
+          <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-2">Teknisi Ditugaskan</p>
+          <div id="assigned-technicians" class="flex flex-wrap gap-2 mb-2">
+            <span class="font-mono text-[10px] text-smoke">Belum ada teknisi ditugaskan</span>
+          </div>
+          <button id="btn-assign-technician" type="button" class="btn-secondary text-xs gap-1.5">
+            <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Assign Teknisi
+          </button>
+        </div>
+
+        <hr class="border-hairline" />
+
+        <div>
+          <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-2">Update Progres</p>
+          <div class="flex items-center gap-3 mb-2">
+            <input id="progress-slider" type="range" min="0" max="100" value="0" step="5" class="w-full accent-signal" />
+            <span id="progress-value" class="font-mono text-sm text-ink w-12 text-right">0%</span>
+          </div>
+          <div class="w-full h-2 bg-hairline mb-3">
+            <div id="progress-bar-fill" class="h-2 bg-signal transition-all duration-200" style="width: 0%"></div>
+          </div>
+          <button id="btn-save-progress" type="button" class="btn-primary text-xs w-full justify-center">
+            Simpan Progres
+          </button>
+        </div>
+
+        <hr class="border-hairline" />
+
+        <div>
+          <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-2">Upload Dokumentasi</p>
+          <label for="drawer-photo" class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-hairline hover:border-ink transition-colors py-8 cursor-pointer text-center">
+            <svg viewBox="0 0 24 24" fill="none" class="w-6 h-6 text-smoke" stroke="currentColor" stroke-width="1.5">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+            <span class="font-mono text-[10px] text-smoke uppercase tracking-widest">Klik untuk pilih foto</span>
+            <input id="drawer-photo" type="file" accept="image/*" capture="environment" multiple class="hidden" />
+          </label>
+          <p id="drawer-photo-filename" class="font-mono text-[10px] text-smoke mt-1.5"></p>
+        </div>
+
+        <hr class="border-hairline" />
+
+        <div>
+          <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-2">Approval</p>
+          <button id="btn-approve-project" type="button" class="btn-primary w-full justify-center gap-1.5" style="background-color: var(--color-armed, #1f7a4d); border-color: var(--color-armed, #1f7a4d);">
+            <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="2">
+              <path d="M20 6L9 17l-5-5"/>
+            </svg>
+            Approve Pekerjaan Selesai
+          </button>
+          <p class="font-mono text-[9px] text-smoke mt-2">Hanya aktif jika progres pekerjaan sudah mencapai 100%.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="drawer-overlay" class="fixed inset-0 bg-ink/40 z-40 hidden"></div>
+
+  <!-- Assign technician modal -->
+  <div id="assign-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
+    <div class="panel w-full max-w-sm bg-paper">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+        <h3 class="font-display text-lg text-ink leading-none">Assign Teknisi</h3>
+        <button id="assign-modal-close" type="button" class="text-smoke hover:text-ink transition-colors" aria-label="Tutup">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="field-label" for="assign-technician-select">Pilih Teknisi</label>
+          <select id="assign-technician-select" class="field-input">
+            <option value="">Pilih teknisi…</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" for="assign-note">Catatan Penugasan</label>
+          <textarea id="assign-note" rows="3" class="field-input resize-none" placeholder="Instruksi tambahan untuk teknisi (opsional)…"></textarea>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
+        <button id="assign-modal-cancel" type="button" class="btn-secondary text-xs">Batal</button>
+        <button id="assign-modal-save" type="button" class="btn-primary text-xs">Assign</button>
+      </div>
+    </div>
+  </div>
+</SupervisorLayout>
+
+<script>
+  // Prototype UI only — belum terhubung ke endpoint projects supervisor.
+  const drawer = document.getElementById("project-drawer");
+  const overlay = document.getElementById("drawer-overlay");
+
+  function openDrawer(): void {
+    drawer?.classList.remove("translate-x-full");
+    overlay?.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+  }
+  function closeDrawer(): void {
+    drawer?.classList.add("translate-x-full");
+    overlay?.classList.add("hidden");
+    document.body.style.overflow = "";
+  }
+  document.getElementById("drawer-close")?.addEventListener("click", closeDrawer);
+  overlay?.addEventListener("click", closeDrawer);
+
+  // Progress slider
+  const slider = document.getElementById("progress-slider") as HTMLInputElement | null;
+  const progressValue = document.getElementById("progress-value");
+  const progressFill = document.getElementById("progress-bar-fill");
+  slider?.addEventListener("input", () => {
+    if (progressValue) progressValue.textContent = `${slider.value}%`;
+    if (progressFill) progressFill.style.width = `${slider.value}%`;
+  });
+  document.getElementById("btn-save-progress")?.addEventListener("click", () => {
+    window.showToast?.(`Progres disimpan: ${slider?.value ?? 0}% (prototype)`, "success");
+  });
+
+  // Documentation upload
+  document.getElementById("drawer-photo")?.addEventListener("change", (e) => {
+    const input = e.target as HTMLInputElement;
+    const label = document.getElementById("drawer-photo-filename");
+    if (label) {
+      label.textContent = input.files && input.files.length > 0
+        ? `${input.files.length} foto dipilih`
+        : "";
+    }
+  });
+
+  // Approve completed work
+  document.getElementById("btn-approve-project")?.addEventListener("click", () => {
+    const progress = Number(slider?.value ?? 0);
+    if (progress < 100) {
+      window.showToast?.("Progres belum 100%, belum bisa di-approve", "error");
+      return;
+    }
+    window.showToast?.("Pekerjaan disetujui sebagai selesai (prototype)", "success");
+  });
+
+  // Assign technician modal
+  const assignModal = document.getElementById("assign-modal");
+  function openAssignModal(): void {
+    assignModal?.classList.remove("hidden");
+    assignModal?.classList.add("flex");
+  }
+  function closeAssignModal(): void {
+    assignModal?.classList.add("hidden");
+    assignModal?.classList.remove("flex");
+  }
+  document.getElementById("btn-assign-technician")?.addEventListener("click", openAssignModal);
+  document.getElementById("assign-modal-close")?.addEventListener("click", closeAssignModal);
+  document.getElementById("assign-modal-cancel")?.addEventListener("click", closeAssignModal);
+  document.getElementById("assign-modal-save")?.addEventListener("click", () => {
+    closeAssignModal();
+    window.showToast?.("Teknisi berhasil di-assign (prototype)", "success");
+  });
+
+  // Table row click → open drawer (prototype: klik baris manapun akan membuka drawer kosong)
+  document.getElementById("projects-body")?.addEventListener("click", () => openDrawer());
+</script>

@@ -1,0 +1,104 @@
+---
+import OwnerLayout from "../../layouts/OwnerLayout.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import StatCard from "../../components/StatCard.astro";
+---
+
+<OwnerLayout title="Dashboard" activeNav="dashboard">
+  <PageHeader heading="Dashboard" sub="Ringkasan performa bisnis FIREPRO" />
+
+  <!-- Financial stat cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-omzet" label="Omzet Bulan Ini" accent />
+    <StatCard id="stat-laba" label="Laba Bersih" />
+    <StatCard id="stat-projects-active" label="Proyek Aktif" />
+    <StatCard id="stat-users-active" label="User Aktif" />
+  </div>
+
+  <!-- Quick actions -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-8">
+    <a href="/owner/users" class="panel flex items-center gap-3 px-5 py-4 hover:brutal-shadow-sm transition-shadow duration-150">
+      <div class="w-9 h-9 shrink-0 bg-ink text-paper flex items-center justify-center">
+        <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </div>
+      <div class="min-w-0">
+        <p class="font-body text-sm font-semibold text-ink">Kelola User & Role</p>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-0.5">Users</p>
+      </div>
+    </a>
+    <a href="/owner/inventory" class="panel flex items-center gap-3 px-5 py-4 hover:brutal-shadow-sm transition-shadow duration-150">
+      <div class="w-9 h-9 shrink-0 bg-ink text-paper flex items-center justify-center">
+        <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
+          <path d="M20 6L9 17l-5-5"/>
+        </svg>
+      </div>
+      <div class="min-w-0">
+        <p class="font-body text-sm font-semibold text-ink">Approve Pembelian</p>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-0.5">Inventory</p>
+      </div>
+    </a>
+    <a href="/owner/reports" class="panel flex items-center gap-3 px-5 py-4 hover:brutal-shadow-sm transition-shadow duration-150">
+      <div class="w-9 h-9 shrink-0 bg-ink text-paper flex items-center justify-center">
+        <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/>
+          <line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+      </div>
+      <div class="min-w-0">
+        <p class="font-body text-sm font-semibold text-ink">Export Laporan</p>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-0.5">Reports</p>
+      </div>
+    </a>
+  </div>
+
+  <!-- 2 col grid -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-8">
+    <div class="panel">
+      <div class="px-5 py-4 border-b-2 border-ink">
+        <h3 class="font-display text-lg text-ink leading-none">Omzet vs Biaya</h3>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">6 bulan terakhir</p>
+      </div>
+      <div id="dashboard-chart-empty" class="empty-state min-h-56">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+        <p>Grafik akan tampil setelah data terhubung</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="px-5 py-4 border-b-2 border-ink">
+        <h3 class="font-display text-lg text-ink leading-none">Menunggu Persetujuan</h3>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Pembelian barang & permintaan lain</p>
+      </div>
+      <div id="dashboard-approval-empty" class="empty-state min-h-56">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M20 6L9 17l-5-5"/>
+        </svg>
+        <p>Tidak ada persetujuan yang menunggu</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Proyek berjalan -->
+  <div class="panel">
+    <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+      <div>
+        <h3 class="font-display text-lg text-ink leading-none">Semua Proyek Berjalan</h3>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Lintas tim & supervisor</p>
+      </div>
+      <a href="/owner/projects" class="font-mono text-[10px] text-smoke border border-hairline px-2 py-1 hover:text-ink hover:border-ink transition-colors">Lihat Semua</a>
+    </div>
+    <div id="dashboard-projects-empty" class="empty-state min-h-52">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M5.5 8H18.5L19.5 21H4.5L5.5 8Z"/>
+        <path d="M8.5 8V6C8.5 4.067 9.567 3 12 3C14.433 3 15.5 4.067 15.5 6V8"/>
+      </svg>
+      <p>Belum ada proyek berjalan</p>
+    </div>
+  </div>
+</OwnerLayout>

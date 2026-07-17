@@ -1,0 +1,92 @@
+---
+import EmployeeLayout from "../../layouts/EmployeeLayout.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import StatCard from "../../components/StatCard.astro";
+---
+
+<EmployeeLayout title="Dashboard" activeNav="dashboard">
+  <PageHeader heading="Dashboard" sub="Ringkasan aktivitas kerja Anda hari ini" />
+
+  <!-- Stat cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-tasks-today" label="Tugas Hari Ini" accent />
+    <StatCard id="stat-attendance-status" label="Status Absensi" />
+    <StatCard id="stat-reports-pending" label="Laporan Tertunda" />
+    <StatCard id="stat-requests-active" label="Request Alat Aktif" />
+  </div>
+
+  <!-- Quick actions -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-8">
+    <a href="/employee-technical/attendance" class="panel flex items-center gap-3 px-5 py-4 hover:brutal-shadow-sm transition-shadow duration-150">
+      <div class="w-9 h-9 shrink-0 bg-ink text-paper flex items-center justify-center">
+        <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
+          <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/>
+        </svg>
+      </div>
+      <div class="min-w-0">
+        <p class="font-body text-sm font-semibold text-ink">Check In / Check Out</p>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-0.5">Absensi Hari Ini</p>
+      </div>
+    </a>
+    <a href="/employee-technical/daily-report" class="panel flex items-center gap-3 px-5 py-4 hover:brutal-shadow-sm transition-shadow duration-150">
+      <div class="w-9 h-9 shrink-0 bg-ink text-paper flex items-center justify-center">
+        <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>
+        </svg>
+      </div>
+      <div class="min-w-0">
+        <p class="font-body text-sm font-semibold text-ink">Isi Laporan Harian</p>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-0.5">Daily Report</p>
+      </div>
+    </a>
+    <a href="/employee-technical/inventory-request" class="panel flex items-center gap-3 px-5 py-4 hover:brutal-shadow-sm transition-shadow duration-150">
+      <div class="w-9 h-9 shrink-0 bg-ink text-paper flex items-center justify-center">
+        <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+        </svg>
+      </div>
+      <div class="min-w-0">
+        <p class="font-body text-sm font-semibold text-ink">Request Alat</p>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-0.5">Inventory Request</p>
+      </div>
+    </a>
+  </div>
+
+  <!-- 2 col grid -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+
+    <!-- Tugas hari ini -->
+    <div class="panel">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+        <div>
+          <h3 class="font-display text-lg text-ink leading-none">Tugas Hari Ini</h3>
+          <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Ditugaskan kepada Anda</p>
+        </div>
+        <a href="/employee-technical/my-tasks" class="font-mono text-[10px] text-smoke border border-hairline px-2 py-1 hover:text-ink hover:border-ink transition-colors">Lihat Semua</a>
+      </div>
+      <div id="dashboard-tasks-empty" class="empty-state min-h-52">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M9 6h11M9 12h11M9 18h11"/>
+          <path d="M4.5 6l1 1 2-2M4.5 12l1 1 2-2M4.5 18l1 1 2-2"/>
+        </svg>
+        <p>Belum ada tugas untuk hari ini</p>
+      </div>
+    </div>
+
+    <!-- Aktivitas terbaru -->
+    <div class="panel">
+      <div class="px-5 py-4 border-b-2 border-ink">
+        <h3 class="font-display text-lg text-ink leading-none">Aktivitas Terbaru</h3>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Riwayat check-in, laporan, request</p>
+      </div>
+      <div id="dashboard-activity-empty" class="empty-state min-h-52">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/>
+        </svg>
+        <p>Belum ada aktivitas tercatat</p>
+      </div>
+    </div>
+  </div>
+</EmployeeLayout>

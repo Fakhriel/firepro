@@ -1,0 +1,78 @@
+---
+import OwnerLayout from "../../layouts/OwnerLayout.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import StatCard from "../../components/StatCard.astro";
+---
+
+<OwnerLayout title="Quotations" activeNav="quotations">
+  <PageHeader heading="Quotations" sub="Penawaran harga untuk calon proyek" crumbs={[{ label: "Operasional" }, { label: "Quotations" }]}>
+    <button id="btn-add-quotation" type="button" class="btn-primary text-xs gap-1.5">
+      <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Buat Penawaran
+    </button>
+  </PageHeader>
+
+  <!-- Stat cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-quotations-total" label="Total Penawaran" accent />
+    <StatCard id="stat-quotations-pending" label="Menunggu Respon" />
+    <StatCard id="stat-quotations-accepted" label="Disetujui" />
+    <StatCard id="stat-quotations-value" label="Nilai Total" />
+  </div>
+
+  <!-- Filter -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-5">
+    <input id="search-quotations" type="search" placeholder="Cari no. penawaran / klien…" class="field-input sm:max-w-xs" />
+    <select id="filter-quotation-status" class="field-input sm:w-44">
+      <option value="">Semua Status</option>
+      <option value="draft">Draft</option>
+      <option value="sent">Terkirim</option>
+      <option value="accepted">Disetujui</option>
+      <option value="rejected">Ditolak</option>
+    </select>
+  </div>
+
+  <!-- Table -->
+  <div class="panel overflow-hidden">
+    <div class="overflow-x-auto">
+      <table id="quotations-table" class="data-table">
+        <thead>
+          <tr>
+            <th>No. Penawaran</th>
+            <th>Klien</th>
+            <th class="hidden sm:table-cell">Tanggal</th>
+            <th>Nilai</th>
+            <th class="hidden md:table-cell">Berlaku Hingga</th>
+            <th>Status</th>
+            <th class="text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="quotations-body"></tbody>
+      </table>
+    </div>
+    <div id="quotations-empty" class="empty-state min-h-56">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>
+      </svg>
+      <p>Belum ada penawaran dibuat</p>
+    </div>
+    <div class="flex items-center justify-between px-4 py-3 border-t border-hairline">
+      <span data-quotations-count class="font-mono text-[10px] text-smoke">0 penawaran</span>
+      <div class="flex items-center gap-1">
+        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>←</button>
+        <span class="font-mono text-xs px-3 py-1.5 border border-hairline">1</span>
+        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>→</button>
+      </div>
+    </div>
+  </div>
+</OwnerLayout>
+
+<script>
+  // Prototype UI only — belum terhubung ke endpoint quotations.
+  document.getElementById("btn-add-quotation")?.addEventListener("click", () => {
+    window.showToast?.("Form buat penawaran (prototype)", "info");
+  });
+</script>

@@ -1,0 +1,165 @@
+---
+import SupervisorLayout from "../../layouts/SupervisorLayout.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import StatCard from "../../components/StatCard.astro";
+---
+
+<SupervisorLayout title="Inventory" activeNav="inventory">
+  <PageHeader heading="Inventory" sub="Stok alat & material untuk kebutuhan proyek" crumbs={[{ label: "Fokus Lapangan" }, { label: "Inventory" }]}>
+    <button id="btn-open-request" type="button" class="btn-primary text-xs gap-1.5">
+      <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Request Barang
+    </button>
+  </PageHeader>
+
+  <!-- Stat cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-item-total" label="Total Jenis Barang" accent />
+    <StatCard id="stat-item-low" label="Stok Menipis" />
+    <StatCard id="stat-request-pending" label="Request Pending" />
+    <StatCard id="stat-request-approved" label="Request Disetujui" />
+  </div>
+
+  <!-- Filter -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-5">
+    <input id="search-inventory" type="search" placeholder="Cari nama barang / kategori…" class="field-input sm:max-w-xs" />
+    <select id="filter-inventory-status" class="field-input sm:w-44">
+      <option value="">Semua Status</option>
+      <option value="available">Tersedia</option>
+      <option value="low">Stok Menipis</option>
+      <option value="out">Habis</option>
+    </select>
+  </div>
+
+  <!-- Stock table -->
+  <div class="panel overflow-hidden mb-8">
+    <div class="px-5 py-4 border-b-2 border-ink">
+      <h3 class="font-display text-lg text-ink leading-none">Stok Gudang</h3>
+      <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Alat & material tersedia</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table id="inventory-table" class="data-table">
+        <thead>
+          <tr>
+            <th>Nama Barang</th>
+            <th class="hidden sm:table-cell">Kategori</th>
+            <th>Stok</th>
+            <th class="hidden md:table-cell">Satuan</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="inventory-body"></tbody>
+      </table>
+    </div>
+    <div id="inventory-empty" class="empty-state min-h-52">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+      </svg>
+      <p>Belum ada data stok barang</p>
+    </div>
+  </div>
+
+  <!-- Request history -->
+  <div class="panel overflow-hidden">
+    <div class="px-5 py-4 border-b-2 border-ink">
+      <h3 class="font-display text-lg text-ink leading-none">Riwayat Request Barang</h3>
+      <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Permintaan untuk tim & proyek Anda</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table id="request-table" class="data-table">
+        <thead>
+          <tr>
+            <th>Alat / Material</th>
+            <th class="hidden sm:table-cell">Jumlah</th>
+            <th class="hidden sm:table-cell">Proyek Terkait</th>
+            <th class="hidden md:table-cell">Tanggal</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="request-body"></tbody>
+      </table>
+    </div>
+    <div id="request-empty" class="empty-state min-h-52">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>
+      </svg>
+      <p>Belum ada permintaan barang yang diajukan</p>
+    </div>
+  </div>
+
+  <!-- Request modal -->
+  <div id="request-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
+    <div class="panel w-full max-w-md bg-paper">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+        <h3 class="font-display text-lg text-ink leading-none">Request Barang</h3>
+        <button id="request-modal-close" type="button" class="text-smoke hover:text-ink transition-colors" aria-label="Tutup">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <form id="request-form">
+        <div class="p-5 space-y-4">
+          <div>
+            <label class="field-label" for="request-item">Nama Alat / Material</label>
+            <input id="request-item" type="text" class="field-input" placeholder="Contoh: APAR 3kg, pipa sprinkler 1 inch" />
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="field-label" for="request-qty">Jumlah</label>
+              <input id="request-qty" type="number" min="1" value="1" class="field-input" />
+            </div>
+            <div>
+              <label class="field-label" for="request-urgency">Urgensi</label>
+              <select id="request-urgency" class="field-input">
+                <option value="normal">Normal</option>
+                <option value="urgent">Mendesak</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="field-label" for="request-project">Proyek Terkait</label>
+            <select id="request-project" class="field-input">
+              <option value="">Pilih proyek…</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label" for="request-note">Catatan</label>
+            <textarea id="request-note" rows="3" class="field-input resize-none" placeholder="Keterangan tambahan (opsional)…"></textarea>
+          </div>
+        </div>
+        <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
+          <button type="button" id="request-modal-cancel" class="btn-secondary text-xs">Batal</button>
+          <button type="submit" class="btn-primary text-xs">Ajukan Request</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</SupervisorLayout>
+
+<script>
+  // Prototype UI only — belum terhubung ke endpoint inventory supervisor.
+  const modal = document.getElementById("request-modal");
+  function openModal(): void {
+    modal?.classList.remove("hidden");
+    modal?.classList.add("flex");
+  }
+  function closeModal(): void {
+    modal?.classList.add("hidden");
+    modal?.classList.remove("flex");
+  }
+  document.getElementById("btn-open-request")?.addEventListener("click", openModal);
+  document.getElementById("request-modal-close")?.addEventListener("click", closeModal);
+  document.getElementById("request-modal-cancel")?.addEventListener("click", closeModal);
+
+  document.getElementById("request-form")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    closeModal();
+    (e.target as HTMLFormElement).reset();
+    window.showToast?.("Permintaan barang terkirim (prototype)", "success");
+  });
+</script>

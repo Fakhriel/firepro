@@ -1,0 +1,141 @@
+---
+import OwnerLayout from "../../layouts/OwnerLayout.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import StatCard from "../../components/StatCard.astro";
+---
+
+<OwnerLayout title="Inventory" activeNav="inventory">
+  <PageHeader heading="Inventory" sub="Kelola material & peralatan FIREPRO" crumbs={[{ label: "Gudang" }, { label: "Inventory" }]}>
+    <button id="btn-add-item" type="button" class="btn-primary text-xs gap-1.5">
+      <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Tambah Barang
+    </button>
+  </PageHeader>
+
+  <!-- Stat cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-item-total" label="Total Jenis Barang" accent />
+    <StatCard id="stat-item-low" label="Stok Menipis" />
+    <StatCard id="stat-purchase-pending" label="Menunggu Approval" />
+    <StatCard id="stat-inventory-value" label="Nilai Total Stok" />
+  </div>
+
+  <!-- Stock table -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-5">
+    <input id="search-inventory" type="search" placeholder="Cari barang / kategori…" class="field-input sm:max-w-xs" />
+    <select id="filter-inventory-status" class="field-input sm:w-44">
+      <option value="">Semua Status</option>
+      <option value="available">Tersedia</option>
+      <option value="low">Stok Menipis</option>
+      <option value="out">Habis</option>
+    </select>
+  </div>
+
+  <div class="panel overflow-hidden mb-8">
+    <div class="overflow-x-auto">
+      <table id="inventory-table" class="data-table">
+        <thead>
+          <tr>
+            <th>Barang</th>
+            <th class="hidden sm:table-cell">Kategori</th>
+            <th>Stok</th>
+            <th class="hidden md:table-cell">Harga Satuan</th>
+            <th>Status</th>
+            <th class="text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="inventory-body"></tbody>
+      </table>
+    </div>
+    <div id="inventory-empty" class="empty-state min-h-52">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+      </svg>
+      <p>Belum ada data barang</p>
+    </div>
+  </div>
+
+  <!-- Purchase requests needing approval -->
+  <div class="panel overflow-hidden">
+    <div class="px-5 py-4 border-b-2 border-ink">
+      <h3 class="font-display text-lg text-ink leading-none">Permintaan Pembelian Barang</h3>
+      <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Diajukan oleh supervisor / teknisi lapangan</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table id="purchase-table" class="data-table">
+        <thead>
+          <tr>
+            <th>Alat / Material</th>
+            <th class="hidden sm:table-cell">Jumlah</th>
+            <th class="hidden sm:table-cell">Diajukan Oleh</th>
+            <th class="hidden md:table-cell">Tanggal</th>
+            <th>Status</th>
+            <th class="text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="purchase-body"></tbody>
+      </table>
+    </div>
+    <div id="purchase-empty" class="empty-state min-h-52">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M20 6L9 17l-5-5"/>
+      </svg>
+      <p>Tidak ada permintaan pembelian yang menunggu</p>
+    </div>
+  </div>
+
+  <!-- Approve/reject modal -->
+  <div id="purchase-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
+    <div class="panel w-full max-w-sm bg-paper">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+        <h3 class="font-display text-lg text-ink leading-none">Tinjau Permintaan</h3>
+        <button id="purchase-modal-close" type="button" class="text-smoke hover:text-ink transition-colors" aria-label="Tutup">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="field-label" for="purchase-note">Catatan Persetujuan</label>
+          <textarea id="purchase-note" rows="3" class="field-input resize-none" placeholder="Catatan (opsional)…"></textarea>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
+        <button id="btn-reject-purchase" type="button" class="btn-danger text-xs">Tolak</button>
+        <button id="btn-approve-purchase" type="button" class="btn-primary text-xs" style="background-color: var(--color-armed, #1f7a4d); border-color: var(--color-armed, #1f7a4d);">Setujui</button>
+      </div>
+    </div>
+  </div>
+</OwnerLayout>
+
+<script>
+  // Prototype UI only — belum terhubung ke endpoint inventory/purchase-approval.
+  document.getElementById("btn-add-item")?.addEventListener("click", () => {
+    window.showToast?.("Form tambah barang (prototype)", "info");
+  });
+
+  const modal = document.getElementById("purchase-modal");
+  function openModal(): void {
+    modal?.classList.remove("hidden");
+    modal?.classList.add("flex");
+  }
+  function closeModal(): void {
+    modal?.classList.add("hidden");
+    modal?.classList.remove("flex");
+  }
+  document.getElementById("purchase-body")?.addEventListener("click", () => openModal());
+  document.getElementById("purchase-modal-close")?.addEventListener("click", closeModal);
+
+  document.getElementById("btn-approve-purchase")?.addEventListener("click", () => {
+    closeModal();
+    window.showToast?.("Permintaan pembelian disetujui (prototype)", "success");
+  });
+  document.getElementById("btn-reject-purchase")?.addEventListener("click", () => {
+    closeModal();
+    window.showToast?.("Permintaan pembelian ditolak (prototype)", "error");
+  });
+</script>

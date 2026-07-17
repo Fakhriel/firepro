@@ -1,0 +1,79 @@
+---
+import OwnerLayout from "../../layouts/OwnerLayout.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import StatCard from "../../components/StatCard.astro";
+---
+
+<OwnerLayout title="Invoices" activeNav="invoices">
+  <PageHeader heading="Invoices" sub="Rekap tagihan & pembayaran proyek" crumbs={[{ label: "Operasional" }, { label: "Invoices" }]}>
+    <button id="btn-export-invoices" type="button" class="btn-secondary text-xs gap-1.5">
+      <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="1.75">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/>
+        <line x1="9" y1="15" x2="15" y2="15"/>
+      </svg>
+      Export PDF
+    </button>
+  </PageHeader>
+
+  <!-- Stat cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-invoices-total" label="Total Tagihan" accent />
+    <StatCard id="stat-invoices-paid" label="Sudah Dibayar" />
+    <StatCard id="stat-invoices-unpaid" label="Belum Dibayar" />
+    <StatCard id="stat-invoices-overdue" label="Jatuh Tempo" />
+  </div>
+
+  <!-- Filter -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-5">
+    <input id="search-invoices" type="search" placeholder="Cari no. invoice / klien…" class="field-input sm:max-w-xs" />
+    <select id="filter-invoice-status" class="field-input sm:w-40">
+      <option value="">Semua Status</option>
+      <option value="paid">Lunas</option>
+      <option value="unpaid">Belum Bayar</option>
+      <option value="overdue">Jatuh Tempo</option>
+    </select>
+  </div>
+
+  <!-- Table -->
+  <div class="panel overflow-hidden">
+    <div class="overflow-x-auto">
+      <table id="invoices-table" class="data-table">
+        <thead>
+          <tr>
+            <th>No. Invoice</th>
+            <th>Klien</th>
+            <th class="hidden sm:table-cell">Metode</th>
+            <th>Jumlah</th>
+            <th class="hidden md:table-cell">Jatuh Tempo</th>
+            <th>Status</th>
+            <th class="text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="invoices-body"></tbody>
+      </table>
+    </div>
+    <div id="invoices-empty" class="empty-state min-h-56">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"/>
+        <line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="16" y2="11"/>
+      </svg>
+      <p>Belum ada invoice diterbitkan</p>
+    </div>
+    <div class="flex items-center justify-between px-4 py-3 border-t border-hairline">
+      <span data-invoices-count class="font-mono text-[10px] text-smoke">0 invoice</span>
+      <div class="flex items-center gap-1">
+        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>←</button>
+        <span class="font-mono text-xs px-3 py-1.5 border border-hairline">1</span>
+        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>→</button>
+      </div>
+    </div>
+  </div>
+</OwnerLayout>
+
+<script>
+  // Prototype UI only — belum terhubung ke endpoint invoices.
+  document.getElementById("btn-export-invoices")?.addEventListener("click", () => {
+    window.showToast?.("Export PDF (prototype)", "info");
+  });
+</script>

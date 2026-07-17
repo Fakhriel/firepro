@@ -1,0 +1,150 @@
+---
+import OwnerLayout from "../../layouts/OwnerLayout.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import StatCard from "../../components/StatCard.astro";
+---
+
+<OwnerLayout title="Users" activeNav="users">
+  <PageHeader heading="Users" sub="Kelola akun & atur role pengguna sistem" crumbs={[{ label: "Utama" }, { label: "Users" }]}>
+    <button id="btn-add-user" type="button" class="btn-primary text-xs gap-1.5">
+      <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Tambah User
+    </button>
+  </PageHeader>
+
+  <!-- Stat cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-users-total" label="Total User" accent />
+    <StatCard id="stat-users-supervisor" label="Supervisor" />
+    <StatCard id="stat-users-teknisi" label="Teknisi Lapangan" />
+    <StatCard id="stat-users-inactive" label="Nonaktif" />
+  </div>
+
+  <!-- Filter -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-5">
+    <input id="search-users" type="search" placeholder="Cari nama / email…" class="field-input sm:max-w-xs" />
+    <select id="filter-role" class="field-input sm:w-48">
+      <option value="">Semua Role</option>
+      <option value="owner">Owner</option>
+      <option value="admin">Admin</option>
+      <option value="supervisor">Supervisor</option>
+      <option value="karyawan">Teknisi Lapangan</option>
+    </select>
+    <select id="filter-user-status" class="field-input sm:w-40">
+      <option value="">Semua Status</option>
+      <option value="active">Aktif</option>
+      <option value="inactive">Nonaktif</option>
+    </select>
+  </div>
+
+  <!-- Table -->
+  <div class="panel overflow-hidden">
+    <div class="overflow-x-auto">
+      <table id="users-table" class="data-table">
+        <thead>
+          <tr>
+            <th>Nama</th>
+            <th class="hidden sm:table-cell">Email</th>
+            <th>Role</th>
+            <th class="hidden md:table-cell">Bergabung</th>
+            <th>Status</th>
+            <th class="text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="users-body"></tbody>
+      </table>
+    </div>
+    <div id="users-empty" class="empty-state min-h-56">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+      <p>Belum ada user terdaftar</p>
+    </div>
+    <div class="flex items-center justify-between px-4 py-3 border-t border-hairline">
+      <span data-users-count class="font-mono text-[10px] text-smoke">0 user</span>
+      <div class="flex items-center gap-1">
+        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>←</button>
+        <span class="font-mono text-xs px-3 py-1.5 border border-hairline">1</span>
+        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>→</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add / edit user modal -->
+  <div id="user-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
+    <div class="panel w-full max-w-md bg-paper">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+        <h3 id="user-modal-title" class="font-display text-lg text-ink leading-none">Tambah User</h3>
+        <button id="user-modal-close" type="button" class="text-smoke hover:text-ink transition-colors" aria-label="Tutup">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <form id="user-form">
+        <div class="p-5 space-y-4">
+          <div>
+            <label class="field-label" for="user-name">Nama Lengkap</label>
+            <input id="user-name" type="text" class="field-input" placeholder="Nama lengkap" />
+          </div>
+          <div>
+            <label class="field-label" for="user-email">Email</label>
+            <input id="user-email" type="email" class="field-input" placeholder="nama@firepro.id" />
+          </div>
+          <div>
+            <label class="field-label" for="user-role">Role</label>
+            <select id="user-role" class="field-input">
+              <option value="owner">Owner</option>
+              <option value="admin">Admin</option>
+              <option value="supervisor">Supervisor</option>
+              <option value="karyawan" selected>Teknisi Lapangan</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label" for="user-status">Status</label>
+            <select id="user-status" class="field-input">
+              <option value="active">Aktif</option>
+              <option value="inactive">Nonaktif</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
+          <button type="button" id="user-modal-cancel" class="btn-secondary text-xs">Batal</button>
+          <button type="submit" class="btn-primary text-xs">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</OwnerLayout>
+
+<script>
+  // Prototype UI only — belum terhubung ke endpoint users/roles.
+  const modal = document.getElementById("user-modal");
+  const modalTitle = document.getElementById("user-modal-title");
+
+  function openModal(title: string): void {
+    if (modalTitle) modalTitle.textContent = title;
+    modal?.classList.remove("hidden");
+    modal?.classList.add("flex");
+  }
+  function closeModal(): void {
+    modal?.classList.add("hidden");
+    modal?.classList.remove("flex");
+  }
+
+  document.getElementById("btn-add-user")?.addEventListener("click", () => openModal("Tambah User"));
+  document.getElementById("user-modal-close")?.addEventListener("click", closeModal);
+  document.getElementById("user-modal-cancel")?.addEventListener("click", closeModal);
+
+  document.getElementById("user-form")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    closeModal();
+    (e.target as HTMLFormElement).reset();
+    window.showToast?.("User tersimpan (prototype)", "success");
+  });
+
+  document.getElementById("users-body")?.addEventListener("click", () => openModal("Edit User"));
+</script>

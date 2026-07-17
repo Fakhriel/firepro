@@ -1,0 +1,101 @@
+---
+import Base from "./Base.astro";
+import OwnerSidebar from "../components/OwnerSidebar.astro";
+import OwnerTopbar from "../components/OwnerTopbar.astro";
+
+export interface Props {
+  title?: string;
+  activeNav?: string;
+}
+
+const { title = "Dashboard", activeNav = "" } = Astro.props;
+---
+
+<Base title={`${title} — FIREPRO Owner`}>
+  <div id="dashboard-root" class="min-h-screen flex bg-paper">
+
+    <!-- ─── Sidebar (desktop) ─────────────────────────────── -->
+    <OwnerSidebar activeNav={activeNav} />
+
+    <!-- ─── Main area ─────────────────────────────────────── -->
+    <div class="flex-1 flex flex-col min-w-0 lg:ml-60">
+
+      <!-- Mobile overlay (backdrop saat sidebar terbuka) -->
+      <div
+        id="sidebar-overlay"
+        class="fixed inset-0 bg-ink/40 z-30 hidden lg:hidden"
+      ></div>
+
+      <OwnerTopbar title={title} />
+
+      <main class="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-hidden">
+        <slot />
+      </main>
+
+    </div>
+  </div>
+
+  <!-- Toast global -->
+  <div id="toast" class="toast" role="alert" aria-live="polite">
+    <span id="toast-msg"></span>
+  </div>
+</Base>
+
+<!--
+  CATATAN PROTOTIPE:
+  Layout ini belum memanggil endpoint auth backend (module owner-auth belum dibuat).
+  Guard auth + fetch data asli akan ditambahkan setelah backend RBAC owner siap,
+  mengikuti pola yang sama seperti DashboardLayout.astro (admin).
+-->
+
+<script>
+  // Mobile sidebar toggle
+  function initSidebarToggle(): void {
+    const toggle = document.getElementById("sidebar-toggle");
+    const sidebar = document.getElementById("sidebar");
+    const overlay = document.getElementById("sidebar-overlay");
+
+    function open(): void {
+      sidebar?.classList.remove("-translate-x-full");
+      overlay?.classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+    }
+    function close(): void {
+      sidebar?.classList.add("-translate-x-full");
+      overlay?.classList.add("hidden");
+      document.body.style.overflow = "";
+    }
+
+    toggle?.addEventListener("click", () => {
+      const isOpen = !sidebar?.classList.contains("-translate-x-full");
+      isOpen ? close() : open();
+    });
+    overlay?.addEventListener("click", close);
+  }
+
+  // Global toast helper (dipakai oleh halaman untuk feedback aksi prototipe)
+  function initToast(): void {
+    window.showToast = (msg: string, type: "success" | "error" | "info" = "success") => {
+      const toast = document.getElementById("toast");
+      const toastMsg = document.getElementById("toast-msg");
+      if (!toast || !toastMsg) return;
+
+      toastMsg.textContent = msg;
+      toast.classList.add("visible");
+
+      if (type === "error") {
+        toast.style.backgroundColor = "var(--color-signal)";
+      } else {
+        toast.style.backgroundColor = "var(--color-ink)";
+      }
+
+      clearTimeout((toast as HTMLElement & { _timer?: ReturnType<typeof setTimeout> })._timer);
+      (toast as HTMLElement & { _timer?: ReturnType<typeof setTimeout> })._timer = setTimeout(() => {
+        toast.classList.remove("visible");
+      }, 3000);
+    };
+  }
+
+  initSidebarToggle();
+  initToast();
+</script>

@@ -1,0 +1,118 @@
+---
+import OwnerLayout from "../../layouts/OwnerLayout.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import StatCard from "../../components/StatCard.astro";
+---
+
+<OwnerLayout title="Projects" activeNav="projects">
+  <PageHeader heading="Projects" sub="Semua proyek lintas tim & supervisor" crumbs={[{ label: "Operasional" }, { label: "Projects" }]}>
+    <button id="btn-export-projects" type="button" class="btn-secondary text-xs gap-1.5">
+      <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="1.75">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/>
+        <line x1="9" y1="15" x2="15" y2="15"/>
+      </svg>
+      Export PDF
+    </button>
+  </PageHeader>
+
+  <!-- Stat cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-projects-total" label="Total Proyek" accent />
+    <StatCard id="stat-projects-running" label="Berjalan" />
+    <StatCard id="stat-projects-value" label="Nilai Total Kontrak" />
+    <StatCard id="stat-projects-completed" label="Selesai Bulan Ini" />
+  </div>
+
+  <!-- Filter -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-5">
+    <input id="search-projects" type="search" placeholder="Cari ID proyek / nama klien…" class="field-input sm:max-w-xs" />
+    <select id="filter-status" class="field-input sm:w-40">
+      <option value="">Semua Status</option>
+      <option value="planning">Perencanaan</option>
+      <option value="in_progress">Berjalan</option>
+      <option value="completed">Selesai</option>
+      <option value="on_hold">Ditunda</option>
+      <option value="cancelled">Dibatalkan</option>
+    </select>
+    <select id="filter-supervisor" class="field-input sm:w-48">
+      <option value="">Semua Supervisor</option>
+    </select>
+  </div>
+
+  <!-- Table -->
+  <div class="panel overflow-hidden">
+    <div class="overflow-x-auto">
+      <table id="projects-table" class="data-table">
+        <thead>
+          <tr>
+            <th>Project ID</th>
+            <th>Klien</th>
+            <th class="hidden sm:table-cell">Supervisor</th>
+            <th>Nilai Kontrak</th>
+            <th class="hidden md:table-cell">Lokasi</th>
+            <th>Status</th>
+            <th class="text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="projects-body"></tbody>
+      </table>
+    </div>
+    <div id="projects-empty" class="empty-state min-h-56">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M5.5 8H18.5L19.5 21H4.5L5.5 8Z"/>
+        <path d="M8.5 8V6C8.5 4.067 9.567 3 12 3C14.433 3 15.5 4.067 15.5 6V8"/>
+      </svg>
+      <p>Belum ada proyek berjalan</p>
+    </div>
+    <div class="flex items-center justify-between px-4 py-3 border-t border-hairline">
+      <span data-projects-count class="font-mono text-[10px] text-smoke">0 proyek</span>
+      <div class="flex items-center gap-1">
+        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>←</button>
+        <span class="font-mono text-xs px-3 py-1.5 border border-hairline">1</span>
+        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>→</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Project detail drawer -->
+  <div id="project-drawer" class="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-paper border-l-2 border-ink translate-x-full transition-transform duration-300 ease-out flex flex-col">
+    <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink shrink-0">
+      <h2 class="font-display text-xl text-ink">Detail Proyek</h2>
+      <button id="drawer-close" type="button" class="text-smoke hover:text-ink p-1">
+        <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-5">
+      <div class="empty-state min-h-40">
+        <p>Pilih proyek untuk melihat detail</p>
+      </div>
+    </div>
+  </div>
+  <div id="drawer-overlay" class="fixed inset-0 bg-ink/40 z-40 hidden"></div>
+</OwnerLayout>
+
+<script>
+  // Prototype UI only — belum terhubung ke endpoint projects owner.
+  const drawer = document.getElementById("project-drawer");
+  const overlay = document.getElementById("drawer-overlay");
+  function openDrawer(): void {
+    drawer?.classList.remove("translate-x-full");
+    overlay?.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+  }
+  function closeDrawer(): void {
+    drawer?.classList.add("translate-x-full");
+    overlay?.classList.add("hidden");
+    document.body.style.overflow = "";
+  }
+  document.getElementById("drawer-close")?.addEventListener("click", closeDrawer);
+  overlay?.addEventListener("click", closeDrawer);
+  document.getElementById("projects-body")?.addEventListener("click", () => openDrawer());
+
+  document.getElementById("btn-export-projects")?.addEventListener("click", () => {
+    window.showToast?.("Export PDF (prototype)", "info");
+  });
+</script>

@@ -1,0 +1,36 @@
+---
+export interface Props {
+  id?: string;
+  label: string;
+  value?: string;
+  sub?: string;
+  accent?: boolean;
+}
+
+const { id, label, value, sub, accent = false } = Astro.props;
+---
+
+<div
+  id={id}
+  class={`stat-card ${accent ? "bg-ink text-paper border-ink" : ""}`}
+>
+  <p class={`font-mono text-[10px] uppercase tracking-widest mb-3 ${accent ? "text-paper/40" : "text-smoke"}`}>
+    {label}
+  </p>
+
+  {value ? (
+    <p class={`stat-value font-display text-3xl sm:text-4xl leading-none ${accent ? "text-paper" : "text-ink"}`}>
+      {value}
+    </p>
+  ) : (
+    <div class="h-9 flex items-center">
+      <div class={`w-24 h-7 ${accent ? "bg-paper/10" : "bg-hairline"} animate-pulse`}></div>
+    </div>
+  )}
+
+  {sub && (
+    <p class={`font-mono text-[10px] mt-2 ${accent ? "text-paper/50" : "text-smoke"}`}>{sub}</p>
+  )}
+
+  <slot />
+</div>

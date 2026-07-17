@@ -1,0 +1,119 @@
+---
+import SupervisorLayout from "../../layouts/SupervisorLayout.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import StatCard from "../../components/StatCard.astro";
+---
+
+<SupervisorLayout title="Daily Report" activeNav="daily-report">
+  <PageHeader heading="Daily Report" sub="Pantau laporan harian teknisi di lapangan" crumbs={[{ label: "Fokus Lapangan" }, { label: "Daily Report" }]} />
+
+  <!-- Stat cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-reports-today" label="Laporan Hari Ini" accent />
+    <StatCard id="stat-reports-reviewed" label="Sudah Ditinjau" />
+    <StatCard id="stat-reports-pending" label="Belum Ditinjau" />
+    <StatCard id="stat-reports-obstacle" label="Ada Kendala" />
+  </div>
+
+  <!-- Filter -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-5">
+    <input id="search-reports" type="search" placeholder="Cari nama teknisi / proyek…" class="field-input sm:max-w-xs" />
+    <select id="filter-report-project" class="field-input sm:w-48">
+      <option value="">Semua Proyek</option>
+    </select>
+    <select id="filter-report-status" class="field-input sm:w-44">
+      <option value="">Semua Status</option>
+      <option value="pending">Belum Ditinjau</option>
+      <option value="reviewed">Sudah Ditinjau</option>
+    </select>
+  </div>
+
+  <!-- Table -->
+  <div class="panel overflow-hidden">
+    <div class="overflow-x-auto">
+      <table id="report-table" class="data-table">
+        <thead>
+          <tr>
+            <th>Teknisi</th>
+            <th class="hidden sm:table-cell">Proyek</th>
+            <th class="hidden md:table-cell">Deskripsi Pekerjaan</th>
+            <th>Foto</th>
+            <th>Status</th>
+            <th class="text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="report-body"></tbody>
+      </table>
+    </div>
+    <div id="report-empty" class="empty-state min-h-56">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>
+      </svg>
+      <p>Belum ada laporan harian dari tim Anda</p>
+    </div>
+    <div class="flex items-center justify-between px-4 py-3 border-t border-hairline">
+      <span data-report-count class="font-mono text-[10px] text-smoke">0 laporan</span>
+      <div class="flex items-center gap-1">
+        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>←</button>
+        <span class="font-mono text-xs px-3 py-1.5 border border-hairline">1</span>
+        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>→</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Report detail drawer -->
+  <div id="report-drawer" class="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-paper border-l-2 border-ink translate-x-full transition-transform duration-300 ease-out flex flex-col">
+    <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink shrink-0">
+      <h2 class="font-display text-xl text-ink">Detail Laporan</h2>
+      <button id="report-drawer-close" type="button" class="text-smoke hover:text-ink p-1">
+        <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-5">
+      <div class="empty-state min-h-40">
+        <p>Pilih laporan untuk melihat detail</p>
+      </div>
+      <div class="space-y-4 mt-6">
+        <div>
+          <label class="field-label" for="report-comment">Komentar / Catatan Tinjauan</label>
+          <textarea id="report-comment" rows="3" class="field-input resize-none" placeholder="Tulis catatan untuk teknisi (opsional)…"></textarea>
+        </div>
+        <button id="btn-mark-reviewed" type="button" class="btn-primary w-full justify-center gap-1.5" style="background-color: var(--color-armed, #1f7a4d); border-color: var(--color-armed, #1f7a4d);">
+          <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="2">
+            <path d="M20 6L9 17l-5-5"/>
+          </svg>
+          Tandai Sudah Ditinjau
+        </button>
+      </div>
+    </div>
+  </div>
+  <div id="report-drawer-overlay" class="fixed inset-0 bg-ink/40 z-40 hidden"></div>
+</SupervisorLayout>
+
+<script>
+  // Prototype UI only — belum terhubung ke endpoint daily report supervisor.
+  const drawer = document.getElementById("report-drawer");
+  const overlay = document.getElementById("report-drawer-overlay");
+
+  function openDrawer(): void {
+    drawer?.classList.remove("translate-x-full");
+    overlay?.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+  }
+  function closeDrawer(): void {
+    drawer?.classList.add("translate-x-full");
+    overlay?.classList.add("hidden");
+    document.body.style.overflow = "";
+  }
+  document.getElementById("report-drawer-close")?.addEventListener("click", closeDrawer);
+  overlay?.addEventListener("click", closeDrawer);
+  document.getElementById("report-body")?.addEventListener("click", () => openDrawer());
+
+  document.getElementById("btn-mark-reviewed")?.addEventListener("click", () => {
+    closeDrawer();
+    window.showToast?.("Laporan ditandai sudah ditinjau (prototype)", "success");
+  });
+</script>

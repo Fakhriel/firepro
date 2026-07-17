@@ -1,0 +1,223 @@
+---
+import OwnerLayout from "../../layouts/OwnerLayout.astro";
+import PageHeader from "../../components/PageHeader.astro";
+---
+
+<OwnerLayout title="Settings" activeNav="settings">
+  <PageHeader heading="Settings" sub="Konfigurasi akun, perusahaan, dan sistem" crumbs={[{ label: "Sistem" }, { label: "Settings" }]} />
+
+  <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6">
+    <!-- Nav tabs -->
+    <div class="lg:col-span-1">
+      <nav class="panel p-2 space-y-1">
+        <button type="button" data-settings-tab="account" class="settings-tab active w-full text-left px-3 py-2 font-body text-sm font-semibold rounded-sm">Akun Saya</button>
+        <button type="button" data-settings-tab="company" class="settings-tab w-full text-left px-3 py-2 font-body text-sm text-charcoal rounded-sm">Profil Perusahaan</button>
+        <button type="button" data-settings-tab="roles" class="settings-tab w-full text-left px-3 py-2 font-body text-sm text-charcoal rounded-sm">Role & Izin Akses</button>
+        <button type="button" data-settings-tab="notif" class="settings-tab w-full text-left px-3 py-2 font-body text-sm text-charcoal rounded-sm">Notifikasi</button>
+      </nav>
+    </div>
+
+    <!-- Panels -->
+    <div class="lg:col-span-4 space-y-4 sm:space-y-6">
+
+      <!-- Akun Saya -->
+      <form id="panel-account" class="settings-panel panel">
+        <div class="px-5 py-4 border-b-2 border-ink">
+          <h3 class="font-display text-lg text-ink leading-none">Akun Saya</h3>
+          <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Informasi profil pemilik</p>
+        </div>
+        <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="field-label" for="acc-name">Nama Lengkap</label>
+            <input id="acc-name" type="text" class="field-input" placeholder="Nama lengkap" />
+          </div>
+          <div>
+            <label class="field-label" for="acc-email">Email</label>
+            <input id="acc-email" type="email" class="field-input" placeholder="owner@firepro.id" />
+          </div>
+          <div>
+            <label class="field-label" for="acc-phone">No. Telepon</label>
+            <input id="acc-phone" type="tel" class="field-input" placeholder="08xx-xxxx-xxxx" />
+          </div>
+          <div>
+            <label class="field-label" for="acc-password">Password Baru</label>
+            <input id="acc-password" type="password" class="field-input" placeholder="••••••••" />
+          </div>
+        </div>
+        <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
+          <button type="reset" class="btn-secondary text-xs">Batal</button>
+          <button type="submit" class="btn-primary text-xs">Simpan Perubahan</button>
+        </div>
+      </form>
+
+      <!-- Profil Perusahaan -->
+      <form id="panel-company" class="settings-panel panel hidden">
+        <div class="px-5 py-4 border-b-2 border-ink">
+          <h3 class="font-display text-lg text-ink leading-none">Profil Perusahaan</h3>
+          <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Identitas bisnis FIREPRO</p>
+        </div>
+        <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="sm:col-span-2">
+            <label class="field-label" for="co-name">Nama Perusahaan</label>
+            <input id="co-name" type="text" class="field-input" placeholder="PT Fire Protection Indonesia" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="field-label" for="co-address">Alamat</label>
+            <input id="co-address" type="text" class="field-input" placeholder="Alamat kantor" />
+          </div>
+          <div>
+            <label class="field-label" for="co-npwp">NPWP</label>
+            <input id="co-npwp" type="text" class="field-input" placeholder="00.000.000.0-000.000" />
+          </div>
+          <div>
+            <label class="field-label" for="co-phone">Telepon Kantor</label>
+            <input id="co-phone" type="tel" class="field-input" placeholder="021-xxxxxxx" />
+          </div>
+        </div>
+        <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
+          <button type="reset" class="btn-secondary text-xs">Batal</button>
+          <button type="submit" class="btn-primary text-xs">Simpan Perubahan</button>
+        </div>
+      </form>
+
+      <!-- Role & Izin Akses -->
+      <div id="panel-roles" class="settings-panel panel hidden">
+        <div class="px-5 py-4 border-b-2 border-ink">
+          <h3 class="font-display text-lg text-ink leading-none">Role & Izin Akses</h3>
+          <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Atur hak akses tiap role dalam sistem</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Modul</th>
+                <th class="text-center">Owner</th>
+                <th class="text-center">Admin</th>
+                <th class="text-center">Supervisor</th>
+                <th class="text-center">Teknisi Lapangan</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Users & Roles</td>
+                <td class="text-center"><span class="badge badge-active">Penuh</span></td>
+                <td class="text-center"><span class="badge badge-inactive">—</span></td>
+                <td class="text-center"><span class="badge badge-inactive">—</span></td>
+                <td class="text-center"><span class="badge badge-inactive">—</span></td>
+              </tr>
+              <tr>
+                <td>Invoices & Quotations</td>
+                <td class="text-center"><span class="badge badge-active">Penuh</span></td>
+                <td class="text-center"><span class="badge badge-active">Penuh</span></td>
+                <td class="text-center"><span class="badge badge-inactive">—</span></td>
+                <td class="text-center"><span class="badge badge-inactive">—</span></td>
+              </tr>
+              <tr>
+                <td>Projects & Maintenance</td>
+                <td class="text-center"><span class="badge badge-active">Penuh</span></td>
+                <td class="text-center"><span class="badge badge-active">Penuh</span></td>
+                <td class="text-center"><span class="badge badge-new">Lapangan</span></td>
+                <td class="text-center"><span class="badge badge-inactive">—</span></td>
+              </tr>
+              <tr>
+                <td>Inventory</td>
+                <td class="text-center"><span class="badge badge-active">Penuh + Approve</span></td>
+                <td class="text-center"><span class="badge badge-active">Penuh</span></td>
+                <td class="text-center"><span class="badge badge-new">Request</span></td>
+                <td class="text-center"><span class="badge badge-new">Request</span></td>
+              </tr>
+              <tr>
+                <td>My Tasks & Daily Report</td>
+                <td class="text-center"><span class="badge badge-inactive">—</span></td>
+                <td class="text-center"><span class="badge badge-inactive">—</span></td>
+                <td class="text-center"><span class="badge badge-new">Review</span></td>
+                <td class="text-center"><span class="badge badge-active">Penuh</span></td>
+              </tr>
+              <tr>
+                <td>Reports (Omzet & Laba)</td>
+                <td class="text-center"><span class="badge badge-active">Penuh</span></td>
+                <td class="text-center"><span class="badge badge-inactive">—</span></td>
+                <td class="text-center"><span class="badge badge-inactive">—</span></td>
+                <td class="text-center"><span class="badge badge-inactive">—</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="font-mono text-[9px] text-smoke px-5 py-4 border-t border-hairline">
+          Matriks izin ini bersifat referensi visual di tahap prototipe — belum tersambung ke sistem RBAC backend.
+        </p>
+      </div>
+
+      <!-- Notifikasi -->
+      <div id="panel-notif" class="settings-panel panel hidden">
+        <div class="px-5 py-4 border-b-2 border-ink">
+          <h3 class="font-display text-lg text-ink leading-none">Preferensi Notifikasi</h3>
+          <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Pilih notifikasi yang ingin diterima</p>
+        </div>
+        <div class="p-5 space-y-4">
+          <label class="flex items-center justify-between gap-3 cursor-pointer">
+            <span class="text-sm text-ink">Permintaan pembelian barang baru</span>
+            <input type="checkbox" checked class="w-4 h-4 accent-signal" />
+          </label>
+          <label class="flex items-center justify-between gap-3 cursor-pointer">
+            <span class="text-sm text-ink">Invoice jatuh tempo</span>
+            <input type="checkbox" checked class="w-4 h-4 accent-signal" />
+          </label>
+          <label class="flex items-center justify-between gap-3 cursor-pointer">
+            <span class="text-sm text-ink">Proyek selesai menunggu approval</span>
+            <input type="checkbox" checked class="w-4 h-4 accent-signal" />
+          </label>
+          <label class="flex items-center justify-between gap-3 cursor-pointer">
+            <span class="text-sm text-ink">Laporan mingguan otomatis via email</span>
+            <input type="checkbox" class="w-4 h-4 accent-signal" />
+          </label>
+        </div>
+        <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
+          <button id="btn-save-notif" type="button" class="btn-primary text-xs">Simpan Preferensi</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</OwnerLayout>
+
+<style>
+  .settings-tab.active {
+    background-color: var(--color-ink);
+    color: var(--color-paper);
+  }
+</style>
+
+<script>
+  // Prototype UI only — belum terhubung ke endpoint settings.
+  const tabs = document.querySelectorAll<HTMLButtonElement>("[data-settings-tab]");
+  const panels: Record<string, HTMLElement | null> = {
+    account: document.getElementById("panel-account"),
+    company: document.getElementById("panel-company"),
+    roles: document.getElementById("panel-roles"),
+    notif: document.getElementById("panel-notif"),
+  };
+
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const key = tab.dataset.settingsTab ?? "account";
+      tabs.forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      Object.entries(panels).forEach(([k, el]) => {
+        el?.classList.toggle("hidden", k !== key);
+      });
+    });
+  });
+
+  document.getElementById("panel-account")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    window.showToast?.("Akun tersimpan (prototype)", "success");
+  });
+  document.getElementById("panel-company")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    window.showToast?.("Profil perusahaan tersimpan (prototype)", "success");
+  });
+  document.getElementById("btn-save-notif")?.addEventListener("click", () => {
+    window.showToast?.("Preferensi notifikasi tersimpan (prototype)", "success");
+  });
+</script>

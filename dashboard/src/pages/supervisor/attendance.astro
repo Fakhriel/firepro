@@ -1,0 +1,173 @@
+---
+import SupervisorLayout from "../../layouts/SupervisorLayout.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import StatCard from "../../components/StatCard.astro";
+---
+
+<SupervisorLayout title="Attendance" activeNav="attendance">
+  <PageHeader heading="Attendance" sub="Absensi Anda & pantau kehadiran tim lapangan" crumbs={[{ label: "Fokus Lapangan" }, { label: "Attendance" }]} />
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
+    <!-- Own check in/out card -->
+    <div class="panel lg:col-span-1 flex flex-col items-center text-center px-6 py-8">
+      <p class="font-mono text-[10px] uppercase tracking-widest text-smoke mb-2">Waktu Saat Ini</p>
+      <p id="live-clock" class="font-display text-4xl text-ink leading-none mb-1">--:--:--</p>
+      <p id="live-date" class="font-mono text-xs text-smoke mb-6">—</p>
+
+      <div id="attendance-status-badge" class="badge badge-inactive mb-6">Belum Check In</div>
+
+      <button id="btn-check-in" type="button" class="btn-primary w-full justify-center">
+        Check In
+      </button>
+      <button id="btn-check-out" type="button" class="btn-danger w-full justify-center hidden">
+        Check Out
+      </button>
+    </div>
+
+    <!-- Team summary -->
+    <div class="panel lg:col-span-2">
+      <div class="px-5 py-4 border-b-2 border-ink">
+        <h3 class="font-display text-lg text-ink leading-none">Ringkasan Kehadiran Tim</h3>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">
+          {new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+        </p>
+      </div>
+      <div class="grid grid-cols-3 divide-x divide-hairline">
+        <div class="px-5 py-6 text-center">
+          <p class="font-mono text-[9px] uppercase tracking-widest text-smoke mb-2">Sudah Check In</p>
+          <p id="summary-checked-in" class="font-display text-2xl text-ink">0</p>
+        </div>
+        <div class="px-5 py-6 text-center">
+          <p class="font-mono text-[9px] uppercase tracking-widest text-smoke mb-2">Belum Check In</p>
+          <p id="summary-not-in" class="font-display text-2xl text-ink">0</p>
+        </div>
+        <div class="px-5 py-6 text-center">
+          <p class="font-mono text-[9px] uppercase tracking-widest text-smoke mb-2">Sudah Check Out</p>
+          <p id="summary-checked-out" class="font-display text-2xl text-ink">0</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stat cards for personal history -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-attendance-month" label="Hadir Bulan Ini" accent />
+    <StatCard id="stat-attendance-late" label="Terlambat" />
+    <StatCard id="stat-attendance-absent" label="Tidak Hadir" />
+    <StatCard id="stat-attendance-avg-hours" label="Rata-rata Jam Kerja" />
+  </div>
+
+  <!-- Team attendance table -->
+  <div class="panel overflow-hidden mb-8">
+    <div class="px-5 py-4 border-b-2 border-ink">
+      <h3 class="font-display text-lg text-ink leading-none">Kehadiran Teknisi Hari Ini</h3>
+      <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Tim di bawah pengawasan Anda</p>
+    </div>
+    <div class="flex flex-col sm:flex-row gap-3 px-5 py-4 border-b border-hairline">
+      <input id="search-team-attendance" type="search" placeholder="Cari nama teknisi…" class="field-input sm:max-w-xs" />
+      <select id="filter-team-attendance" class="field-input sm:w-44">
+        <option value="">Semua Status</option>
+        <option value="checked_in">Sedang Bekerja</option>
+        <option value="checked_out">Sudah Pulang</option>
+        <option value="not_in">Belum Check In</option>
+      </select>
+    </div>
+    <div class="overflow-x-auto">
+      <table id="team-attendance-table" class="data-table">
+        <thead>
+          <tr>
+            <th>Nama Teknisi</th>
+            <th class="hidden sm:table-cell">Proyek</th>
+            <th>Jam Masuk</th>
+            <th>Jam Keluar</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="team-attendance-body"></tbody>
+      </table>
+    </div>
+    <div id="team-attendance-empty" class="empty-state min-h-52">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+      </svg>
+      <p>Belum ada data kehadiran teknisi hari ini</p>
+    </div>
+  </div>
+
+  <!-- Personal history -->
+  <div class="panel overflow-hidden">
+    <div class="px-5 py-4 border-b-2 border-ink">
+      <h3 class="font-display text-lg text-ink leading-none">Riwayat Kehadiran Saya</h3>
+      <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">30 hari terakhir</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table id="attendance-table" class="data-table">
+        <thead>
+          <tr>
+            <th>Tanggal</th>
+            <th>Jam Masuk</th>
+            <th>Jam Keluar</th>
+            <th class="hidden sm:table-cell">Durasi</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="attendance-body"></tbody>
+      </table>
+    </div>
+    <div id="attendance-empty" class="empty-state min-h-52">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/>
+      </svg>
+      <p>Belum ada riwayat kehadiran</p>
+    </div>
+  </div>
+</SupervisorLayout>
+
+<script>
+  // Live clock
+  function tickClock(): void {
+    const now = new Date();
+    const clockEl = document.getElementById("live-clock");
+    const dateEl = document.getElementById("live-date");
+    if (clockEl) {
+      clockEl.textContent = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    }
+    if (dateEl) {
+      dateEl.textContent = now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    }
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  // Check in / out toggle — prototype only, belum terhubung backend absensi.
+  const btnIn = document.getElementById("btn-check-in");
+  const btnOut = document.getElementById("btn-check-out");
+  const badge = document.getElementById("attendance-status-badge");
+
+  let checkInTime: Date | null = null;
+
+  btnIn?.addEventListener("click", () => {
+    checkInTime = new Date();
+    const timeStr = checkInTime.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    if (badge) {
+      badge.textContent = "Sedang Bekerja";
+      badge.className = "badge badge-active mb-6";
+    }
+    btnIn?.classList.add("hidden");
+    btnOut?.classList.remove("hidden");
+    window.showToast?.(`Check in berhasil pukul ${timeStr} (prototype)`, "success");
+  });
+
+  btnOut?.addEventListener("click", () => {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    if (badge) {
+      badge.textContent = "Selesai Check Out";
+      badge.className = "badge badge-inactive mb-6";
+    }
+    btnOut?.classList.add("hidden");
+    btnIn?.classList.remove("hidden");
+    window.showToast?.(`Check out berhasil pukul ${timeStr} (prototype)`, "success");
+    void checkInTime;
+  });
+</script>

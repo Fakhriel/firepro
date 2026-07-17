@@ -1,0 +1,74 @@
+---
+import OwnerLayout from "../../layouts/OwnerLayout.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import StatCard from "../../components/StatCard.astro";
+---
+
+<OwnerLayout title="Clients" activeNav="clients">
+  <PageHeader heading="Clients" sub="Data klien terdaftar" crumbs={[{ label: "Utama" }, { label: "Clients" }]}>
+    <button id="btn-add-client" type="button" class="btn-primary text-xs gap-1.5">
+      <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Tambah Klien
+    </button>
+  </PageHeader>
+
+  <!-- Stat cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-clients-total" label="Total Klien" accent />
+    <StatCard id="stat-clients-active" label="Klien Aktif" />
+    <StatCard id="stat-clients-projects" label="Sedang Ada Proyek" />
+    <StatCard id="stat-clients-new" label="Baru Bulan Ini" />
+  </div>
+
+  <!-- Filter -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-5">
+    <input id="search-clients" type="search" placeholder="Cari nama klien / email…" class="field-input sm:max-w-xs" />
+    <select id="filter-client-status" class="field-input sm:w-40">
+      <option value="">Semua Status</option>
+      <option value="active">Aktif</option>
+      <option value="inactive">Nonaktif</option>
+    </select>
+  </div>
+
+  <!-- Table -->
+  <div class="panel overflow-hidden">
+    <div class="overflow-x-auto">
+      <table id="clients-table" class="data-table">
+        <thead>
+          <tr>
+            <th>Nama</th>
+            <th class="hidden sm:table-cell">Email</th>
+            <th class="hidden md:table-cell">No. Telepon</th>
+            <th class="hidden md:table-cell">Total Proyek</th>
+            <th>Status</th>
+            <th class="text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="clients-body"></tbody>
+      </table>
+    </div>
+    <div id="clients-empty" class="empty-state min-h-56">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+      </svg>
+      <p>Belum ada klien terdaftar</p>
+    </div>
+    <div class="flex items-center justify-between px-4 py-3 border-t border-hairline">
+      <span data-clients-count class="font-mono text-[10px] text-smoke">0 klien</span>
+      <div class="flex items-center gap-1">
+        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>←</button>
+        <span class="font-mono text-xs px-3 py-1.5 border border-hairline">1</span>
+        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>→</button>
+      </div>
+    </div>
+  </div>
+</OwnerLayout>
+
+<script>
+  // Prototype UI only — belum terhubung ke endpoint clients.
+  document.getElementById("btn-add-client")?.addEventListener("click", () => {
+    window.showToast?.("Form tambah klien (prototype)", "info");
+  });
+</script>

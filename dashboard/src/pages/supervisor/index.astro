@@ -1,0 +1,103 @@
+---
+import SupervisorLayout from "../../layouts/SupervisorLayout.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import StatCard from "../../components/StatCard.astro";
+---
+
+<SupervisorLayout title="Dashboard" activeNav="dashboard">
+  <PageHeader heading="Dashboard" sub="Ringkasan operasional lapangan hari ini" />
+
+  <!-- Stat cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-projects-active" label="Proyek Aktif" accent />
+    <StatCard id="stat-pending-approval" label="Menunggu Approval" />
+    <StatCard id="stat-technicians-onsite" label="Teknisi Bertugas" />
+    <StatCard id="stat-inventory-pending" label="Request Barang Pending" />
+  </div>
+
+  <!-- Quick actions -->
+  <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <a href="/supervisor/projects" class="panel flex items-center gap-3 px-5 py-4 hover:brutal-shadow-sm transition-shadow duration-150">
+      <div class="w-9 h-9 shrink-0 bg-ink text-paper flex items-center justify-center">
+        <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+        </svg>
+      </div>
+      <div class="min-w-0">
+        <p class="font-body text-sm font-semibold text-ink">Assign Teknisi</p>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-0.5">Ke Proyek Berjalan</p>
+      </div>
+    </a>
+    <a href="/supervisor/projects" class="panel flex items-center gap-3 px-5 py-4 hover:brutal-shadow-sm transition-shadow duration-150">
+      <div class="w-9 h-9 shrink-0 bg-ink text-paper flex items-center justify-center">
+        <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+      </div>
+      <div class="min-w-0">
+        <p class="font-body text-sm font-semibold text-ink">Upload Dokumentasi</p>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-0.5">Progres Pekerjaan</p>
+      </div>
+    </a>
+    <a href="/supervisor/inventory" class="panel flex items-center gap-3 px-5 py-4 hover:brutal-shadow-sm transition-shadow duration-150">
+      <div class="w-9 h-9 shrink-0 bg-ink text-paper flex items-center justify-center">
+        <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+        </svg>
+      </div>
+      <div class="min-w-0">
+        <p class="font-body text-sm font-semibold text-ink">Request Barang</p>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-0.5">Inventory</p>
+      </div>
+    </a>
+    <a href="/supervisor/projects" class="panel flex items-center gap-3 px-5 py-4 hover:brutal-shadow-sm transition-shadow duration-150">
+      <div class="w-9 h-9 shrink-0 bg-ink text-paper flex items-center justify-center">
+        <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
+          <path d="M20 6L9 17l-5-5"/>
+        </svg>
+      </div>
+      <div class="min-w-0">
+        <p class="font-body text-sm font-semibold text-ink">Approve Selesai</p>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-0.5">Pekerjaan Teknisi</p>
+      </div>
+    </a>
+  </div>
+
+  <!-- 2 col grid -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+
+    <!-- Proyek perlu perhatian -->
+    <div class="panel">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+        <div>
+          <h3 class="font-display text-lg text-ink leading-none">Proyek Perlu Perhatian</h3>
+          <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Progres tertahan / mendekati tenggat</p>
+        </div>
+        <a href="/supervisor/projects" class="font-mono text-[10px] text-smoke border border-hairline px-2 py-1 hover:text-ink hover:border-ink transition-colors">Lihat Semua</a>
+      </div>
+      <div id="dashboard-projects-empty" class="empty-state min-h-52">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M5.5 8H18.5L19.5 21H4.5L5.5 8Z"/>
+          <path d="M8.5 8V6C8.5 4.067 9.567 3 12 3C14.433 3 15.5 4.067 15.5 6V8"/>
+        </svg>
+        <p>Belum ada proyek yang perlu perhatian</p>
+      </div>
+    </div>
+
+    <!-- Approval pekerjaan selesai -->
+    <div class="panel">
+      <div class="px-5 py-4 border-b-2 border-ink">
+        <h3 class="font-display text-lg text-ink leading-none">Menunggu Approval</h3>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Pekerjaan teknisi ditandai selesai</p>
+      </div>
+      <div id="dashboard-approval-empty" class="empty-state min-h-52">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M20 6L9 17l-5-5"/>
+        </svg>
+        <p>Tidak ada pekerjaan menunggu approval</p>
+      </div>
+    </div>
+  </div>
+</SupervisorLayout>
