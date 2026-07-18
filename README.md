@@ -71,12 +71,12 @@ Remaining tasks:
 
 - [x] Complete core authentication flow (login/me)
 - [x] Finish core admin management module (CRUD + superadmin guard)
-- [x] Design extended role structure (Owner / Supervisor / Karyawan Teknisi)
+- [x] Design extended role structure (Owner / Supervisor / Employee Technical)
 - [x] Scaffold Owner module (backend routes + frontend pages)
-- [ ] Mount Owner routes in `app.js`
-- [ ] Implement Supervisor module (backend + wire up existing frontend pages)
-- [ ] Implement Karyawan Teknisi module (new tables: tasks, attendance, daily reports, inventory requests + wire up existing frontend pages)
-- [ ] Apply per-module RBAC guards consistently across all roles
+- [x] Mount Owner routes in `app.js`
+- [x] Implement Supervisor module (backend + wire up existing frontend pages)
+- [ ] Implement Employee Technical module (new tables: tasks, attendance, daily reports, inventory requests + wire up existing frontend pages)
+- [x] Apply per-module RBAC guards consistently across all roles
 - [ ] Manual end-to-end testing *(kept intentionally — every flow above still needs to be walked through by hand before it's trusted)*
 - [ ] Add automated tests *(kept intentionally — still not started)*
 
