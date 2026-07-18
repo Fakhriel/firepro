@@ -156,4 +156,4 @@ This project is still under active development. The repository reflects the curr
 
 ## Author
 
-Developed by **Fakhriel Yusmana Shiddiq**
+Developed by **ByFakhriel**
