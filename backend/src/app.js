@@ -15,14 +15,22 @@ const projectsRoutes = require('./modules/projects/projects.routes');
 const quotationsRoutes = require('./modules/quotations/quotations.routes');
 const maintenanceRoutes = require('./modules/maintenance/maintenance.routes');
 const reportsRoutes = require('./modules/reports/reports.routes');
+const ownerRoutes = require('./modules-owner/owner.routes');
+const supervisorRoutes = require('./modules-supervisor/supervisor.routes');
+const technicalRoutes = require('./modules-technical/technical.routes');
 
 
 const app = express();
 
 
-app.use(helmet());
+// crossOriginResourcePolicy dilonggarkan supaya foto di /uploads bisa
+// di-<img src> dari frontend Astro yang jalan di port/origin berbeda —
+// default helmet ('same-origin') akan memblokirnya.
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: env.corsOrigin, credentials: true }));
 app.use(express.json());
+
+app.use('/uploads', express.static(require('path').join(__dirname, '..', 'uploads')));
 
 
 app.use('/api', generalLimiter);
@@ -40,6 +48,9 @@ app.use('/api/projects', projectsRoutes);
 app.use('/api/quotations', quotationsRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/owner', ownerRoutes);
+app.use('/api/supervisor', supervisorRoutes);
+app.use('/api/technical', technicalRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
