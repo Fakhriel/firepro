@@ -2,9 +2,9 @@
 
 An internal dashboard for managing fire protection service operations.
 
-This project is being built to manage clients, projects, quotations, invoices, maintenance schedules, inventory, and basic business reports from a single dashboard.
+This project is being built to manage clients, projects, quotations, invoices, maintenance schedules, inventory, and basic business reports from a single dashboard — with role-based access for Owner, Supervisor, and Karyawan Teknisi (field technician).
 
-> **Status:** 🚧 Under active development. The core authentication flow is now working end-to-end (login → JWT → protected routes), and a role-based access structure (Owner / Supervisor / Karyawan Teknisi) has been scaffolded on top of it. Some role-specific modules are still incomplete, and the app has not yet been fully tested end-to-end.
+> **Status:** 🚧 Under active development. Authentication and the backend are functionally complete for all three role tiers (Owner / Supervisor / Karyawan Teknisi). The **Owner frontend is partially wired** (4 of 11 pages call the API), while the **Supervisor and Karyawan Teknisi frontends are still static prototype UI** — built visually, but not yet connected to the backend. The app is not ready for full end-to-end testing until that wiring is finished.
 
 ---
 
@@ -22,47 +22,66 @@ This project is being built to manage clients, projects, quotations, invoices, m
 
 ## Current Progress
 
-### Completed
+### Completed — Backend
 
 The backend follows a modular architecture where each feature has its own routes, controller, service, and model.
 
-Core modules (shared/base implementation):
-- Admin Authentication
-- Clients
-- Projects
-- Quotations
-- Invoices
-- Maintenance
-- Inventory
-- Reports
+Core/shared modules (`backend/src/modules/`):
+- Admin Authentication (login, session check, superadmin-guarded admin management)
+- Clients, Projects, Quotations, Invoices, Maintenance, Inventory, Reports
+- Attendance, Daily Reports, Project Assignments, Project Documentation, Purchase Requests
 
-Implemented so far:
-- Sequelize ORM
-- Password hashing with bcrypt
-- **JWT-based authentication — login (`POST /api/admin-auth/login`) and session check (`GET /api/admin-auth/me`) are now fully wired and working**
-- Helmet security middleware
-- Restricted CORS configuration
-- Global API rate limiting (with a dedicated stricter limiter on the login endpoint)
-- Global error handling
-- Database migrations using Sequelize CLI, with a working `sequelize-cli` config (`.sequelizerc` + `config/config.js`)
-- Input validation in several modules (e.g. Clients, Invoices)
-- **Role-based account model**: the `admins` table now supports an extended role set (`admin`, `superadmin`, `owner`, `supervisor`, `karyawan`) instead of a flat admin/superadmin split
-- **Superadmin-only guard** on the core admin management endpoints (`/api/admins`) — only superadmin accounts can create, list, update, or delete other admin accounts
-- **Owner module scaffolded** (`modules-owner/`): dashboard, user management, clients, projects, quotations, invoices, maintenance, inventory, and reports routes for the Owner role, reusing the existing core controllers/services under a single `requireRole('owner')` guard
+Role-scoped route groups, all mounted and reachable:
+- `modules-owner/` → `/api/owner/*` — dashboard, users, clients, projects, quotations, invoices, maintenance, inventory (incl. purchase-request approve/reject), reports, attendance recap
+- `modules-supervisor/` → `/api/supervisor/*` — all 9 sub-modules built (dashboard, projects, assignments, technicians, documentation, inventory, maintenance, attendance, daily reports)
+- `modules-technical/` → `/api/technical/*` — all 6 sub-modules built (my tasks, daily report, attendance, inventory request, profile, dashboard), self-scoped to the logged-in technician
+
+Also implemented:
+- Sequelize ORM, password hashing with bcrypt
+- JWT-based authentication, fully wired login (`POST /api/admin-auth/login`) and session check (`GET /api/admin-auth/me`)
+- Extended role model: `admin`, `superadmin`, `owner`, `supervisor`, `karyawan`, each with the correct route-level guard (`requireRole`)
+- Helmet, restricted CORS, global + login-specific rate limiting, global error handling
+- Working `sequelize-cli` setup (`.sequelizerc` + `config/config.js`) and a complete migration chain
+- File upload utility (`utils/uploadStorage.js`) with extension/mimetype whitelisting, used for task documentation photos
+- Input validation in several modules (e.g. Clients, Invoices, Admin Auth — including email format validation, `phone`/`email` fields on admin accounts)
+
+---
+
+### Completed — Frontend
+
+**Legacy Admin UI** (`dashboard/src/pages/*.astro` — clients, invoices, projects, quotations, maintenance, inventory, reports, `admins.astro`): fully wired to the backend API, manually tested.
+
+**Owner UI** (`dashboard/src/pages/owner/`): 4 of 11 pages wired to `/api/owner/*` —
+- ✅ `users.astro`, `invoices.astro`, `maintenance.astro`, `quotations.astro`
+
+Role-based login redirect and client-side layout guards (`OwnerLayout`, `SupervisorLayout`, `EmployeeLayout`) are in place for all roles.
 
 ---
 
 ### In Progress
 
-The current focus is finishing the role-based structure and stabilizing the app before production use.
+**Owner UI — 7 of 11 pages still static, not yet wired:**
+```
+attendance, clients, index (dashboard), inventory, projects, reports, settings
+```
+
+**Supervisor UI — 0 of 6 pages wired.** Backend (`/api/supervisor/*`) is ready; none of the frontend pages call it yet:
+```
+attendance, daily-report, index (dashboard), inventory, maintenance, projects
+```
+
+**Karyawan Teknisi UI — 0 of 6 pages wired.** Backend (`/api/technical/*`) is ready; none of the frontend pages call it yet:
+```
+attendance, daily-report, index (dashboard), inventory-request, my-tasks, profile
+```
+
+All corresponding backend endpoints already exist and are ready — remaining work here is purely frontend wiring (fetch on load, real form submission, real error/success handling), following the same `adminApiFetch` pattern already used in the legacy Admin pages and the 4 completed Owner pages.
 
 Remaining tasks:
-- **Mount `/api/owner` routes in `app.js`** — the Owner module is built but not yet registered on the Express app, so it isn't reachable yet. This is the next fix.
-- **Supervisor module** (`modules-supervisor/`) — not yet implemented on the backend. Frontend pages exist (`pages/supervisor/`) but aren't connected to any API yet.
-- **Karyawan Teknisi (field/technical) module** (`modules-technical/`) — not yet implemented on the backend. Frontend UI exists (`pages/employee-technical/`: My Tasks, Daily Report, Attendance, Inventory Request, Profile) as static mockups only, with no API calls wired up.
-  - This module needs new data models that don't exist yet: task assignment linked to a technician's account (current `maintenance_schedules.technician` is a free-text field, not a relation), attendance records, daily reports, and inventory request/approval records.
-- Finish remaining RBAC guards for Supervisor and Karyawan Teknisi roles (per-module, not just per-role grouping)
-- Manual end-to-end testing of the dashboard, across all three role types
+- Wire up the remaining 7 Owner pages
+- Wire up all 6 Supervisor pages
+- Wire up all 6 Karyawan Teknisi pages
+- Manual end-to-end testing of the dashboard, across all five roles (admin/superadmin, owner, supervisor, karyawan)
 - Add automated tests
 
 ---
@@ -71,12 +90,15 @@ Remaining tasks:
 
 - [x] Complete core authentication flow (login/me)
 - [x] Finish core admin management module (CRUD + superadmin guard)
-- [x] Design extended role structure (Owner / Supervisor / Employee Technical)
-- [x] Scaffold Owner module (backend routes + frontend pages)
-- [x] Mount Owner routes in `app.js`
-- [x] Implement Supervisor module (backend + wire up existing frontend pages)
-- [ ] Implement Employee Technical module (new tables: tasks, attendance, daily reports, inventory requests + wire up existing frontend pages)
-- [x] Apply per-module RBAC guards consistently across all roles
+- [x] Design extended role structure (Owner / Supervisor / Karyawan Teknisi)
+- [x] Build & mount Owner backend routes
+- [x] Build Supervisor backend (all 9 sub-modules)
+- [x] Build Karyawan Teknisi backend (all 6 sub-modules + supporting data modules)
+- [x] Apply per-module RBAC guards across all roles
+- [x] Role-based login redirect + client-side layout guards
+- [ ] **Wire up remaining Owner pages (7 of 11 left)**
+- [ ] **Wire up Supervisor pages (6 of 6 left)**
+- [ ] **Wire up Karyawan Teknisi pages (6 of 6 left)**
 - [ ] Manual end-to-end testing *(kept intentionally — every flow above still needs to be walked through by hand before it's trusted)*
 - [ ] Add automated tests *(kept intentionally — still not started)*
 
@@ -97,7 +119,7 @@ npm run dev
 
 Update the `.env` file with your database credentials and a secure `JWT_SECRET` (generate one with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`).
 
-> Login is now functional: after `npm run seed:admin`, the seeded account can be used against `POST /api/admin-auth/login` to obtain a JWT token.
+> Login is fully functional for all roles via `POST /api/admin-auth/login`. The legacy Admin dashboard (`/`) and 4 Owner pages are usable end-to-end today. The rest of the Owner UI, plus all Supervisor and Karyawan Teknisi UI, are not yet usable — see **In Progress** above.
 
 ---
 
@@ -118,21 +140,14 @@ Configure `PUBLIC_API_URL` to point to your backend server.
 
 ```
 backend/
-├── modules/            # Core/shared modules (reused across roles)
-│   ├── admin-auth/
-│   ├── clients/
-│   ├── inventory/
-│   ├── invoices/
-│   ├── maintenance/
-│   ├── projects/
-│   ├── quotations/
-│   └── reports/
-├── modules-owner/       # Owner-role routes (reuse core controllers, built, not yet mounted)
-├── modules-supervisor/  # Supervisor-role routes (not yet implemented)
-├── modules-technical/   # Karyawan Teknisi-role routes (not yet implemented)
+├── modules/             # Core/shared modules (reused across roles), fully wired
+├── modules-owner/        # Owner-role routes, backend complete
+├── modules-supervisor/   # Supervisor-role routes, backend complete
+├── modules-technical/    # Karyawan Teknisi-role routes, backend complete
 ├── middleware/
 ├── config/
 ├── migrations/
+├── utils/
 └── scripts/
 
 dashboard/
@@ -141,9 +156,10 @@ dashboard/
 │   ├── layouts/
 │   ├── lib/
 │   └── pages/
-│       ├── owner/
-│       ├── supervisor/
-│       └── employee-technical/
+│       ├── *.astro              # legacy Admin UI — wired ✅
+│       ├── owner/                # 4/11 wired ✅ ⚠️
+│       ├── supervisor/           # 0/6 wired ⚠️
+│       └── employee-technical/   # 0/6 wired ⚠️
 ```
 
 ---
