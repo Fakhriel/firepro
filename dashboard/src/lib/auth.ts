@@ -5,7 +5,7 @@ export interface AdminUser {
   id: string;
   username: string;
   name: string;
-  role: "admin" | "superadmin";
+  role: "admin" | "superadmin" | "owner" | "supervisor" | "karyawan";
 }
 
 export interface AdminAuthState {
