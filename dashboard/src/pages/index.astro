@@ -1,70 +1,269 @@
 ---
-import DashboardLayout from "../layouts/DashboardLayout.astro";
+import OwnerLayout from "../layouts/OwnerLayout.astro";
 import PageHeader from "../components/PageHeader.astro";
 import StatCard from "../components/StatCard.astro";
 ---
 
-<DashboardLayout title="Overview" activeNav="overview">
-  <PageHeader heading="Overview" sub="Ringkasan performa toko hari ini" />
+<OwnerLayout title="Dashboard" activeNav="dashboard">
+  <PageHeader heading="Dashboard" sub="Ringkasan performa bisnis FIREPRO" />
 
-  <!-- Stat cards -->
+  <!-- Financial stat cards -->
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
-    <StatCard label="Total Revenue" accent />
-    <StatCard label="Total Order" />
-    <StatCard label="Produk Aktif" />
-    <StatCard label="Pelanggan" />
+    <StatCard id="stat-omzet" label="Omzet Bulan Ini" accent />
+    <StatCard id="stat-laba" label="Laba Bersih" />
+    <StatCard id="stat-projects-active" label="Proyek Aktif" />
+    <StatCard id="stat-users-active" label="User Aktif" />
+  </div>
+
+  <!-- Quick actions -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-8">
+    <a href="/owner/users" class="panel flex items-center gap-3 px-5 py-4 hover:brutal-shadow-sm transition-shadow duration-150">
+      <div class="w-9 h-9 shrink-0 bg-ink text-paper flex items-center justify-center">
+        <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </div>
+      <div class="min-w-0">
+        <p class="font-body text-sm font-semibold text-ink">Kelola User & Role</p>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-0.5">Users</p>
+      </div>
+    </a>
+    <a href="/owner/inventory" class="panel flex items-center gap-3 px-5 py-4 hover:brutal-shadow-sm transition-shadow duration-150">
+      <div class="w-9 h-9 shrink-0 bg-ink text-paper flex items-center justify-center">
+        <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
+          <path d="M20 6L9 17l-5-5"/>
+        </svg>
+      </div>
+      <div class="min-w-0">
+        <p class="font-body text-sm font-semibold text-ink">Approve Pembelian</p>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-0.5">Inventory</p>
+      </div>
+    </a>
+    <a href="/owner/reports" class="panel flex items-center gap-3 px-5 py-4 hover:brutal-shadow-sm transition-shadow duration-150">
+      <div class="w-9 h-9 shrink-0 bg-ink text-paper flex items-center justify-center">
+        <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/>
+          <line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+      </div>
+      <div class="min-w-0">
+        <p class="font-body text-sm font-semibold text-ink">Export Laporan</p>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-0.5">Reports</p>
+      </div>
+    </a>
   </div>
 
   <!-- 2 col grid -->
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
-
-    <!-- Revenue chart placeholder -->
-    <div class="panel lg:col-span-2">
-      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
-        <div>
-          <h3 class="font-display text-lg text-ink leading-none">Revenue</h3>
-          <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">30 hari terakhir</p>
-        </div>
-        <span class="font-mono text-[10px] text-smoke border border-hairline px-2 py-1">Chart coming soon</span>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-8">
+    <div class="panel">
+      <div class="px-5 py-4 border-b-2 border-ink">
+        <h3 class="font-display text-lg text-ink leading-none">Omzet vs Biaya</h3>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">6 bulan terakhir</p>
       </div>
-      <div class="empty-state min-h-52">
+      <div id="dashboard-chart-empty" class="empty-state min-h-56">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
         </svg>
-        <p>Data revenue akan tampil di sini</p>
+        <p>Grafik akan tampil setelah data terhubung</p>
       </div>
     </div>
 
-    <!-- Top produk placeholder -->
     <div class="panel">
       <div class="px-5 py-4 border-b-2 border-ink">
-        <h3 class="font-display text-lg text-ink leading-none">Top Produk</h3>
-        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Penjualan tertinggi</p>
+        <h3 class="font-display text-lg text-ink leading-none">Menunggu Persetujuan</h3>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Pembelian barang & permintaan lain</p>
       </div>
-      <div class="empty-state min-h-52">
+      <div id="dashboard-approval-empty" class="empty-state min-h-56">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+          <path d="M20 6L9 17l-5-5"/>
         </svg>
-        <p>Belum ada data produk</p>
+        <p>Tidak ada persetujuan yang menunggu</p>
       </div>
     </div>
   </div>
 
-  <!-- Recent orders placeholder -->
+  <!-- Proyek berjalan -->
   <div class="panel">
     <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
       <div>
-        <h3 class="font-display text-lg text-ink leading-none">Order Terbaru</h3>
-        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Transaksi masuk</p>
+        <h3 class="font-display text-lg text-ink leading-none">Semua Proyek Berjalan</h3>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Lintas tim & supervisor</p>
       </div>
-      <a href="/projects" class="btn-secondary text-xs px-3 py-1.5">Lihat Semua</a>
+      <a href="/owner/projects" class="font-mono text-[10px] text-smoke border border-hairline px-2 py-1 hover:text-ink hover:border-ink transition-colors">Lihat Semua</a>
     </div>
-    <div class="empty-state min-h-44">
+    <div id="dashboard-projects-empty" class="empty-state min-h-52">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path d="M5.5 8H18.5L19.5 21H4.5L5.5 8Z"/>
         <path d="M8.5 8V6C8.5 4.067 9.567 3 12 3C14.433 3 15.5 4.067 15.5 6V8"/>
       </svg>
-      <p>Belum ada order masuk</p>
+      <p>Belum ada proyek berjalan</p>
     </div>
   </div>
-</DashboardLayout>
+</OwnerLayout>
+
+<script>
+  import { adminApiFetch } from "../lib/auth";
+  import { escapeHtml } from "../lib/escapeHtml";
+  import { formatIDR } from "../lib/export";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface DashboardSummary {
+    omzet: number;
+    laba: number;
+    projectsActive: number;
+    usersActive: number;
+  }
+
+  interface PurchaseRequest {
+    id: string;
+    itemName: string;
+    quantity: number;
+    urgency: "low" | "normal" | "urgent";
+    requester?: { id: number; name: string };
+    project?: { id: number; name: string };
+  }
+
+  interface ProjectRow {
+    id: number;
+    projectCode: string;
+    projectName: string;
+    clientName: string;
+    location: string;
+    status: string;
+  }
+
+  function setStatValue(cardId: string, value: string): void {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
+    if (!valueEl) {
+      const skeleton = card.querySelector(".animate-pulse")?.parentElement;
+      valueEl = document.createElement("p");
+      const isAccent = card.classList.contains("bg-ink");
+      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
+      if (skeleton) {
+        skeleton.replaceWith(valueEl);
+      } else {
+        card.appendChild(valueEl);
+      }
+    }
+    valueEl.textContent = value;
+  }
+
+  async function loadSummary(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/owner/dashboard/summary`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat ringkasan dashboard", "error");
+        return;
+      }
+      const summary: DashboardSummary = json.data;
+      setStatValue("stat-omzet", formatIDR(summary.omzet));
+      setStatValue("stat-laba", formatIDR(summary.laba));
+      setStatValue("stat-projects-active", String(summary.projectsActive));
+      setStatValue("stat-users-active", String(summary.usersActive));
+    } catch (err) {
+      console.error("[loadSummary] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  function urgencyBadge(urgency: string): string {
+    const map: Record<string, string> = {
+      urgent: "bg-signal/10 text-signal border-signal",
+      normal: "bg-hairline/40 text-ink border-hairline",
+      low: "bg-hairline/20 text-smoke border-hairline",
+    };
+    return map[urgency] ?? map.normal;
+  }
+
+  async function loadPendingApprovals(): Promise<void> {
+    const container = document.getElementById("dashboard-approval-empty");
+    if (!container) return;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/owner/inventory/requests?status=pending`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat persetujuan tertunda", "error");
+        return;
+      }
+      const requests: PurchaseRequest[] = json.data ?? [];
+
+      if (requests.length === 0) return; // biarkan empty-state bawaan tampil
+
+      const list = document.createElement("div");
+      list.className = "divide-y divide-hairline";
+      requests.slice(0, 6).forEach((r) => {
+        const row = document.createElement("div");
+        row.className = "flex items-center justify-between px-5 py-3 gap-3";
+        row.innerHTML = `
+          <div class="min-w-0">
+            <p class="font-body text-sm font-semibold text-ink truncate">${escapeHtml(r.itemName)} <span class="font-mono text-xs text-smoke">×${r.quantity}</span></p>
+            <p class="font-mono text-[10px] text-smoke mt-0.5 truncate">${escapeHtml(r.requester?.name ?? "-")}${r.project ? " · " + escapeHtml(r.project.name) : ""}</p>
+          </div>
+          <span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 shrink-0 ${urgencyBadge(r.urgency)}">${escapeHtml(r.urgency)}</span>
+        `;
+        list.appendChild(row);
+      });
+
+      container.replaceWith(list);
+    } catch (err) {
+      console.error("[loadPendingApprovals] gagal fetch backend:", err);
+    }
+  }
+
+  function statusBadge(status: string): string {
+    const map: Record<string, string> = {
+      planning: "bg-hairline/30 text-smoke border-hairline",
+      in_progress: "bg-ink/5 text-ink border-ink",
+      completed: "bg-hairline/20 text-smoke border-hairline",
+      on_hold: "bg-signal/10 text-signal border-signal",
+      cancelled: "bg-signal/10 text-signal border-signal",
+    };
+    return map[status] ?? map.planning;
+  }
+
+  async function loadActiveProjects(): Promise<void> {
+    const container = document.getElementById("dashboard-projects-empty");
+    if (!container) return;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/owner/projects/admin?status=in_progress`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat proyek berjalan", "error");
+        return;
+      }
+      const projects: ProjectRow[] = json.data ?? [];
+
+      if (projects.length === 0) return;
+
+      const list = document.createElement("div");
+      list.className = "divide-y divide-hairline";
+      projects.slice(0, 8).forEach((p) => {
+        const row = document.createElement("div");
+        row.className = "flex items-center justify-between px-5 py-3 gap-3";
+        row.innerHTML = `
+          <div class="min-w-0">
+            <p class="font-body text-sm font-semibold text-ink truncate">${escapeHtml(p.projectName)}</p>
+            <p class="font-mono text-[10px] text-smoke mt-0.5 truncate">${escapeHtml(p.projectCode)} · ${escapeHtml(p.clientName)} · ${escapeHtml(p.location ?? "-")}</p>
+          </div>
+          <span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 shrink-0 ${statusBadge(p.status)}">${escapeHtml(p.status.replace("_", " "))}</span>
+        `;
+        list.appendChild(row);
+      });
+
+      container.replaceWith(list);
+    } catch (err) {
+      console.error("[loadActiveProjects] gagal fetch backend:", err);
+    }
+  }
+
+  loadSummary();
+  loadPendingApprovals();
+  loadActiveProjects();
+</script>
