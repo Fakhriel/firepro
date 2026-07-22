@@ -78,13 +78,197 @@ import StatCard from "../../components/StatCard.astro";
 </OwnerLayout>
 
 <script>
-  // Prototype UI only — belum terhubung ke endpoint attendance perusahaan.
+  import { adminApiFetch } from "../../lib/auth";
+  import { escapeHtml } from "../../lib/escapeHtml";
+  import { exportTableToPDF } from "../../lib/export";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface AttendanceRecord {
+    id: string;
+    adminId: number;
+    workDate: string;
+    checkInAt: string | null;
+    checkOutAt: string | null;
+    status: string;
+    admin?: { id: number; name: string; username: string; role?: string };
+  }
+
+  interface TeamUser {
+    id: number;
+    name: string;
+    role: "supervisor" | "karyawan";
+  }
+
+  interface RowData {
+    userId: number;
+    name: string;
+    role: string;
+    checkInAt: string | null;
+    checkOutAt: string | null;
+    status: "checked_in" | "checked_out" | "not_in";
+  }
+
   const dateInput = document.getElementById("filter-attendance-date") as HTMLInputElement | null;
+  const searchInput = document.getElementById("search-attendance") as HTMLInputElement | null;
+  const roleFilter = document.getElementById("filter-attendance-role") as HTMLSelectElement | null;
+  const statusFilter = document.getElementById("filter-attendance-status") as HTMLSelectElement | null;
+  const tableBody = document.getElementById("attendance-body") as HTMLTableSectionElement;
+  const emptyState = document.getElementById("attendance-empty") as HTMLDivElement;
+  const table = document.getElementById("attendance-table") as HTMLTableElement;
+  const countLabel = document.querySelector("[data-attendance-count]") as HTMLElement | null;
+
   if (dateInput) {
     dateInput.value = new Date().toISOString().split("T")[0];
   }
 
+  let allRows: RowData[] = [];
+
+  function setStatValue(cardId: string, value: string): void {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
+    if (!valueEl) {
+      const skeleton = card.querySelector(".animate-pulse")?.parentElement;
+      valueEl = document.createElement("p");
+      const isAccent = card.classList.contains("bg-ink");
+      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
+      if (skeleton) {
+        skeleton.replaceWith(valueEl);
+      } else {
+        card.appendChild(valueEl);
+      }
+    }
+    valueEl.textContent = value;
+  }
+
+  function formatTime(iso: string | null): string {
+    if (!iso) return "-";
+    try {
+      return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return "-";
+    }
+  }
+
+  function formatDuration(checkIn: string | null, checkOut: string | null): string {
+    if (!checkIn || !checkOut) return "-";
+    const ms = new Date(checkOut).getTime() - new Date(checkIn).getTime();
+    if (ms <= 0) return "-";
+    const hours = Math.floor(ms / 3600000);
+    const minutes = Math.floor((ms % 3600000) / 60000);
+    return `${hours}j ${minutes}m`;
+  }
+
+  const STATUS_LABEL: Record<string, string> = {
+    checked_in: "Sedang Bekerja",
+    checked_out: "Sudah Pulang",
+    not_in: "Belum Check In",
+  };
+  const STATUS_BADGE: Record<string, string> = {
+    checked_in: "bg-ink/5 text-ink border-ink",
+    checked_out: "bg-hairline/20 text-smoke border-hairline",
+    not_in: "bg-signal/10 text-signal border-signal",
+  };
+  const ROLE_LABEL: Record<string, string> = {
+    supervisor: "Supervisor",
+    karyawan: "Teknisi Lapangan",
+  };
+
+  function applyFiltersAndRender(): void {
+    const keyword = (searchInput?.value ?? "").trim().toLowerCase();
+    const role = roleFilter?.value ?? "";
+    const status = statusFilter?.value ?? "";
+
+    const filtered = allRows.filter((r) => {
+      if (keyword && !r.name.toLowerCase().includes(keyword)) return false;
+      if (role && r.role !== role) return false;
+      if (status && status !== "absent" && r.status !== status) return false;
+      if (status === "absent") return false; // backend belum punya konsep "tidak hadir" eksplisit
+      return true;
+    });
+
+    tableBody.innerHTML = "";
+    const isEmpty = filtered.length === 0;
+    table.classList.toggle("hidden", isEmpty);
+    emptyState.classList.toggle("hidden", !isEmpty);
+    if (countLabel) countLabel.textContent = `${filtered.length} karyawan`;
+
+    filtered.forEach((r) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="font-semibold text-ink">${escapeHtml(r.name)}</td>
+        <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${escapeHtml(ROLE_LABEL[r.role] ?? r.role)}</td>
+        <td class="hidden sm:table-cell font-mono text-xs text-charcoal">-</td>
+        <td class="font-mono text-xs text-charcoal">${formatTime(r.checkInAt)}</td>
+        <td class="font-mono text-xs text-charcoal">${formatTime(r.checkOutAt)}</td>
+        <td class="hidden md:table-cell font-mono text-xs text-charcoal">${formatDuration(r.checkInAt, r.checkOutAt)}</td>
+        <td><span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${STATUS_BADGE[r.status]}">${STATUS_LABEL[r.status]}</span></td>
+      `;
+      tableBody.appendChild(tr);
+    });
+  }
+
+  function updateStats(rows: RowData[]): void {
+    setStatValue("stat-attendance-checked-in", String(rows.filter((r) => r.status === "checked_in" || r.status === "checked_out").length));
+    setStatValue("stat-attendance-not-in", String(rows.filter((r) => r.status === "not_in").length));
+    // Backend belum menandai keterlambatan/ketidakhadiran eksplisit — 0 sampai ada endpoint-nya.
+    setStatValue("stat-attendance-late", "0");
+    setStatValue("stat-attendance-absent", "0");
+  }
+
+  async function loadAttendance(): Promise<void> {
+    const date = dateInput?.value || new Date().toISOString().split("T")[0];
+    try {
+      const [teamRes, attRes] = await Promise.all([
+        adminApiFetch(`${apiUrl}/api/owner/users`),
+        adminApiFetch(`${apiUrl}/api/owner/attendance/team?date=${date}`),
+      ]);
+      const teamJson = await teamRes.json();
+      const attJson = await attRes.json();
+      if (!teamRes.ok || !attRes.ok) {
+        window.showToast?.(teamJson.error ?? attJson.error ?? "Gagal memuat data kehadiran", "error");
+        return;
+      }
+
+      const teamUsers: TeamUser[] = (teamJson.data ?? []).filter(
+        (u: { role: string }) => u.role === "supervisor" || u.role === "karyawan"
+      );
+      const records: AttendanceRecord[] = attJson.data ?? [];
+      const recordByAdminId = new Map(records.map((r) => [r.adminId, r]));
+
+      allRows = teamUsers.map((u) => {
+        const rec = recordByAdminId.get(u.id);
+        let status: RowData["status"] = "not_in";
+        if (rec?.checkOutAt) status = "checked_out";
+        else if (rec?.checkInAt) status = "checked_in";
+        return {
+          userId: u.id,
+          name: u.name,
+          role: u.role,
+          checkInAt: rec?.checkInAt ?? null,
+          checkOutAt: rec?.checkOutAt ?? null,
+          status,
+        };
+      });
+
+      applyFiltersAndRender();
+      updateStats(allRows);
+    } catch (err) {
+      console.error("[loadAttendance] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  dateInput?.addEventListener("change", loadAttendance);
+  searchInput?.addEventListener("input", applyFiltersAndRender);
+  roleFilter?.addEventListener("change", applyFiltersAndRender);
+  statusFilter?.addEventListener("change", applyFiltersAndRender);
+
   document.getElementById("btn-export-attendance")?.addEventListener("click", () => {
-    window.showToast?.("Rekap kehadiran diekspor (prototype)", "success");
+    exportTableToPDF("attendance-table", { title: "Rekap Kehadiran", subtitle: `Tanggal ${dateInput?.value ?? "-"} — FIREPRO` });
   });
+
+  loadAttendance();
 </script>
