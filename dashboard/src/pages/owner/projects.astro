@@ -95,9 +95,51 @@ import StatCard from "../../components/StatCard.astro";
 </OwnerLayout>
 
 <script>
-  // Prototype UI only — belum terhubung ke endpoint projects owner.
+  import { adminApiFetch } from "../../lib/auth";
+  import { escapeHtml } from "../../lib/escapeHtml";
+  import { exportTableToPDF, formatIDR } from "../../lib/export";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface ProjectRow {
+    id: number;
+    projectCode: string;
+    projectName: string;
+    clientName: string;
+    clientEmail: string;
+    location: string;
+    category: string;
+    crewSize: number;
+    baseCost: number;
+    additionalCost: number;
+    contractValue: number;
+    paymentRef: string;
+    status: "planning" | "in_progress" | "completed" | "on_hold" | "cancelled";
+    startDate: string;
+  }
+
+  const STATUS_LABEL: Record<string, string> = {
+    planning: "Perencanaan",
+    in_progress: "Berjalan",
+    completed: "Selesai",
+    on_hold: "Ditunda",
+    cancelled: "Dibatalkan",
+  };
+
+  let allProjects: ProjectRow[] = [];
+
+  const tableBody = document.getElementById("projects-body") as HTMLTableSectionElement;
+  const emptyState = document.getElementById("projects-empty") as HTMLDivElement;
+  const table = document.getElementById("projects-table") as HTMLTableElement;
+  const countLabel = document.querySelector("[data-projects-count]") as HTMLElement | null;
+  const searchInput = document.getElementById("search-projects") as HTMLInputElement | null;
+  const statusFilter = document.getElementById("filter-status") as HTMLSelectElement | null;
+
   const drawer = document.getElementById("project-drawer");
   const overlay = document.getElementById("drawer-overlay");
+  const drawerBody = drawer?.querySelector(".flex-1.overflow-y-auto") as HTMLElement | null;
+
   function openDrawer(): void {
     drawer?.classList.remove("translate-x-full");
     overlay?.classList.remove("hidden");
@@ -110,9 +152,136 @@ import StatCard from "../../components/StatCard.astro";
   }
   document.getElementById("drawer-close")?.addEventListener("click", closeDrawer);
   overlay?.addEventListener("click", closeDrawer);
-  document.getElementById("projects-body")?.addEventListener("click", () => openDrawer());
 
-  document.getElementById("btn-export-projects")?.addEventListener("click", () => {
-    window.showToast?.("Export PDF (prototype)", "info");
+  function statusBadge(status: string): string {
+    const map: Record<string, string> = {
+      planning: "bg-hairline/30 text-smoke border-hairline",
+      in_progress: "bg-ink/5 text-ink border-ink",
+      completed: "bg-hairline/20 text-smoke border-hairline",
+      on_hold: "bg-signal/10 text-signal border-signal",
+      cancelled: "bg-signal/10 text-signal border-signal",
+    };
+    return map[status] ?? map.planning;
+  }
+
+  function showDetail(p: ProjectRow): void {
+    if (!drawerBody) return;
+    drawerBody.innerHTML = `
+      <div class="space-y-4">
+        <div>
+          <p class="font-mono text-[9px] text-smoke uppercase tracking-widest">${escapeHtml(p.projectCode)}</p>
+          <h3 class="font-display text-xl text-ink mt-1">${escapeHtml(p.projectName)}</h3>
+          <span class="inline-block mt-2 font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${statusBadge(p.status)}">${escapeHtml(STATUS_LABEL[p.status] ?? p.status)}</span>
+        </div>
+        <div class="border-t border-hairline pt-4 space-y-2 font-mono text-xs">
+          <div class="flex justify-between"><span class="text-smoke">Klien</span><span class="text-ink">${escapeHtml(p.clientName)}</span></div>
+          <div class="flex justify-between"><span class="text-smoke">Email Klien</span><span class="text-ink">${escapeHtml(p.clientEmail)}</span></div>
+          <div class="flex justify-between"><span class="text-smoke">Lokasi</span><span class="text-ink">${escapeHtml(p.location ?? "-")}</span></div>
+          <div class="flex justify-between"><span class="text-smoke">Kategori</span><span class="text-ink">${escapeHtml(p.category ?? "-")}</span></div>
+          <div class="flex justify-between"><span class="text-smoke">Jumlah Kru</span><span class="text-ink">${p.crewSize ?? "-"}</span></div>
+          <div class="flex justify-between"><span class="text-smoke">Mulai</span><span class="text-ink">${p.startDate ? new Date(p.startDate).toLocaleDateString("id-ID") : "-"}</span></div>
+        </div>
+        <div class="border-t border-hairline pt-4 space-y-2 font-mono text-xs">
+          <div class="flex justify-between"><span class="text-smoke">Biaya Dasar</span><span class="text-ink">${formatIDR(p.baseCost)}</span></div>
+          <div class="flex justify-between"><span class="text-smoke">Biaya Tambahan</span><span class="text-ink">${formatIDR(p.additionalCost)}</span></div>
+          <div class="flex justify-between font-semibold"><span class="text-ink">Nilai Kontrak</span><span class="text-ink">${formatIDR(p.contractValue)}</span></div>
+          <div class="flex justify-between"><span class="text-smoke">Ref. Pembayaran</span><span class="text-ink">${escapeHtml(p.paymentRef ?? "-")}</span></div>
+        </div>
+      </div>
+    `;
+    openDrawer();
+  }
+
+  function renderTable(projects: ProjectRow[]): void {
+    tableBody.innerHTML = "";
+
+    const isEmpty = projects.length === 0;
+    table.classList.toggle("hidden", isEmpty);
+    emptyState.classList.toggle("hidden", !isEmpty);
+    if (countLabel) countLabel.textContent = `${projects.length} proyek`;
+
+    projects.forEach((p) => {
+      const tr = document.createElement("tr");
+      tr.className = "cursor-pointer hover:bg-hairline/10";
+      tr.innerHTML = `
+        <td class="font-mono text-xs text-ink">${escapeHtml(p.projectCode)}</td>
+        <td class="font-semibold text-ink">${escapeHtml(p.clientName)}</td>
+        <td class="hidden sm:table-cell font-mono text-xs text-charcoal">-</td>
+        <td class="font-mono text-xs text-charcoal">${formatIDR(p.contractValue)}</td>
+        <td class="hidden md:table-cell font-mono text-xs text-charcoal">${escapeHtml(p.location ?? "-")}</td>
+        <td><span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${statusBadge(p.status)}">${escapeHtml(STATUS_LABEL[p.status] ?? p.status)}</span></td>
+        <td class="text-right font-mono text-[10px] text-smoke">Lihat →</td>
+      `;
+      tr.addEventListener("click", () => showDetail(p));
+      tableBody.appendChild(tr);
+    });
+  }
+
+  function setStatValue(cardId: string, value: string): void {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
+    if (!valueEl) {
+      const skeleton = card.querySelector(".animate-pulse")?.parentElement;
+      valueEl = document.createElement("p");
+      const isAccent = card.classList.contains("bg-ink");
+      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
+      if (skeleton) {
+        skeleton.replaceWith(valueEl);
+      } else {
+        card.appendChild(valueEl);
+      }
+    }
+    valueEl.textContent = value;
+  }
+
+  function updateStats(projects: ProjectRow[]): void {
+    const total = projects.length;
+    const running = projects.filter((p) => p.status === "in_progress").length;
+    const totalValue = projects.reduce((sum, p) => sum + p.contractValue, 0);
+    const now = new Date();
+    const completedThisMonth = projects.filter((p) => {
+      if (p.status !== "completed") return false;
+      const d = new Date(p.startDate);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }).length;
+
+    setStatValue("stat-projects-total", String(total));
+    setStatValue("stat-projects-running", String(running));
+    setStatValue("stat-projects-value", formatIDR(totalValue));
+    setStatValue("stat-projects-completed", String(completedThisMonth));
+  }
+
+  async function loadProjects(): Promise<void> {
+    try {
+      const params = new URLSearchParams();
+      if (searchInput?.value) params.set("search", searchInput.value);
+      if (statusFilter?.value) params.set("status", statusFilter.value);
+
+      const res = await adminApiFetch(`${apiUrl}/api/owner/projects/admin?${params.toString()}`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat data proyek", "error");
+        return;
+      }
+      allProjects = json.data ?? [];
+      renderTable(allProjects);
+      updateStats(allProjects);
+    } catch (err) {
+      console.error("[loadProjects] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  let searchDebounce: ReturnType<typeof setTimeout>;
+  searchInput?.addEventListener("input", () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(loadProjects, 300);
   });
+  statusFilter?.addEventListener("change", loadProjects);
+  document.getElementById("btn-export-projects")?.addEventListener("click", () => {
+    exportTableToPDF("projects-table", { title: "Daftar Proyek", subtitle: "Semua proyek lintas tim & supervisor — FIREPRO" });
+  });
+
+  loadProjects();
 </script>
