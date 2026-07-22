@@ -64,11 +64,271 @@ import StatCard from "../../components/StatCard.astro";
       </div>
     </div>
   </div>
+  <!-- Add / edit client modal -->
+  <div id="client-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
+    <div class="panel w-full max-w-md bg-paper">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+        <h3 id="client-modal-title" class="font-display text-lg text-ink leading-none">Tambah Klien</h3>
+        <button id="client-modal-close" type="button" class="text-smoke hover:text-ink transition-colors" aria-label="Tutup">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <input type="hidden" id="client-id" />
+        <div>
+          <label class="field-label" for="client-name">Nama Klien</label>
+          <input id="client-name" type="text" class="field-input" placeholder="Nama klien / perusahaan" />
+        </div>
+        <div>
+          <label class="field-label" for="client-email">Email</label>
+          <input id="client-email" type="email" class="field-input" placeholder="nama@klien.id" />
+        </div>
+        <div>
+          <label class="field-label" for="client-phone">No. Telepon</label>
+          <input id="client-phone" type="tel" class="field-input" placeholder="08xxxxxxxxxx" />
+        </div>
+        <div>
+          <label class="field-label" for="client-address">Alamat</label>
+          <textarea id="client-address" rows="2" class="field-input" placeholder="Alamat klien"></textarea>
+        </div>
+        <div>
+          <label class="field-label" for="client-status">Status</label>
+          <select id="client-status" class="field-input">
+            <option value="active">Aktif</option>
+            <option value="inactive">Nonaktif</option>
+          </select>
+        </div>
+        <div id="client-modal-error" class="hidden border-2 border-signal bg-signal/5 px-3 py-2">
+          <p id="client-modal-error-msg" class="font-mono text-xs text-signal"></p>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
+        <button type="button" id="client-modal-cancel" class="btn-secondary text-xs">Batal</button>
+        <button type="button" id="client-modal-save" class="btn-primary text-xs">Simpan</button>
+      </div>
+    </div>
+  </div>
 </OwnerLayout>
 
 <script>
-  // Prototype UI only — belum terhubung ke endpoint clients.
+  import { adminApiFetch } from "../../lib/auth";
+  import { escapeHtml } from "../../lib/escapeHtml";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface ClientRow {
+    id: number;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    address: string | null;
+    status: "active" | "inactive";
+    createdAt: string;
+    totalProjects: number;
+  }
+
+  let allClients: ClientRow[] = [];
+
+  const tableBody = document.getElementById("clients-body") as HTMLTableSectionElement;
+  const emptyState = document.getElementById("clients-empty") as HTMLDivElement;
+  const table = document.getElementById("clients-table") as HTMLTableElement;
+  const countLabel = document.querySelector("[data-clients-count]") as HTMLElement | null;
+  const searchInput = document.getElementById("search-clients") as HTMLInputElement | null;
+  const statusFilter = document.getElementById("filter-client-status") as HTMLSelectElement | null;
+
+  function openModal(id: string): void {
+    document.getElementById(id)?.classList.replace("hidden", "flex");
+  }
+  function closeModal(id: string): void {
+    document.getElementById(id)?.classList.replace("flex", "hidden");
+  }
+
+  function statusBadge(status: string): string {
+    return status === "active"
+      ? "bg-ink/5 text-ink border-ink"
+      : "bg-hairline/30 text-smoke border-hairline";
+  }
+
+  function renderTable(clients: ClientRow[]): void {
+    tableBody.innerHTML = "";
+
+    const isEmpty = clients.length === 0;
+    table.classList.toggle("hidden", isEmpty);
+    emptyState.classList.toggle("hidden", !isEmpty);
+    if (countLabel) countLabel.textContent = `${clients.length} klien`;
+
+    clients.forEach((c) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="font-semibold text-ink">${escapeHtml(c.name)}</td>
+        <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${escapeHtml(c.email ?? "-")}</td>
+        <td class="hidden md:table-cell font-mono text-xs text-charcoal">${escapeHtml(c.phone ?? "-")}</td>
+        <td class="hidden md:table-cell font-mono text-xs text-charcoal">${c.totalProjects}</td>
+        <td><span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${statusBadge(c.status)}">${escapeHtml(c.status)}</span></td>
+        <td class="text-right whitespace-nowrap">
+          <button type="button" data-id="${c.id}" class="btn-edit-client text-xs text-smoke hover:text-ink font-mono underline-offset-2 hover:underline mr-3">Edit</button>
+          <button type="button" data-id="${c.id}" data-name="${escapeHtml(c.name)}" class="btn-delete-client text-xs text-smoke hover:text-signal font-mono underline-offset-2 hover:underline">Hapus</button>
+        </td>
+      `;
+      tableBody.appendChild(tr);
+    });
+
+    tableBody.querySelectorAll<HTMLButtonElement>(".btn-edit-client").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const client = allClients.find((c) => String(c.id) === btn.dataset.id);
+        if (client) openEditModal(client);
+      });
+    });
+
+    tableBody.querySelectorAll<HTMLButtonElement>(".btn-delete-client").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id;
+        const name = btn.dataset.name ?? "";
+        if (!window.confirm(`Hapus klien "${name}"? Aksi ini tidak bisa dibatalkan.`)) return;
+        try {
+          const res = await adminApiFetch(`${apiUrl}/api/owner/clients/${id}`, { method: "DELETE" });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            window.showToast?.(json.error ?? "Gagal menghapus klien", "error");
+            return;
+          }
+          window.showToast?.("Klien berhasil dihapus");
+          await loadClients();
+        } catch {
+          window.showToast?.("Tidak bisa terhubung ke server", "error");
+        }
+      });
+    });
+  }
+
+  function updateStats(clients: ClientRow[]): void {
+    const total = clients.length;
+    const active = clients.filter((c) => c.status === "active").length;
+    const withProjects = clients.filter((c) => c.totalProjects > 0).length;
+    const now = new Date();
+    const newThisMonth = clients.filter((c) => {
+      const d = new Date(c.createdAt);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }).length;
+
+    setStatValue("stat-clients-total", String(total));
+    setStatValue("stat-clients-active", String(active));
+    setStatValue("stat-clients-projects", String(withProjects));
+    setStatValue("stat-clients-new", String(newThisMonth));
+  }
+
+  function setStatValue(cardId: string, value: string): void {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
+    if (!valueEl) {
+      const skeleton = card.querySelector(".animate-pulse")?.parentElement;
+      valueEl = document.createElement("p");
+      const isAccent = card.classList.contains("bg-ink");
+      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
+      if (skeleton) {
+        skeleton.replaceWith(valueEl);
+      } else {
+        card.appendChild(valueEl);
+      }
+    }
+    valueEl.textContent = value;
+  }
+
+  async function loadClients(): Promise<void> {
+    try {
+      const params = new URLSearchParams();
+      if (searchInput?.value) params.set("search", searchInput.value);
+      if (statusFilter?.value) params.set("status", statusFilter.value);
+      params.set("limit", "100");
+
+      const res = await adminApiFetch(`${apiUrl}/api/owner/clients?${params.toString()}`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat data klien", "error");
+        return;
+      }
+      allClients = json.data ?? [];
+      renderTable(allClients);
+      updateStats(allClients);
+    } catch (err) {
+      console.error("[loadClients] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  function resetModalForm(): void {
+    (document.getElementById("client-id") as HTMLInputElement).value = "";
+    (document.getElementById("client-name") as HTMLInputElement).value = "";
+    (document.getElementById("client-email") as HTMLInputElement).value = "";
+    (document.getElementById("client-phone") as HTMLInputElement).value = "";
+    (document.getElementById("client-address") as HTMLTextAreaElement).value = "";
+    (document.getElementById("client-status") as HTMLSelectElement).value = "active";
+    document.getElementById("client-modal-error")?.classList.add("hidden");
+  }
+
+  function openEditModal(client: ClientRow): void {
+    resetModalForm();
+    (document.getElementById("client-modal-title") as HTMLElement).textContent = "Edit Klien";
+    (document.getElementById("client-id") as HTMLInputElement).value = String(client.id);
+    (document.getElementById("client-name") as HTMLInputElement).value = client.name;
+    (document.getElementById("client-email") as HTMLInputElement).value = client.email ?? "";
+    (document.getElementById("client-phone") as HTMLInputElement).value = client.phone ?? "";
+    (document.getElementById("client-address") as HTMLTextAreaElement).value = client.address ?? "";
+    (document.getElementById("client-status") as HTMLSelectElement).value = client.status;
+    openModal("client-modal");
+  }
+
   document.getElementById("btn-add-client")?.addEventListener("click", () => {
-    window.showToast?.("Form tambah klien (prototype)", "info");
+    resetModalForm();
+    (document.getElementById("client-modal-title") as HTMLElement).textContent = "Tambah Klien";
+    openModal("client-modal");
   });
+  document.getElementById("client-modal-close")?.addEventListener("click", () => closeModal("client-modal"));
+  document.getElementById("client-modal-cancel")?.addEventListener("click", () => closeModal("client-modal"));
+
+  document.getElementById("client-modal-save")?.addEventListener("click", async () => {
+    const id = (document.getElementById("client-id") as HTMLInputElement).value;
+    const name = (document.getElementById("client-name") as HTMLInputElement).value.trim();
+    const email = (document.getElementById("client-email") as HTMLInputElement).value.trim();
+    const phone = (document.getElementById("client-phone") as HTMLInputElement).value.trim();
+    const address = (document.getElementById("client-address") as HTMLTextAreaElement).value.trim();
+    const status = (document.getElementById("client-status") as HTMLSelectElement).value;
+
+    const errorBox = document.getElementById("client-modal-error");
+    const errorMsg = document.getElementById("client-modal-error-msg");
+
+    const body = { name, email: email || null, phone: phone || null, address: address || null, status };
+
+    try {
+      const res = await adminApiFetch(
+        id ? `${apiUrl}/api/owner/clients/${id}` : `${apiUrl}/api/owner/clients`,
+        { method: id ? "PATCH" : "POST", body: JSON.stringify(body) }
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        if (errorMsg) errorMsg.textContent = json.error ?? "Gagal menyimpan klien";
+        errorBox?.classList.remove("hidden");
+        return;
+      }
+      window.showToast?.(id ? "Klien berhasil diperbarui" : "Klien berhasil ditambahkan");
+      closeModal("client-modal");
+      await loadClients();
+    } catch {
+      if (errorMsg) errorMsg.textContent = "Tidak bisa terhubung ke server";
+      errorBox?.classList.remove("hidden");
+    }
+  });
+
+  let searchDebounce: ReturnType<typeof setTimeout>;
+  searchInput?.addEventListener("input", () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(loadClients, 300);
+  });
+  statusFilter?.addEventListener("change", loadClients);
+
+  loadClients();
 </script>
