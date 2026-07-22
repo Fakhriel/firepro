@@ -68,11 +68,291 @@ import StatCard from "../../components/StatCard.astro";
       </div>
     </div>
   </div>
+  <!-- Add / edit quotation modal -->
+  <div id="quotation-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
+    <div class="panel w-full max-w-md bg-paper">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+        <h3 id="quotation-modal-title" class="font-display text-lg text-ink leading-none">Buat Penawaran</h3>
+        <button id="quotation-modal-close" type="button" class="text-smoke hover:text-ink transition-colors" aria-label="Tutup">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <input type="hidden" id="quotation-id" />
+        <div>
+          <label class="field-label" for="quotation-client">Nama Klien</label>
+          <input id="quotation-client" type="text" class="field-input" placeholder="Nama klien / calon klien" />
+        </div>
+        <div>
+          <label class="field-label" for="quotation-project">Nama Proyek</label>
+          <input id="quotation-project" type="text" class="field-input" placeholder="Nama proyek yang ditawarkan" />
+        </div>
+        <div>
+          <label class="field-label" for="quotation-description">Deskripsi</label>
+          <textarea id="quotation-description" rows="2" class="field-input" placeholder="Ringkasan lingkup pekerjaan"></textarea>
+        </div>
+        <div>
+          <label class="field-label" for="quotation-amount">Nilai Penawaran (Rp)</label>
+          <input id="quotation-amount" type="number" min="0" class="field-input" placeholder="0" />
+        </div>
+        <div>
+          <label class="field-label" for="quotation-valid-until">Berlaku Hingga</label>
+          <input id="quotation-valid-until" type="date" class="field-input" />
+        </div>
+        <div>
+          <label class="field-label" for="quotation-status-field">Status</label>
+          <select id="quotation-status-field" class="field-input">
+            <option value="draft">Draft</option>
+            <option value="sent">Terkirim</option>
+            <option value="accepted">Disetujui</option>
+            <option value="rejected">Ditolak</option>
+            <option value="expired">Kedaluwarsa</option>
+          </select>
+        </div>
+        <div id="quotation-modal-error" class="hidden border-2 border-signal bg-signal/5 px-3 py-2">
+          <p id="quotation-modal-error-msg" class="font-mono text-xs text-signal"></p>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
+        <button type="button" id="quotation-modal-cancel" class="btn-secondary text-xs">Batal</button>
+        <button type="button" id="quotation-modal-save" class="btn-primary text-xs">Simpan</button>
+      </div>
+    </div>
+  </div>
 </OwnerLayout>
 
 <script>
-  // Prototype UI only — belum terhubung ke endpoint quotations.
+  import { adminApiFetch } from "../../lib/auth";
+  import { escapeHtml } from "../../lib/escapeHtml";
+  import { formatIDR } from "../../lib/export";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface QuotationRow {
+    id: string;
+    number: string;
+    client: string;
+    project: string;
+    description: string;
+    amount: number;
+    validUntil: string;
+    status: "draft" | "sent" | "accepted" | "rejected" | "expired";
+  }
+
+  const STATUS_LABEL: Record<string, string> = {
+    draft: "Draft",
+    sent: "Terkirim",
+    accepted: "Disetujui",
+    rejected: "Ditolak",
+    expired: "Kedaluwarsa",
+  };
+
+  let allQuotations: QuotationRow[] = [];
+
+  const tableBody = document.getElementById("quotations-body") as HTMLTableSectionElement;
+  const emptyState = document.getElementById("quotations-empty") as HTMLDivElement;
+  const table = document.getElementById("quotations-table") as HTMLTableElement;
+  const countLabel = document.querySelector("[data-quotations-count]") as HTMLElement | null;
+  const searchInput = document.getElementById("search-quotations") as HTMLInputElement | null;
+  const statusFilter = document.getElementById("filter-quotation-status") as HTMLSelectElement | null;
+
+  function openModal(id: string): void {
+    document.getElementById(id)?.classList.replace("hidden", "flex");
+  }
+  function closeModal(id: string): void {
+    document.getElementById(id)?.classList.replace("flex", "hidden");
+  }
+
+  function statusBadge(status: string): string {
+    const map: Record<string, string> = {
+      draft: "bg-hairline/30 text-smoke border-hairline",
+      sent: "bg-ink/5 text-ink border-ink",
+      accepted: "bg-ink text-paper border-ink",
+      rejected: "bg-signal/10 text-signal border-signal",
+      expired: "bg-signal/10 text-signal border-signal",
+    };
+    return map[status] ?? map.draft;
+  }
+
+  function setStatValue(cardId: string, value: string): void {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
+    if (!valueEl) {
+      const skeleton = card.querySelector(".animate-pulse")?.parentElement;
+      valueEl = document.createElement("p");
+      const isAccent = card.classList.contains("bg-ink");
+      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
+      if (skeleton) {
+        skeleton.replaceWith(valueEl);
+      } else {
+        card.appendChild(valueEl);
+      }
+    }
+    valueEl.textContent = value;
+  }
+
+  function renderTable(quotations: QuotationRow[]): void {
+    tableBody.innerHTML = "";
+
+    const isEmpty = quotations.length === 0;
+    table.classList.toggle("hidden", isEmpty);
+    emptyState.classList.toggle("hidden", !isEmpty);
+    if (countLabel) countLabel.textContent = `${quotations.length} penawaran`;
+
+    quotations.forEach((q) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="font-mono text-xs text-ink">${escapeHtml(q.number)}</td>
+        <td class="font-semibold text-ink">${escapeHtml(q.client)}</td>
+        <td class="hidden sm:table-cell font-mono text-xs text-charcoal">-</td>
+        <td class="font-mono text-xs text-charcoal">${formatIDR(q.amount)}</td>
+        <td class="hidden md:table-cell font-mono text-xs text-charcoal">${q.validUntil ? new Date(q.validUntil).toLocaleDateString("id-ID") : "-"}</td>
+        <td><span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${statusBadge(q.status)}">${escapeHtml(STATUS_LABEL[q.status] ?? q.status)}</span></td>
+        <td class="text-right whitespace-nowrap">
+          <button type="button" data-id="${q.id}" class="btn-edit-quotation text-xs text-smoke hover:text-ink font-mono underline-offset-2 hover:underline mr-3">Edit</button>
+          <button type="button" data-id="${q.id}" data-number="${escapeHtml(q.number)}" class="btn-delete-quotation text-xs text-smoke hover:text-signal font-mono underline-offset-2 hover:underline">Hapus</button>
+        </td>
+      `;
+      tableBody.appendChild(tr);
+    });
+
+    tableBody.querySelectorAll<HTMLButtonElement>(".btn-edit-quotation").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const q = allQuotations.find((x) => x.id === btn.dataset.id);
+        if (q) openEditModal(q);
+      });
+    });
+
+    tableBody.querySelectorAll<HTMLButtonElement>(".btn-delete-quotation").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id;
+        const number = btn.dataset.number ?? "";
+        if (!window.confirm(`Hapus penawaran "${number}"? Aksi ini tidak bisa dibatalkan.`)) return;
+        try {
+          const res = await adminApiFetch(`${apiUrl}/api/owner/quotations/${id}`, { method: "DELETE" });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            window.showToast?.(json.error ?? "Gagal menghapus penawaran", "error");
+            return;
+          }
+          window.showToast?.("Penawaran berhasil dihapus");
+          await loadQuotations();
+        } catch {
+          window.showToast?.("Tidak bisa terhubung ke server", "error");
+        }
+      });
+    });
+  }
+
+  function updateStats(quotations: QuotationRow[]): void {
+    const total = quotations.length;
+    const pending = quotations.filter((q) => q.status === "sent" || q.status === "draft").length;
+    const accepted = quotations.filter((q) => q.status === "accepted").length;
+    const totalValue = quotations.reduce((sum, q) => sum + q.amount, 0);
+
+    setStatValue("stat-quotations-total", String(total));
+    setStatValue("stat-quotations-pending", String(pending));
+    setStatValue("stat-quotations-accepted", String(accepted));
+    setStatValue("stat-quotations-value", formatIDR(totalValue));
+  }
+
+  async function loadQuotations(): Promise<void> {
+    try {
+      const params = new URLSearchParams();
+      if (searchInput?.value) params.set("search", searchInput.value);
+      if (statusFilter?.value) params.set("status", statusFilter.value);
+
+      const res = await adminApiFetch(`${apiUrl}/api/owner/quotations/admin?${params.toString()}`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat data penawaran", "error");
+        return;
+      }
+      allQuotations = json.data ?? [];
+      renderTable(allQuotations);
+      updateStats(allQuotations);
+    } catch (err) {
+      console.error("[loadQuotations] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  function resetForm(): void {
+    (document.getElementById("quotation-id") as HTMLInputElement).value = "";
+    (document.getElementById("quotation-client") as HTMLInputElement).value = "";
+    (document.getElementById("quotation-project") as HTMLInputElement).value = "";
+    (document.getElementById("quotation-description") as HTMLTextAreaElement).value = "";
+    (document.getElementById("quotation-amount") as HTMLInputElement).value = "";
+    (document.getElementById("quotation-valid-until") as HTMLInputElement).value = "";
+    (document.getElementById("quotation-status-field") as HTMLSelectElement).value = "draft";
+    document.getElementById("quotation-modal-error")?.classList.add("hidden");
+  }
+
+  function openEditModal(q: QuotationRow): void {
+    resetForm();
+    (document.getElementById("quotation-modal-title") as HTMLElement).textContent = "Edit Penawaran";
+    (document.getElementById("quotation-id") as HTMLInputElement).value = q.id;
+    (document.getElementById("quotation-client") as HTMLInputElement).value = q.client;
+    (document.getElementById("quotation-project") as HTMLInputElement).value = q.project;
+    (document.getElementById("quotation-description") as HTMLTextAreaElement).value = q.description ?? "";
+    (document.getElementById("quotation-amount") as HTMLInputElement).value = String(q.amount);
+    (document.getElementById("quotation-valid-until") as HTMLInputElement).value = q.validUntil ?? "";
+    (document.getElementById("quotation-status-field") as HTMLSelectElement).value = q.status;
+    openModal("quotation-modal");
+  }
+
   document.getElementById("btn-add-quotation")?.addEventListener("click", () => {
-    window.showToast?.("Form buat penawaran (prototype)", "info");
+    resetForm();
+    (document.getElementById("quotation-modal-title") as HTMLElement).textContent = "Buat Penawaran";
+    openModal("quotation-modal");
   });
+  document.getElementById("quotation-modal-close")?.addEventListener("click", () => closeModal("quotation-modal"));
+  document.getElementById("quotation-modal-cancel")?.addEventListener("click", () => closeModal("quotation-modal"));
+
+  document.getElementById("quotation-modal-save")?.addEventListener("click", async () => {
+    const id = (document.getElementById("quotation-id") as HTMLInputElement).value;
+    const client = (document.getElementById("quotation-client") as HTMLInputElement).value.trim();
+    const project = (document.getElementById("quotation-project") as HTMLInputElement).value.trim();
+    const description = (document.getElementById("quotation-description") as HTMLTextAreaElement).value.trim();
+    const amount = (document.getElementById("quotation-amount") as HTMLInputElement).value;
+    const validUntil = (document.getElementById("quotation-valid-until") as HTMLInputElement).value;
+    const status = (document.getElementById("quotation-status-field") as HTMLSelectElement).value;
+
+    const errorBox = document.getElementById("quotation-modal-error");
+    const errorMsg = document.getElementById("quotation-modal-error-msg");
+
+    const body = { client, project, description: description || null, amount: Number(amount), validUntil, status };
+
+    try {
+      const res = await adminApiFetch(
+        id ? `${apiUrl}/api/owner/quotations/${id}` : `${apiUrl}/api/owner/quotations`,
+        { method: id ? "PATCH" : "POST", body: JSON.stringify(body) }
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        if (errorMsg) errorMsg.textContent = json.error ?? "Gagal menyimpan penawaran";
+        errorBox?.classList.remove("hidden");
+        return;
+      }
+      window.showToast?.(id ? "Penawaran berhasil diperbarui" : "Penawaran berhasil dibuat");
+      closeModal("quotation-modal");
+      await loadQuotations();
+    } catch {
+      if (errorMsg) errorMsg.textContent = "Tidak bisa terhubung ke server";
+      errorBox?.classList.remove("hidden");
+    }
+  });
+
+  let searchDebounce: ReturnType<typeof setTimeout>;
+  searchInput?.addEventListener("input", () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(loadQuotations, 300);
+  });
+  statusFilter?.addEventListener("change", loadQuotations);
+
+  loadQuotations();
 </script>
