@@ -78,25 +78,11 @@ import StatCard from "../../components/StatCard.astro";
             <option value="">Pilih teknisi…</option>
           </select>
         </div>
-        <div>
-          <label class="field-label" for="maintenance-note">Catatan Pekerjaan</label>
-          <textarea id="maintenance-note" rows="3" class="field-input resize-none" placeholder="Catatan hasil pemeriksaan / servis…"></textarea>
-        </div>
-        <div>
-          <label class="field-label" for="maintenance-photo">Upload Dokumentasi</label>
-          <label for="maintenance-photo" class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-hairline hover:border-ink transition-colors py-8 cursor-pointer text-center">
-            <svg viewBox="0 0 24 24" fill="none" class="w-6 h-6 text-smoke" stroke="currentColor" stroke-width="1.5">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-              <circle cx="12" cy="13" r="4"/>
-            </svg>
-            <span class="font-mono text-[10px] text-smoke uppercase tracking-widest">Klik untuk pilih foto</span>
-            <input id="maintenance-photo" type="file" accept="image/*" capture="environment" multiple class="hidden" />
-          </label>
-          <p id="maintenance-photo-filename" class="font-mono text-[10px] text-smoke mt-1.5"></p>
-        </div>
+        <p class="font-mono text-[9px] text-smoke">Catatan & upload dokumentasi belum tersedia — backend belum punya endpoint untuk itu di modul maintenance.</p>
       </div>
       <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
         <button id="maintenance-modal-cancel" type="button" class="btn-secondary text-xs">Batal</button>
+        <button id="maintenance-assign-save" type="button" class="btn-secondary text-xs">Simpan Teknisi</button>
         <button id="maintenance-mark-done" type="button" class="btn-primary text-xs gap-1.5" style="background-color: var(--color-armed, #1f7a4d); border-color: var(--color-armed, #1f7a4d);">
           Tandai Selesai
         </button>
@@ -106,32 +92,225 @@ import StatCard from "../../components/StatCard.astro";
 </SupervisorLayout>
 
 <script>
-  // Prototype UI only — belum terhubung ke endpoint maintenance.
-  const modal = document.getElementById("maintenance-modal");
+  import { adminApiFetch } from "../../lib/auth";
+  import { escapeHtml } from "../../lib/escapeHtml";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface MaintenanceItem {
+    id: string;
+    client: string;
+    location: string;
+    equipment: string;
+    nextService: string;
+    technician: string;
+    status: "scheduled" | "due_soon" | "overdue" | "completed";
+  }
+
+  const STATUS_LABEL: Record<string, string> = {
+    scheduled: "Terjadwal",
+    due_soon: "Segera Jatuh Tempo",
+    overdue: "Terlambat",
+    completed: "Selesai",
+  };
+  const STATUS_BADGE: Record<string, string> = {
+    scheduled: "bg-hairline/20 text-smoke border-hairline",
+    due_soon: "bg-amber/10 text-amber border-amber",
+    overdue: "bg-signal/10 text-signal border-signal",
+    completed: "bg-armed/10 text-armed border-armed",
+  };
+
+  let allItems: MaintenanceItem[] = [];
+  let currentItemId: string | null = null;
+  let technicianNames: string[] = [];
+
+  const searchInput = document.getElementById("search-maintenance") as HTMLInputElement | null;
+  const statusFilter = document.getElementById("filter-maintenance-status") as HTMLSelectElement | null;
+  const tableBody = document.getElementById("maintenance-body") as HTMLTableSectionElement;
+  const table = document.getElementById("maintenance-table") as HTMLTableElement;
+  const emptyState = document.getElementById("maintenance-empty") as HTMLDivElement;
+  const countLabel = document.querySelector("[data-maintenance-count]") as HTMLElement | null;
+
+  function setStatValue(cardId: string, value: string): void {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
+    if (!valueEl) {
+      const skeleton = card.querySelector(".animate-pulse")?.parentElement;
+      valueEl = document.createElement("p");
+      const isAccent = card.classList.contains("bg-ink");
+      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
+      if (skeleton) {
+        skeleton.replaceWith(valueEl);
+      } else {
+        card.appendChild(valueEl);
+      }
+    }
+    valueEl.textContent = value;
+  }
+
+  function formatDate(iso: string): string {
+    try {
+      return new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+    } catch {
+      return iso;
+    }
+  }
+
   function openModal(): void {
-    modal?.classList.remove("hidden");
-    modal?.classList.add("flex");
+    document.getElementById("maintenance-modal")?.classList.replace("hidden", "flex");
   }
   function closeModal(): void {
-    modal?.classList.add("hidden");
-    modal?.classList.remove("flex");
+    document.getElementById("maintenance-modal")?.classList.replace("flex", "hidden");
+    currentItemId = null;
   }
   document.getElementById("maintenance-modal-close")?.addEventListener("click", closeModal);
   document.getElementById("maintenance-modal-cancel")?.addEventListener("click", closeModal);
-  document.getElementById("maintenance-mark-done")?.addEventListener("click", () => {
-    closeModal();
-    window.showToast?.("Maintenance ditandai selesai (prototype)", "success");
-  });
 
-  document.getElementById("maintenance-photo")?.addEventListener("change", (e) => {
-    const input = e.target as HTMLInputElement;
-    const label = document.getElementById("maintenance-photo-filename");
-    if (label) {
-      label.textContent = input.files && input.files.length > 0
-        ? `${input.files.length} foto dipilih`
-        : "";
+  function renderTable(): void {
+    const keyword = (searchInput?.value ?? "").trim().toLowerCase();
+    const statusF = statusFilter?.value ?? "";
+    const filtered = allItems.filter((m) => {
+      if (statusF && m.status !== statusF) return false;
+      if (
+        keyword &&
+        !m.client.toLowerCase().includes(keyword) &&
+        !m.location.toLowerCase().includes(keyword) &&
+        !m.equipment.toLowerCase().includes(keyword)
+      )
+        return false;
+      return true;
+    });
+
+    tableBody.innerHTML = "";
+    const isEmpty = filtered.length === 0;
+    table.classList.toggle("hidden", isEmpty);
+    emptyState.classList.toggle("hidden", !isEmpty);
+    if (countLabel) countLabel.textContent = `${filtered.length} jadwal`;
+
+    filtered.forEach((m) => {
+      const tr = document.createElement("tr");
+      tr.className = "cursor-pointer hover:bg-hairline/10";
+      tr.innerHTML = `
+        <td>
+          <p class="font-semibold text-ink">${escapeHtml(m.client)}</p>
+          <p class="font-mono text-[10px] text-smoke">${escapeHtml(m.location)}</p>
+        </td>
+        <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${escapeHtml(m.equipment)}</td>
+        <td class="hidden md:table-cell font-mono text-xs text-charcoal">${formatDate(m.nextService)}</td>
+        <td class="hidden md:table-cell font-mono text-xs text-charcoal">${escapeHtml(m.technician || "-")}</td>
+        <td><span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${STATUS_BADGE[m.status]}">${STATUS_LABEL[m.status]}</span></td>
+        <td class="text-right font-mono text-[10px] text-smoke">Kelola →</td>
+      `;
+      tr.addEventListener("click", () => {
+        currentItemId = m.id;
+        const select = document.getElementById("maintenance-technician-select") as HTMLSelectElement;
+        select.value = m.technician || "";
+        openModal();
+      });
+      tableBody.appendChild(tr);
+    });
+  }
+
+  function updateStats(): void {
+    setStatValue("stat-maintenance-active", String(allItems.filter((m) => m.status !== "completed").length));
+    setStatValue("stat-maintenance-due-soon", String(allItems.filter((m) => m.status === "due_soon").length));
+    setStatValue("stat-maintenance-overdue", String(allItems.filter((m) => m.status === "overdue").length));
+    const now = new Date();
+    setStatValue(
+      "stat-maintenance-completed",
+      String(
+        allItems.filter((m) => {
+          if (m.status !== "completed") return false;
+          const d = new Date(m.nextService);
+          return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+        }).length
+      )
+    );
+  }
+
+  async function loadMaintenance(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/maintenance`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat jadwal maintenance", "error");
+        return;
+      }
+      allItems = json.data ?? [];
+      renderTable();
+      updateStats();
+    } catch (err) {
+      console.error("[loadMaintenance] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  async function loadTechnicians(): Promise<void> {
+    const select = document.getElementById("maintenance-technician-select") as HTMLSelectElement;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/technicians`);
+      const json = await res.json();
+      if (!res.ok) return;
+      technicianNames = (json.data ?? []).map((t: { name: string }) => t.name);
+      select.innerHTML =
+        `<option value="">Pilih teknisi…</option>` +
+        technicianNames.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+    } catch (err) {
+      console.error("[loadTechnicians] gagal fetch backend:", err);
+    }
+  }
+
+  document.getElementById("maintenance-assign-save")?.addEventListener("click", async () => {
+    if (!currentItemId) return;
+    const technician = (document.getElementById("maintenance-technician-select") as HTMLSelectElement).value;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/maintenance/${currentItemId}/assign`, {
+        method: "PATCH",
+        body: JSON.stringify({ technician }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal menugaskan teknisi", "error");
+        return;
+      }
+      window.showToast?.(json.message ?? "Teknisi berhasil ditugaskan");
+      closeModal();
+      await loadMaintenance();
+    } catch (err) {
+      console.error("[maintenance-assign-save] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
     }
   });
 
-  document.getElementById("maintenance-body")?.addEventListener("click", () => openModal());
+  document.getElementById("maintenance-mark-done")?.addEventListener("click", async () => {
+    if (!currentItemId) return;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/maintenance/${currentItemId}/complete`, {
+        method: "PATCH",
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal menandai selesai", "error");
+        return;
+      }
+      window.showToast?.(json.message ?? "Maintenance ditandai selesai");
+      closeModal();
+      await loadMaintenance();
+    } catch (err) {
+      console.error("[maintenance-mark-done] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  });
+
+  let searchDebounce: ReturnType<typeof setTimeout>;
+  searchInput?.addEventListener("input", () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(renderTable, 300);
+  });
+  statusFilter?.addEventListener("change", renderTable);
+
+  loadMaintenance();
+  loadTechnicians();
 </script>
