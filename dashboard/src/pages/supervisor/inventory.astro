@@ -5,14 +5,7 @@ import StatCard from "../../components/StatCard.astro";
 ---
 
 <SupervisorLayout title="Inventory" activeNav="inventory">
-  <PageHeader heading="Inventory" sub="Stok alat & material untuk kebutuhan proyek" crumbs={[{ label: "Fokus Lapangan" }, { label: "Inventory" }]}>
-    <button id="btn-open-request" type="button" class="btn-primary text-xs gap-1.5">
-      <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="2">
-        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-      </svg>
-      Request Barang
-    </button>
-  </PageHeader>
+  <PageHeader heading="Inventory" sub="Stok alat & material untuk kebutuhan proyek" crumbs={[{ label: "Fokus Lapangan" }, { label: "Inventory" }]} />
 
   <!-- Stat cards -->
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
@@ -37,7 +30,7 @@ import StatCard from "../../components/StatCard.astro";
   <div class="panel overflow-hidden mb-8">
     <div class="px-5 py-4 border-b-2 border-ink">
       <h3 class="font-display text-lg text-ink leading-none">Stok Gudang</h3>
-      <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Alat & material tersedia</p>
+      <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Alat & material tersedia (read-only)</p>
     </div>
     <div class="overflow-x-auto">
       <table id="inventory-table" class="data-table">
@@ -46,7 +39,6 @@ import StatCard from "../../components/StatCard.astro";
             <th>Nama Barang</th>
             <th class="hidden sm:table-cell">Kategori</th>
             <th>Stok</th>
-            <th class="hidden md:table-cell">Satuan</th>
             <th>Status</th>
           </tr>
         </thead>
@@ -62,11 +54,11 @@ import StatCard from "../../components/StatCard.astro";
     </div>
   </div>
 
-  <!-- Request history -->
+  <!-- Purchase requests needing approval -->
   <div class="panel overflow-hidden">
     <div class="px-5 py-4 border-b-2 border-ink">
-      <h3 class="font-display text-lg text-ink leading-none">Riwayat Request Barang</h3>
-      <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Permintaan untuk tim & proyek Anda</p>
+      <h3 class="font-display text-lg text-ink leading-none">Permintaan Barang dari Teknisi</h3>
+      <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Menunggu persetujuan Anda</p>
     </div>
     <div class="overflow-x-auto">
       <table id="request-table" class="data-table">
@@ -74,9 +66,10 @@ import StatCard from "../../components/StatCard.astro";
           <tr>
             <th>Alat / Material</th>
             <th class="hidden sm:table-cell">Jumlah</th>
-            <th class="hidden sm:table-cell">Proyek Terkait</th>
-            <th class="hidden md:table-cell">Tanggal</th>
+            <th class="hidden sm:table-cell">Diajukan Oleh</th>
+            <th class="hidden md:table-cell">Proyek</th>
             <th>Status</th>
+            <th class="text-right">Aksi</th>
           </tr>
         </thead>
         <tbody id="request-body"></tbody>
@@ -91,75 +84,239 @@ import StatCard from "../../components/StatCard.astro";
     </div>
   </div>
 
-  <!-- Request modal -->
+  <!-- Approve/reject modal -->
   <div id="request-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
-    <div class="panel w-full max-w-md bg-paper">
+    <div class="panel w-full max-w-sm bg-paper">
       <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
-        <h3 class="font-display text-lg text-ink leading-none">Request Barang</h3>
+        <h3 class="font-display text-lg text-ink leading-none">Tinjau Permintaan</h3>
         <button id="request-modal-close" type="button" class="text-smoke hover:text-ink transition-colors" aria-label="Tutup">
           <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         </button>
       </div>
-      <form id="request-form">
-        <div class="p-5 space-y-4">
-          <div>
-            <label class="field-label" for="request-item">Nama Alat / Material</label>
-            <input id="request-item" type="text" class="field-input" placeholder="Contoh: APAR 3kg, pipa sprinkler 1 inch" />
-          </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="field-label" for="request-qty">Jumlah</label>
-              <input id="request-qty" type="number" min="1" value="1" class="field-input" />
-            </div>
-            <div>
-              <label class="field-label" for="request-urgency">Urgensi</label>
-              <select id="request-urgency" class="field-input">
-                <option value="normal">Normal</option>
-                <option value="urgent">Mendesak</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label class="field-label" for="request-project">Proyek Terkait</label>
-            <select id="request-project" class="field-input">
-              <option value="">Pilih proyek…</option>
-            </select>
-          </div>
-          <div>
-            <label class="field-label" for="request-note">Catatan</label>
-            <textarea id="request-note" rows="3" class="field-input resize-none" placeholder="Keterangan tambahan (opsional)…"></textarea>
-          </div>
-        </div>
-        <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
-          <button type="button" id="request-modal-cancel" class="btn-secondary text-xs">Batal</button>
-          <button type="submit" class="btn-primary text-xs">Ajukan Request</button>
-        </div>
-      </form>
+      <div class="p-5">
+        <p class="font-body text-sm text-charcoal">
+          <span id="request-modal-item" class="font-semibold text-ink"></span> —
+          qty <span id="request-modal-qty"></span>, diajukan oleh
+          <span id="request-modal-by"></span>.
+        </p>
+      </div>
+      <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
+        <button id="btn-reject-request" type="button" class="btn-danger text-xs">Tolak</button>
+        <button id="btn-approve-request" type="button" class="btn-primary text-xs" style="background-color: var(--color-armed, #1f7a4d); border-color: var(--color-armed, #1f7a4d);">Setujui</button>
+      </div>
     </div>
   </div>
 </SupervisorLayout>
 
 <script>
-  // Prototype UI only — belum terhubung ke endpoint inventory supervisor.
-  const modal = document.getElementById("request-modal");
-  function openModal(): void {
-    modal?.classList.remove("hidden");
-    modal?.classList.add("flex");
-  }
-  function closeModal(): void {
-    modal?.classList.add("hidden");
-    modal?.classList.remove("flex");
-  }
-  document.getElementById("btn-open-request")?.addEventListener("click", openModal);
-  document.getElementById("request-modal-close")?.addEventListener("click", closeModal);
-  document.getElementById("request-modal-cancel")?.addEventListener("click", closeModal);
+  import { adminApiFetch } from "../../lib/auth";
+  import { escapeHtml } from "../../lib/escapeHtml";
 
-  document.getElementById("request-form")?.addEventListener("submit", (e) => {
-    e.preventDefault();
-    closeModal();
-    (e.target as HTMLFormElement).reset();
-    window.showToast?.("Permintaan barang terkirim (prototype)", "success");
-  });
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface InventoryItem {
+    id: string;
+    name: string;
+    category: string;
+    totalStock: number;
+  }
+
+  interface PurchaseRequest {
+    id: string;
+    itemName: string;
+    quantity: number;
+    status: string;
+    requester?: { id: number; name: string };
+    project?: { id: number; name: string };
+  }
+
+  function setStatValue(cardId: string, value: string): void {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
+    if (!valueEl) {
+      const skeleton = card.querySelector(".animate-pulse")?.parentElement;
+      valueEl = document.createElement("p");
+      const isAccent = card.classList.contains("bg-ink");
+      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
+      if (skeleton) {
+        skeleton.replaceWith(valueEl);
+      } else {
+        card.appendChild(valueEl);
+      }
+    }
+    valueEl.textContent = value;
+  }
+
+  function stockStatus(stock: number): "available" | "low" | "out" {
+    if (stock <= 0) return "out";
+    if (stock < 10) return "low";
+    return "available";
+  }
+  const STOCK_LABEL: Record<string, string> = { available: "Tersedia", low: "Menipis", out: "Habis" };
+  const STOCK_BADGE: Record<string, string> = {
+    available: "bg-hairline/20 text-smoke border-hairline",
+    low: "bg-amber/10 text-amber border-amber",
+    out: "bg-signal/10 text-signal border-signal",
+  };
+
+  let allItems: InventoryItem[] = [];
+  const searchInput = document.getElementById("search-inventory") as HTMLInputElement | null;
+  const statusFilter = document.getElementById("filter-inventory-status") as HTMLSelectElement | null;
+  const invBody = document.getElementById("inventory-body") as HTMLTableSectionElement;
+  const invTable = document.getElementById("inventory-table") as HTMLTableElement;
+  const invEmpty = document.getElementById("inventory-empty") as HTMLDivElement;
+
+  function renderInventory(): void {
+    const keyword = (searchInput?.value ?? "").trim().toLowerCase();
+    const statusF = statusFilter?.value ?? "";
+    const filtered = allItems.filter((i) => {
+      const status = stockStatus(i.totalStock);
+      if (keyword && !i.name.toLowerCase().includes(keyword) && !i.category.toLowerCase().includes(keyword)) return false;
+      if (statusF && status !== statusF) return false;
+      return true;
+    });
+    invBody.innerHTML = "";
+    const isEmpty = filtered.length === 0;
+    invTable.classList.toggle("hidden", isEmpty);
+    invEmpty.classList.toggle("hidden", !isEmpty);
+    filtered.forEach((i) => {
+      const status = stockStatus(i.totalStock);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="font-semibold text-ink">${escapeHtml(i.name)}</td>
+        <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${escapeHtml(i.category)}</td>
+        <td class="font-mono text-xs text-charcoal">${i.totalStock}</td>
+        <td><span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${STOCK_BADGE[status]}">${STOCK_LABEL[status]}</span></td>
+      `;
+      invBody.appendChild(tr);
+    });
+  }
+
+  async function loadInventory(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/inventory`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat data stok", "error");
+        return;
+      }
+      allItems = json.data ?? [];
+      renderInventory();
+      setStatValue("stat-item-total", String(allItems.length));
+      setStatValue("stat-item-low", String(allItems.filter((i) => stockStatus(i.totalStock) !== "available").length));
+    } catch (err) {
+      console.error("[loadInventory] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+  searchInput?.addEventListener("input", renderInventory);
+  statusFilter?.addEventListener("change", renderInventory);
+
+  // ─── Purchase requests ──────────────────────────────────────────────
+  let allRequests: PurchaseRequest[] = [];
+  let requestBeingReviewed: PurchaseRequest | null = null;
+  const reqBody = document.getElementById("request-body") as HTMLTableSectionElement;
+  const reqTable = document.getElementById("request-table") as HTMLTableElement;
+  const reqEmpty = document.getElementById("request-empty") as HTMLDivElement;
+
+  function openModal(id: string): void {
+    document.getElementById(id)?.classList.replace("hidden", "flex");
+  }
+  function closeModal(id: string): void {
+    document.getElementById(id)?.classList.replace("flex", "hidden");
+  }
+
+  function renderRequests(): void {
+    reqBody.innerHTML = "";
+    const isEmpty = allRequests.length === 0;
+    reqTable.classList.toggle("hidden", isEmpty);
+    reqEmpty.classList.toggle("hidden", !isEmpty);
+    allRequests.forEach((r) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="font-semibold text-ink">${escapeHtml(r.itemName)}</td>
+        <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${r.quantity}</td>
+        <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${escapeHtml(r.requester?.name ?? "-")}</td>
+        <td class="hidden md:table-cell font-mono text-xs text-charcoal">${escapeHtml(r.project?.name ?? "-")}</td>
+        <td><span class="font-mono text-[9px] uppercase tracking-widest border border-signal text-signal px-2 py-1">Menunggu</span></td>
+        <td class="text-right">
+          <button type="button" data-id="${r.id}" class="btn-review-request text-xs text-smoke hover:text-ink font-mono underline-offset-2 hover:underline">Tinjau</button>
+        </td>
+      `;
+      reqBody.appendChild(tr);
+    });
+    reqBody.querySelectorAll<HTMLButtonElement>(".btn-review-request").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const req = allRequests.find((r) => r.id === btn.dataset.id);
+        if (req) {
+          requestBeingReviewed = req;
+          (document.getElementById("request-modal-item") as HTMLElement).textContent = req.itemName;
+          (document.getElementById("request-modal-qty") as HTMLElement).textContent = String(req.quantity);
+          (document.getElementById("request-modal-by") as HTMLElement).textContent = req.requester?.name ?? "-";
+          openModal("request-modal");
+        }
+      });
+    });
+  }
+
+  async function loadRequests(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/inventory/requests?status=pending`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat permintaan barang", "error");
+        return;
+      }
+      allRequests = json.data ?? [];
+      renderRequests();
+      setStatValue("stat-request-pending", String(allRequests.length));
+    } catch (err) {
+      console.error("[loadRequests] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  async function loadApprovedCount(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/inventory/requests?status=approved`);
+      const json = await res.json();
+      if (!res.ok) return;
+      setStatValue("stat-request-approved", String((json.data ?? []).length));
+    } catch (err) {
+      console.error("[loadApprovedCount] gagal fetch backend:", err);
+    }
+  }
+
+  document.getElementById("request-modal-close")?.addEventListener("click", () => closeModal("request-modal"));
+
+  async function reviewRequest(action: "approve" | "reject"): Promise<void> {
+    if (!requestBeingReviewed) return;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/inventory/requests/${requestBeingReviewed.id}/${action}`, {
+        method: "PATCH",
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memproses permintaan", "error");
+        return;
+      }
+      window.showToast?.(json.message ?? "Permintaan berhasil diproses");
+      closeModal("request-modal");
+      requestBeingReviewed = null;
+      await Promise.all([loadRequests(), loadApprovedCount()]);
+    } catch (err) {
+      console.error("[reviewRequest] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+  document.getElementById("btn-approve-request")?.addEventListener("click", () => reviewRequest("approve"));
+  document.getElementById("btn-reject-request")?.addEventListener("click", () => reviewRequest("reject"));
+
+  loadInventory();
+  loadRequests();
+  loadApprovedCount();
 </script>
