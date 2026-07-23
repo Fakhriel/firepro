@@ -84,6 +84,7 @@ import StatCard from "../../components/StatCard.astro";
         </svg>
         <p>Belum ada proyek yang perlu perhatian</p>
       </div>
+      <ul id="dashboard-projects-list" class="hidden divide-y divide-hairline"></ul>
     </div>
 
     <!-- Approval pekerjaan selesai -->
@@ -98,6 +99,134 @@ import StatCard from "../../components/StatCard.astro";
         </svg>
         <p>Tidak ada pekerjaan menunggu approval</p>
       </div>
+      <ul id="dashboard-approval-list" class="hidden divide-y divide-hairline"></ul>
     </div>
   </div>
 </SupervisorLayout>
+
+<script>
+  import { adminApiFetch } from "../../lib/auth";
+  import { escapeHtml } from "../../lib/escapeHtml";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  function setStatValue(cardId: string, value: string): void {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
+    if (!valueEl) {
+      const skeleton = card.querySelector(".animate-pulse")?.parentElement;
+      valueEl = document.createElement("p");
+      const isAccent = card.classList.contains("bg-ink");
+      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
+      if (skeleton) {
+        skeleton.replaceWith(valueEl);
+      } else {
+        card.appendChild(valueEl);
+      }
+    }
+    valueEl.textContent = value;
+  }
+
+  async function loadSummary(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/dashboard/summary`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat ringkasan dashboard", "error");
+        return;
+      }
+      const d = json.data ?? {};
+      setStatValue("stat-projects-active", String(d.activeProjects ?? 0));
+      setStatValue("stat-pending-approval", String(d.pendingReports ?? 0));
+      setStatValue("stat-technicians-onsite", String(d.technicians ?? 0));
+      setStatValue("stat-inventory-pending", String(d.pendingRequests ?? 0));
+    } catch (err) {
+      console.error("[loadSummary] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  interface ProjectRow {
+    id: number;
+    projectCode: string;
+    projectName: string;
+    clientName: string;
+    status: string;
+  }
+
+  async function loadAttentionProjects(): Promise<void> {
+    const emptyEl = document.getElementById("dashboard-projects-empty");
+    const listEl = document.getElementById("dashboard-projects-list") as HTMLUListElement | null;
+    if (!listEl) return;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/projects?status=in_progress`);
+      const json = await res.json();
+      if (!res.ok) return;
+      const projects: ProjectRow[] = json.data ?? [];
+      const isEmpty = projects.length === 0;
+      emptyEl?.classList.toggle("hidden", !isEmpty);
+      listEl.classList.toggle("hidden", isEmpty);
+      listEl.innerHTML = projects
+        .slice(0, 6)
+        .map(
+          (p) => `
+        <li class="px-5 py-3 flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <p class="font-body text-sm text-ink truncate">${escapeHtml(p.projectName)}</p>
+            <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-0.5">${escapeHtml(p.projectCode)} — ${escapeHtml(p.clientName)}</p>
+          </div>
+          <span class="font-mono text-[9px] uppercase tracking-widest border border-ink px-2 py-1 shrink-0">Berjalan</span>
+        </li>
+      `
+        )
+        .join("");
+    } catch (err) {
+      console.error("[loadAttentionProjects] gagal fetch backend:", err);
+    }
+  }
+
+  interface DailyReportRow {
+    id: string;
+    description: string;
+    reportDate: string;
+    technician?: { id: number; name: string };
+    project?: { id: number; name: string; code: string };
+  }
+
+  async function loadPendingApprovals(): Promise<void> {
+    const emptyEl = document.getElementById("dashboard-approval-empty");
+    const listEl = document.getElementById("dashboard-approval-list") as HTMLUListElement | null;
+    if (!listEl) return;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/daily-report?status=submitted`);
+      const json = await res.json();
+      if (!res.ok) return;
+      const reports: DailyReportRow[] = json.data ?? [];
+      const isEmpty = reports.length === 0;
+      emptyEl?.classList.toggle("hidden", !isEmpty);
+      listEl.classList.toggle("hidden", isEmpty);
+      listEl.innerHTML = reports
+        .slice(0, 6)
+        .map(
+          (r) => `
+        <li class="px-5 py-3 flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <p class="font-body text-sm text-ink truncate">${escapeHtml(r.technician?.name ?? "Teknisi")} — ${escapeHtml(r.project?.name ?? "-")}</p>
+            <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-0.5 truncate">${escapeHtml(r.description)}</p>
+          </div>
+          <span class="font-mono text-[9px] uppercase tracking-widest border border-signal text-signal px-2 py-1 shrink-0">Ditinjau</span>
+        </li>
+      `
+        )
+        .join("");
+    } catch (err) {
+      console.error("[loadPendingApprovals] gagal fetch backend:", err);
+    }
+  }
+
+  loadSummary();
+  loadAttentionProjects();
+  loadPendingApprovals();
+</script>
