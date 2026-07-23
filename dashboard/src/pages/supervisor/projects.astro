@@ -95,32 +95,27 @@ import StatCard from "../../components/StatCard.astro";
         <hr class="border-hairline" />
 
         <div>
-          <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-2">Update Progres</p>
-          <div class="flex items-center gap-3 mb-2">
-            <input id="progress-slider" type="range" min="0" max="100" value="0" step="5" class="w-full accent-signal" />
-            <span id="progress-value" class="font-mono text-sm text-ink w-12 text-right">0%</span>
-          </div>
-          <div class="w-full h-2 bg-hairline mb-3">
-            <div id="progress-bar-fill" class="h-2 bg-signal transition-all duration-200" style="width: 0%"></div>
-          </div>
+          <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-2">Update Status Proyek</p>
+          <select id="status-select" class="field-input mb-3">
+            <option value="planning">Perencanaan</option>
+            <option value="in_progress">Berjalan</option>
+            <option value="completed">Selesai</option>
+            <option value="on_hold">Ditunda</option>
+            <option value="cancelled">Dibatalkan</option>
+          </select>
           <button id="btn-save-progress" type="button" class="btn-primary text-xs w-full justify-center">
-            Simpan Progres
+            Simpan Status
           </button>
         </div>
 
         <hr class="border-hairline" />
 
         <div>
-          <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-2">Upload Dokumentasi</p>
-          <label for="drawer-photo" class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-hairline hover:border-ink transition-colors py-8 cursor-pointer text-center">
-            <svg viewBox="0 0 24 24" fill="none" class="w-6 h-6 text-smoke" stroke="currentColor" stroke-width="1.5">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-              <circle cx="12" cy="13" r="4"/>
-            </svg>
-            <span class="font-mono text-[10px] text-smoke uppercase tracking-widest">Klik untuk pilih foto</span>
-            <input id="drawer-photo" type="file" accept="image/*" capture="environment" multiple class="hidden" />
-          </label>
-          <p id="drawer-photo-filename" class="font-mono text-[10px] text-smoke mt-1.5"></p>
+          <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-2">Dokumentasi Proyek</p>
+          <div id="drawer-documentation-list" class="space-y-1.5 mb-2">
+            <p class="font-mono text-[10px] text-smoke">Memuat…</p>
+          </div>
+          <p class="font-mono text-[9px] text-smoke">Upload foto dokumentasi belum tersedia untuk role Supervisor — backend belum punya endpoint upload-nya (baru GET list).</p>
         </div>
 
         <hr class="border-hairline" />
@@ -133,7 +128,7 @@ import StatCard from "../../components/StatCard.astro";
             </svg>
             Approve Pekerjaan Selesai
           </button>
-          <p class="font-mono text-[9px] text-smoke mt-2">Hanya aktif jika progres pekerjaan sudah mencapai 100%.</p>
+          <p class="font-mono text-[9px] text-smoke mt-2">Menandai proyek sebagai status "Selesai".</p>
         </div>
       </div>
     </div>
@@ -162,6 +157,9 @@ import StatCard from "../../components/StatCard.astro";
           <label class="field-label" for="assign-note">Catatan Penugasan</label>
           <textarea id="assign-note" rows="3" class="field-input resize-none" placeholder="Instruksi tambahan untuk teknisi (opsional)…"></textarea>
         </div>
+        <div id="assign-modal-error" class="hidden border-2 border-signal bg-signal/5 px-3 py-2">
+          <p id="assign-modal-error-msg" class="font-mono text-xs text-signal"></p>
+        </div>
       </div>
       <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
         <button id="assign-modal-cancel" type="button" class="btn-secondary text-xs">Batal</button>
@@ -172,9 +170,85 @@ import StatCard from "../../components/StatCard.astro";
 </SupervisorLayout>
 
 <script>
-  // Prototype UI only — belum terhubung ke endpoint projects supervisor.
+  import { adminApiFetch } from "../../lib/auth";
+  import { escapeHtml } from "../../lib/escapeHtml";
+  import { formatIDR } from "../../lib/export";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface ProjectRow {
+    id: number;
+    projectCode: string;
+    projectName: string;
+    clientName: string;
+    location: string;
+    contractValue: number;
+    status: "planning" | "in_progress" | "completed" | "on_hold" | "cancelled";
+    startDate: string;
+  }
+
+  interface Technician {
+    id: number;
+    name: string;
+  }
+
+  interface Assignment {
+    id: number;
+    projectId: number;
+    technicianId: number;
+    notes?: string;
+    status: string;
+    technician?: { id: number; name: string };
+  }
+
+  const STATUS_LABEL: Record<string, string> = {
+    planning: "Perencanaan",
+    in_progress: "Berjalan",
+    completed: "Selesai",
+    on_hold: "Ditunda",
+    cancelled: "Dibatalkan",
+  };
+
+  let allProjects: ProjectRow[] = [];
+  let currentProjectId: number | null = null;
+  let allTechnicians: Technician[] = [];
+
+  const tableBody = document.getElementById("projects-body") as HTMLTableSectionElement;
+  const emptyState = document.getElementById("projects-empty") as HTMLDivElement;
+  const table = document.getElementById("projects-table") as HTMLTableElement;
+  const countLabel = document.querySelector("[data-projects-count]") as HTMLElement | null;
+  const searchInput = document.getElementById("search-projects") as HTMLInputElement | null;
+  const statusFilter = document.getElementById("filter-status") as HTMLSelectElement | null;
+
   const drawer = document.getElementById("project-drawer");
   const overlay = document.getElementById("drawer-overlay");
+  const drawerContent = drawer?.querySelector(".flex-1.overflow-y-auto > div:first-child") as HTMLElement | null;
+
+  function setStatValue(cardId: string, value: string): void {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
+    if (!valueEl) {
+      const skeleton = card.querySelector(".animate-pulse")?.parentElement;
+      valueEl = document.createElement("p");
+      const isAccent = card.classList.contains("bg-ink");
+      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
+      if (skeleton) {
+        skeleton.replaceWith(valueEl);
+      } else {
+        card.appendChild(valueEl);
+      }
+    }
+    valueEl.textContent = value;
+  }
+
+  function openModal(id: string): void {
+    document.getElementById(id)?.classList.replace("hidden", "flex");
+  }
+  function closeModal(id: string): void {
+    document.getElementById(id)?.classList.replace("flex", "hidden");
+  }
 
   function openDrawer(): void {
     drawer?.classList.remove("translate-x-full");
@@ -185,61 +259,262 @@ import StatCard from "../../components/StatCard.astro";
     drawer?.classList.add("translate-x-full");
     overlay?.classList.add("hidden");
     document.body.style.overflow = "";
+    currentProjectId = null;
   }
   document.getElementById("drawer-close")?.addEventListener("click", closeDrawer);
   overlay?.addEventListener("click", closeDrawer);
 
-  // Progress slider
-  const slider = document.getElementById("progress-slider") as HTMLInputElement | null;
-  const progressValue = document.getElementById("progress-value");
-  const progressFill = document.getElementById("progress-bar-fill");
-  slider?.addEventListener("input", () => {
-    if (progressValue) progressValue.textContent = `${slider.value}%`;
-    if (progressFill) progressFill.style.width = `${slider.value}%`;
-  });
-  document.getElementById("btn-save-progress")?.addEventListener("click", () => {
-    window.showToast?.(`Progres disimpan: ${slider?.value ?? 0}% (prototype)`, "success");
-  });
+  function statusBadge(status: string): string {
+    const map: Record<string, string> = {
+      planning: "bg-hairline/30 text-smoke border-hairline",
+      in_progress: "bg-ink/5 text-ink border-ink",
+      completed: "bg-hairline/20 text-smoke border-hairline",
+      on_hold: "bg-signal/10 text-signal border-signal",
+      cancelled: "bg-signal/10 text-signal border-signal",
+    };
+    return map[status] ?? map.planning;
+  }
 
-  // Documentation upload
-  document.getElementById("drawer-photo")?.addEventListener("change", (e) => {
-    const input = e.target as HTMLInputElement;
-    const label = document.getElementById("drawer-photo-filename");
-    if (label) {
-      label.textContent = input.files && input.files.length > 0
-        ? `${input.files.length} foto dipilih`
-        : "";
+  function renderTable(projects: ProjectRow[]): void {
+    tableBody.innerHTML = "";
+    const isEmpty = projects.length === 0;
+    table.classList.toggle("hidden", isEmpty);
+    emptyState.classList.toggle("hidden", !isEmpty);
+    if (countLabel) countLabel.textContent = `${projects.length} proyek`;
+
+    projects.forEach((p) => {
+      const tr = document.createElement("tr");
+      tr.className = "cursor-pointer hover:bg-hairline/10";
+      tr.innerHTML = `
+        <td class="font-semibold text-ink">${escapeHtml(p.projectName)}</td>
+        <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${escapeHtml(p.location ?? "-")}</td>
+        <td class="hidden md:table-cell font-mono text-xs text-charcoal">-</td>
+        <td class="font-mono text-xs text-charcoal">${p.status === "completed" ? "100%" : p.status === "planning" ? "0%" : "-"}</td>
+        <td><span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${statusBadge(p.status)}">${escapeHtml(STATUS_LABEL[p.status] ?? p.status)}</span></td>
+        <td class="text-right font-mono text-[10px] text-smoke">Lihat →</td>
+      `;
+      tr.addEventListener("click", () => openProjectDrawer(p));
+      tableBody.appendChild(tr);
+    });
+  }
+
+  function updateStats(projects: ProjectRow[]): void {
+    const now = new Date();
+    setStatValue("stat-projects-total", String(projects.length));
+    setStatValue("stat-projects-running", String(projects.filter((p) => p.status === "in_progress").length));
+    setStatValue("stat-projects-approval", "0");
+    setStatValue(
+      "stat-projects-done",
+      String(
+        projects.filter((p) => {
+          if (p.status !== "completed") return false;
+          const d = new Date(p.startDate);
+          return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+        }).length
+      )
+    );
+  }
+
+  async function loadProjects(): Promise<void> {
+    try {
+      const params = new URLSearchParams();
+      if (searchInput?.value) params.set("search", searchInput.value);
+      if (statusFilter?.value) params.set("status", statusFilter.value);
+
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/projects?${params.toString()}`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat data proyek", "error");
+        return;
+      }
+      allProjects = json.data ?? [];
+      renderTable(allProjects);
+      updateStats(allProjects);
+    } catch (err) {
+      console.error("[loadProjects] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  async function loadAssignedTechnicians(projectId: number): Promise<void> {
+    const wrap = document.getElementById("assigned-technicians");
+    if (!wrap) return;
+    wrap.innerHTML = `<span class="font-mono text-[10px] text-smoke">Memuat…</span>`;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/assignments?projectId=${projectId}`);
+      const json = await res.json();
+      if (!res.ok) return;
+      const assignments: Assignment[] = json.data ?? [];
+      if (assignments.length === 0) {
+        wrap.innerHTML = `<span class="font-mono text-[10px] text-smoke">Belum ada teknisi ditugaskan</span>`;
+        return;
+      }
+      wrap.innerHTML = assignments
+        .map(
+          (a) =>
+            `<span class="font-mono text-[10px] uppercase tracking-widest border border-ink px-2 py-1">${escapeHtml(a.technician?.name ?? "Teknisi")}</span>`
+        )
+        .join("");
+    } catch (err) {
+      console.error("[loadAssignedTechnicians] gagal fetch backend:", err);
+    }
+  }
+
+  async function loadDocumentation(projectId: number): Promise<void> {
+    const wrap = document.getElementById("drawer-documentation-list");
+    if (!wrap) return;
+    wrap.innerHTML = `<p class="font-mono text-[10px] text-smoke">Memuat…</p>`;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/documentation/project/${projectId}`);
+      const json = await res.json();
+      if (!res.ok) {
+        wrap.innerHTML = `<p class="font-mono text-[10px] text-smoke">Gagal memuat dokumentasi</p>`;
+        return;
+      }
+      const docs: { id: string; photoUrl?: string; note?: string }[] = json.data ?? [];
+      wrap.innerHTML = docs.length
+        ? docs
+            .map(
+              (d) =>
+                `<p class="font-mono text-[10px] text-charcoal truncate">• ${escapeHtml(d.note || d.photoUrl || `Dokumentasi #${d.id}`)}</p>`
+            )
+            .join("")
+        : `<p class="font-mono text-[10px] text-smoke">Belum ada dokumentasi untuk proyek ini</p>`;
+    } catch (err) {
+      console.error("[loadDocumentation] gagal fetch backend:", err);
+    }
+  }
+
+  function openProjectDrawer(p: ProjectRow): void {
+    currentProjectId = p.id;
+    if (drawerContent) {
+      drawerContent.innerHTML = `
+        <div class="space-y-2">
+          <p class="font-mono text-[9px] text-smoke uppercase tracking-widest">${escapeHtml(p.projectCode)}</p>
+          <h3 class="font-display text-xl text-ink">${escapeHtml(p.projectName)}</h3>
+          <span class="inline-block font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${statusBadge(p.status)}">${escapeHtml(STATUS_LABEL[p.status] ?? p.status)}</span>
+          <div class="border-t border-hairline pt-3 mt-3 space-y-1.5 font-mono text-xs">
+            <div class="flex justify-between"><span class="text-smoke">Klien</span><span class="text-ink">${escapeHtml(p.clientName)}</span></div>
+            <div class="flex justify-between"><span class="text-smoke">Lokasi</span><span class="text-ink">${escapeHtml(p.location ?? "-")}</span></div>
+            <div class="flex justify-between"><span class="text-smoke">Nilai Kontrak</span><span class="text-ink">${formatIDR(p.contractValue)}</span></div>
+          </div>
+        </div>
+      `;
+    }
+    (document.getElementById("status-select") as HTMLSelectElement).value = p.status;
+    loadAssignedTechnicians(p.id);
+    loadDocumentation(p.id);
+    openDrawer();
+  }
+
+  document.getElementById("btn-save-progress")?.addEventListener("click", async () => {
+    if (!currentProjectId) return;
+    const status = (document.getElementById("status-select") as HTMLSelectElement).value;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/projects/${currentProjectId}/progress`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal menyimpan status", "error");
+        return;
+      }
+      window.showToast?.("Status proyek berhasil diperbarui");
+      await loadProjects();
+    } catch (err) {
+      console.error("[btn-save-progress] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
     }
   });
 
-  // Approve completed work
-  document.getElementById("btn-approve-project")?.addEventListener("click", () => {
-    const progress = Number(slider?.value ?? 0);
-    if (progress < 100) {
-      window.showToast?.("Progres belum 100%, belum bisa di-approve", "error");
+  document.getElementById("btn-approve-project")?.addEventListener("click", async () => {
+    if (!currentProjectId) return;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/projects/${currentProjectId}/progress`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "completed" }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal menyetujui proyek", "error");
+        return;
+      }
+      window.showToast?.("Proyek ditandai selesai");
+      closeDrawer();
+      await loadProjects();
+    } catch (err) {
+      console.error("[btn-approve-project] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  });
+
+  // ─── Assign technician modal ───────────────────────────────────────
+  async function loadTechnicianOptions(): Promise<void> {
+    const select = document.getElementById("assign-technician-select") as HTMLSelectElement;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/technicians`);
+      const json = await res.json();
+      if (!res.ok) return;
+      allTechnicians = json.data ?? [];
+      select.innerHTML =
+        `<option value="">Pilih teknisi…</option>` +
+        allTechnicians.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
+    } catch (err) {
+      console.error("[loadTechnicianOptions] gagal fetch backend:", err);
+    }
+  }
+
+  document.getElementById("btn-assign-technician")?.addEventListener("click", () => {
+    document.getElementById("assign-modal-error")?.classList.add("hidden");
+    (document.getElementById("assign-technician-select") as HTMLSelectElement).value = "";
+    (document.getElementById("assign-note") as HTMLTextAreaElement).value = "";
+    openModal("assign-modal");
+  });
+  document.getElementById("assign-modal-close")?.addEventListener("click", () => closeModal("assign-modal"));
+  document.getElementById("assign-modal-cancel")?.addEventListener("click", () => closeModal("assign-modal"));
+
+  document.getElementById("assign-modal-save")?.addEventListener("click", async () => {
+    if (!currentProjectId) return;
+    const technicianId = (document.getElementById("assign-technician-select") as HTMLSelectElement).value;
+    const notes = (document.getElementById("assign-note") as HTMLTextAreaElement).value.trim();
+    const errorBox = document.getElementById("assign-modal-error");
+    const errorMsg = document.getElementById("assign-modal-error-msg");
+
+    if (!technicianId) {
+      if (errorMsg) errorMsg.textContent = "Pilih teknisi terlebih dahulu.";
+      errorBox?.classList.remove("hidden");
       return;
     }
-    window.showToast?.("Pekerjaan disetujui sebagai selesai (prototype)", "success");
+
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/assignments`, {
+        method: "POST",
+        body: JSON.stringify({ projectId: currentProjectId, technicianId: Number(technicianId), notes: notes || undefined }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        if (errorMsg) errorMsg.textContent = json.error ?? "Gagal menugaskan teknisi";
+        errorBox?.classList.remove("hidden");
+        return;
+      }
+      window.showToast?.(json.message ?? "Teknisi berhasil ditugaskan");
+      closeModal("assign-modal");
+      await loadAssignedTechnicians(currentProjectId);
+    } catch (err) {
+      console.error("[assign-modal-save] gagal fetch backend:", err);
+      if (errorMsg) errorMsg.textContent = "Tidak bisa terhubung ke server";
+      errorBox?.classList.remove("hidden");
+    }
   });
 
-  // Assign technician modal
-  const assignModal = document.getElementById("assign-modal");
-  function openAssignModal(): void {
-    assignModal?.classList.remove("hidden");
-    assignModal?.classList.add("flex");
-  }
-  function closeAssignModal(): void {
-    assignModal?.classList.add("hidden");
-    assignModal?.classList.remove("flex");
-  }
-  document.getElementById("btn-assign-technician")?.addEventListener("click", openAssignModal);
-  document.getElementById("assign-modal-close")?.addEventListener("click", closeAssignModal);
-  document.getElementById("assign-modal-cancel")?.addEventListener("click", closeAssignModal);
-  document.getElementById("assign-modal-save")?.addEventListener("click", () => {
-    closeAssignModal();
-    window.showToast?.("Teknisi berhasil di-assign (prototype)", "success");
+  let searchDebounce: ReturnType<typeof setTimeout>;
+  searchInput?.addEventListener("input", () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(loadProjects, 300);
   });
+  statusFilter?.addEventListener("change", loadProjects);
 
-  // Table row click → open drawer (prototype: klik baris manapun akan membuka drawer kosong)
-  document.getElementById("projects-body")?.addEventListener("click", () => openDrawer());
+  loadProjects();
+  loadTechnicianOptions();
 </script>
