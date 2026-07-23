@@ -23,7 +23,7 @@ import StatCard from "../../components/StatCard.astro";
     </select>
     <select id="filter-report-status" class="field-input sm:w-44">
       <option value="">Semua Status</option>
-      <option value="pending">Belum Ditinjau</option>
+      <option value="submitted">Belum Ditinjau</option>
       <option value="reviewed">Sudah Ditinjau</option>
     </select>
   </div>
@@ -94,9 +94,55 @@ import StatCard from "../../components/StatCard.astro";
 </SupervisorLayout>
 
 <script>
-  // Prototype UI only — belum terhubung ke endpoint daily report supervisor.
+  import { adminApiFetch } from "../../lib/auth";
+  import { escapeHtml } from "../../lib/escapeHtml";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface DailyReportRow {
+    id: string;
+    description: string;
+    materialsUsed: string;
+    obstacle: string;
+    status: "submitted" | "reviewed";
+    reviewNote: string;
+    technician?: { id: number; name: string };
+    project?: { id: number; name: string; code: string };
+  }
+
+  let allReports: DailyReportRow[] = [];
+  let currentReportId: string | null = null;
+
+  const searchInput = document.getElementById("search-reports") as HTMLInputElement | null;
+  const projectFilter = document.getElementById("filter-report-project") as HTMLSelectElement | null;
+  const statusFilter = document.getElementById("filter-report-status") as HTMLSelectElement | null;
+  const tableBody = document.getElementById("report-body") as HTMLTableSectionElement;
+  const table = document.getElementById("report-table") as HTMLTableElement;
+  const emptyState = document.getElementById("report-empty") as HTMLDivElement;
+  const countLabel = document.querySelector("[data-report-count]") as HTMLElement | null;
+
   const drawer = document.getElementById("report-drawer");
   const overlay = document.getElementById("report-drawer-overlay");
+  const drawerTop = drawer?.querySelector(".flex-1.overflow-y-auto > div:first-child") as HTMLElement | null;
+
+  function setStatValue(cardId: string, value: string): void {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
+    if (!valueEl) {
+      const skeleton = card.querySelector(".animate-pulse")?.parentElement;
+      valueEl = document.createElement("p");
+      const isAccent = card.classList.contains("bg-ink");
+      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
+      if (skeleton) {
+        skeleton.replaceWith(valueEl);
+      } else {
+        card.appendChild(valueEl);
+      }
+    }
+    valueEl.textContent = value;
+  }
 
   function openDrawer(): void {
     drawer?.classList.remove("translate-x-full");
@@ -107,13 +153,158 @@ import StatCard from "../../components/StatCard.astro";
     drawer?.classList.add("translate-x-full");
     overlay?.classList.add("hidden");
     document.body.style.overflow = "";
+    currentReportId = null;
   }
   document.getElementById("report-drawer-close")?.addEventListener("click", closeDrawer);
   overlay?.addEventListener("click", closeDrawer);
-  document.getElementById("report-body")?.addEventListener("click", () => openDrawer());
 
-  document.getElementById("btn-mark-reviewed")?.addEventListener("click", () => {
-    closeDrawer();
-    window.showToast?.("Laporan ditandai sudah ditinjau (prototype)", "success");
+  function renderTable(): void {
+    const keyword = (searchInput?.value ?? "").trim().toLowerCase();
+    const projectId = projectFilter?.value ?? "";
+    const statusF = statusFilter?.value ?? "";
+
+    const filtered = allReports.filter((r) => {
+      if (statusF && r.status !== statusF) return false;
+      if (projectId && String(r.project?.id) !== projectId) return false;
+      if (
+        keyword &&
+        !(r.technician?.name ?? "").toLowerCase().includes(keyword) &&
+        !(r.project?.name ?? "").toLowerCase().includes(keyword)
+      )
+        return false;
+      return true;
+    });
+
+    tableBody.innerHTML = "";
+    const isEmpty = filtered.length === 0;
+    table.classList.toggle("hidden", isEmpty);
+    emptyState.classList.toggle("hidden", !isEmpty);
+    if (countLabel) countLabel.textContent = `${filtered.length} laporan`;
+
+    filtered.forEach((r) => {
+      const tr = document.createElement("tr");
+      tr.className = "cursor-pointer hover:bg-hairline/10";
+      const badge =
+        r.status === "reviewed"
+          ? "bg-hairline/20 text-smoke border-hairline"
+          : "bg-signal/10 text-signal border-signal";
+      tr.innerHTML = `
+        <td class="font-semibold text-ink">${escapeHtml(r.technician?.name ?? "-")}</td>
+        <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${escapeHtml(r.project?.name ?? "-")}</td>
+        <td class="hidden md:table-cell font-mono text-xs text-charcoal truncate max-w-xs">${escapeHtml(r.description)}</td>
+        <td class="font-mono text-xs text-smoke">-</td>
+        <td><span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${badge}">${r.status === "reviewed" ? "Ditinjau" : "Belum Ditinjau"}</span></td>
+        <td class="text-right font-mono text-[10px] text-smoke">Lihat →</td>
+      `;
+      tr.addEventListener("click", () => openReportDrawer(r));
+      tableBody.appendChild(tr);
+    });
+  }
+
+  function updateStats(): void {
+    const today = new Date().toISOString().split("T")[0];
+    setStatValue("stat-reports-today", String(allReports.length));
+    setStatValue("stat-reports-reviewed", String(allReports.filter((r) => r.status === "reviewed").length));
+    setStatValue("stat-reports-pending", String(allReports.filter((r) => r.status === "submitted").length));
+    setStatValue("stat-reports-obstacle", String(allReports.filter((r) => (r.obstacle ?? "").trim().length > 0).length));
+  }
+
+  function openReportDrawer(r: DailyReportRow): void {
+    currentReportId = r.id;
+    if (drawerTop) {
+      drawerTop.innerHTML = `
+        <div class="space-y-2">
+          <p class="font-mono text-[9px] text-smoke uppercase tracking-widest">${escapeHtml(r.project?.code ?? "")}</p>
+          <h3 class="font-display text-lg text-ink">${escapeHtml(r.technician?.name ?? "-")}</h3>
+          <p class="font-body text-sm text-charcoal">${escapeHtml(r.project?.name ?? "-")}</p>
+          <div class="border-t border-hairline pt-3 mt-3 space-y-2">
+            <div>
+              <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mb-1">Deskripsi Pekerjaan</p>
+              <p class="font-body text-sm text-ink">${escapeHtml(r.description)}</p>
+            </div>
+            ${
+              r.materialsUsed
+                ? `<div><p class="font-mono text-[9px] text-smoke uppercase tracking-widest mb-1">Material Digunakan</p><p class="font-body text-sm text-ink">${escapeHtml(r.materialsUsed)}</p></div>`
+                : ""
+            }
+            ${
+              r.obstacle
+                ? `<div><p class="font-mono text-[9px] text-signal uppercase tracking-widest mb-1">Kendala</p><p class="font-body text-sm text-ink">${escapeHtml(r.obstacle)}</p></div>`
+                : ""
+            }
+          </div>
+        </div>
+      `;
+    }
+    (document.getElementById("report-comment") as HTMLTextAreaElement).value = r.reviewNote || "";
+    openDrawer();
+  }
+
+  async function loadReports(): Promise<void> {
+    try {
+      const params = new URLSearchParams();
+      if (statusFilter?.value) params.set("status", statusFilter.value);
+      if (projectFilter?.value) params.set("projectId", projectFilter.value);
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/daily-report?${params.toString()}`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat laporan harian", "error");
+        return;
+      }
+      allReports = json.data ?? [];
+      renderTable();
+      updateStats();
+      populateProjectFilter();
+    } catch (err) {
+      console.error("[loadReports] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  function populateProjectFilter(): void {
+    if (!projectFilter || projectFilter.dataset.filled === "true") return;
+    const seen = new Map<number, string>();
+    allReports.forEach((r) => {
+      if (r.project) seen.set(r.project.id, r.project.name);
+    });
+    if (seen.size === 0) return;
+    projectFilter.innerHTML =
+      `<option value="">Semua Proyek</option>` +
+      Array.from(seen.entries())
+        .map(([id, name]) => `<option value="${id}">${escapeHtml(name)}</option>`)
+        .join("");
+    projectFilter.dataset.filled = "true";
+  }
+
+  document.getElementById("btn-mark-reviewed")?.addEventListener("click", async () => {
+    if (!currentReportId) return;
+    const reviewNote = (document.getElementById("report-comment") as HTMLTextAreaElement).value.trim();
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/daily-report/${currentReportId}/review`, {
+        method: "PATCH",
+        body: JSON.stringify({ reviewNote: reviewNote || undefined }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal menandai laporan", "error");
+        return;
+      }
+      window.showToast?.(json.message ?? "Laporan ditandai sudah ditinjau");
+      closeDrawer();
+      await loadReports();
+    } catch (err) {
+      console.error("[btn-mark-reviewed] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
   });
+
+  let searchDebounce: ReturnType<typeof setTimeout>;
+  searchInput?.addEventListener("input", () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(renderTable, 300);
+  });
+  projectFilter?.addEventListener("change", loadReports);
+  statusFilter?.addEventListener("change", loadReports);
+
+  loadReports();
 </script>
