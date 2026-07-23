@@ -124,7 +124,26 @@ import StatCard from "../../components/StatCard.astro";
 </SupervisorLayout>
 
 <script>
-  // Live clock
+  import { adminApiFetch } from "../../lib/auth";
+  import { escapeHtml } from "../../lib/escapeHtml";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface AttendanceRecord {
+    id: string;
+    workDate: string;
+    checkInAt: string | null;
+    checkOutAt: string | null;
+    status: string;
+    admin?: { id: number; name: string };
+  }
+  interface Technician {
+    id: number;
+    name: string;
+  }
+
+  // ─── Live clock ─────────────────────────────────────────────────────
   function tickClock(): void {
     const now = new Date();
     const clockEl = document.getElementById("live-clock");
@@ -139,35 +158,271 @@ import StatCard from "../../components/StatCard.astro";
   tickClock();
   setInterval(tickClock, 1000);
 
-  // Check in / out toggle — prototype only, belum terhubung backend absensi.
+  function setStatValue(cardId: string, value: string): void {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
+    if (!valueEl) {
+      const skeleton = card.querySelector(".animate-pulse")?.parentElement;
+      valueEl = document.createElement("p");
+      const isAccent = card.classList.contains("bg-ink");
+      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
+      if (skeleton) {
+        skeleton.replaceWith(valueEl);
+      } else {
+        card.appendChild(valueEl);
+      }
+    }
+    valueEl.textContent = value;
+  }
+
+  function formatTime(iso: string | null): string {
+    if (!iso) return "-";
+    try {
+      return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return "-";
+    }
+  }
+  function formatDate(iso: string): string {
+    try {
+      return new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+    } catch {
+      return iso;
+    }
+  }
+  function durationHours(checkIn: string | null, checkOut: string | null): number {
+    if (!checkIn || !checkOut) return 0;
+    const ms = new Date(checkOut).getTime() - new Date(checkIn).getTime();
+    return ms > 0 ? ms / 3600000 : 0;
+  }
+  function formatDuration(checkIn: string | null, checkOut: string | null): string {
+    const hrs = durationHours(checkIn, checkOut);
+    if (hrs === 0) return "-";
+    const h = Math.floor(hrs);
+    const m = Math.round((hrs - h) * 60);
+    return `${h}j ${m}m`;
+  }
+
+  // ─── Absensi milik sendiri ──────────────────────────────────────────
   const btnIn = document.getElementById("btn-check-in");
   const btnOut = document.getElementById("btn-check-out");
   const badge = document.getElementById("attendance-status-badge");
 
-  let checkInTime: Date | null = null;
-
-  btnIn?.addEventListener("click", () => {
-    checkInTime = new Date();
-    const timeStr = checkInTime.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-    if (badge) {
-      badge.textContent = "Sedang Bekerja";
-      badge.className = "badge badge-active mb-6";
+  function applySelfState(record: AttendanceRecord | null): void {
+    if (record?.checkOutAt) {
+      if (badge) {
+        badge.textContent = "Selesai Check Out";
+        badge.className = "badge badge-inactive mb-6";
+      }
+      btnIn?.classList.add("hidden");
+      btnOut?.classList.add("hidden");
+    } else if (record?.checkInAt) {
+      if (badge) {
+        badge.textContent = "Sedang Bekerja";
+        badge.className = "badge badge-active mb-6";
+      }
+      btnIn?.classList.add("hidden");
+      btnOut?.classList.remove("hidden");
+    } else {
+      if (badge) {
+        badge.textContent = "Belum Check In";
+        badge.className = "badge badge-inactive mb-6";
+      }
+      btnIn?.classList.remove("hidden");
+      btnOut?.classList.add("hidden");
     }
-    btnIn?.classList.add("hidden");
-    btnOut?.classList.remove("hidden");
-    window.showToast?.(`Check in berhasil pukul ${timeStr} (prototype)`, "success");
+  }
+
+  async function loadToday(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/attendance/today`);
+      const json = await res.json();
+      if (!res.ok) return;
+      applySelfState(json.data ?? null);
+    } catch (err) {
+      console.error("[loadToday] gagal fetch backend:", err);
+    }
+  }
+
+  btnIn?.addEventListener("click", async () => {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/attendance/check-in`, { method: "POST", body: JSON.stringify({}) });
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal check in", "error");
+        return;
+      }
+      window.showToast?.(json.message ?? "Check in berhasil");
+      applySelfState(json.data);
+      await loadHistory();
+    } catch (err) {
+      console.error("[btn-check-in] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
   });
 
-  btnOut?.addEventListener("click", () => {
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-    if (badge) {
-      badge.textContent = "Selesai Check Out";
-      badge.className = "badge badge-inactive mb-6";
+  btnOut?.addEventListener("click", async () => {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/attendance/check-out`, { method: "POST", body: JSON.stringify({}) });
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal check out", "error");
+        return;
+      }
+      window.showToast?.(json.message ?? "Check out berhasil");
+      applySelfState(json.data);
+      await loadHistory();
+    } catch (err) {
+      console.error("[btn-check-out] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
     }
-    btnOut?.classList.add("hidden");
-    btnIn?.classList.remove("hidden");
-    window.showToast?.(`Check out berhasil pukul ${timeStr} (prototype)`, "success");
-    void checkInTime;
   });
+
+  // ─── Riwayat kehadiran saya ─────────────────────────────────────────
+  async function loadHistory(): Promise<void> {
+    const tableBody = document.getElementById("attendance-body") as HTMLTableSectionElement;
+    const table = document.getElementById("attendance-table") as HTMLTableElement;
+    const emptyState = document.getElementById("attendance-empty") as HTMLDivElement;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/supervisor/attendance/history`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat riwayat kehadiran", "error");
+        return;
+      }
+      const history: AttendanceRecord[] = json.data ?? [];
+      const isEmpty = history.length === 0;
+      table.classList.toggle("hidden", isEmpty);
+      emptyState.classList.toggle("hidden", !isEmpty);
+      tableBody.innerHTML = history
+        .map(
+          (r) => `
+        <tr>
+          <td class="font-mono text-xs text-charcoal">${formatDate(r.workDate)}</td>
+          <td class="font-mono text-xs text-charcoal">${formatTime(r.checkInAt)}</td>
+          <td class="font-mono text-xs text-charcoal">${formatTime(r.checkOutAt)}</td>
+          <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${formatDuration(r.checkInAt, r.checkOutAt)}</td>
+          <td><span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${r.checkOutAt ? "bg-hairline/20 text-smoke border-hairline" : "bg-ink/5 text-ink border-ink"}">${r.checkOutAt ? "Sudah Pulang" : "Sedang Bekerja"}</span></td>
+        </tr>
+      `
+        )
+        .join("");
+
+      const now = new Date();
+      const thisMonth = history.filter((r) => {
+        const d = new Date(r.workDate);
+        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      });
+      setStatValue("stat-attendance-month", String(thisMonth.length));
+      setStatValue("stat-attendance-late", "0");
+      setStatValue("stat-attendance-absent", "0");
+      const durations = thisMonth.map((r) => durationHours(r.checkInAt, r.checkOutAt)).filter((h) => h > 0);
+      const avg = durations.length ? durations.reduce((a, b) => a + b, 0) / durations.length : 0;
+      setStatValue("stat-attendance-avg-hours", avg > 0 ? `${avg.toFixed(1)}j` : "-");
+    } catch (err) {
+      console.error("[loadHistory] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  // ─── Kehadiran tim (teknisi) hari ini ───────────────────────────────
+  interface TeamRow {
+    userId: number;
+    name: string;
+    checkInAt: string | null;
+    checkOutAt: string | null;
+    status: "checked_in" | "checked_out" | "not_in";
+  }
+  let teamRows: TeamRow[] = [];
+  const teamSearch = document.getElementById("search-team-attendance") as HTMLInputElement | null;
+  const teamFilter = document.getElementById("filter-team-attendance") as HTMLSelectElement | null;
+
+  const TEAM_STATUS_LABEL: Record<string, string> = {
+    checked_in: "Sedang Bekerja",
+    checked_out: "Sudah Pulang",
+    not_in: "Belum Check In",
+  };
+  const TEAM_STATUS_BADGE: Record<string, string> = {
+    checked_in: "bg-ink/5 text-ink border-ink",
+    checked_out: "bg-hairline/20 text-smoke border-hairline",
+    not_in: "bg-signal/10 text-signal border-signal",
+  };
+
+  function setPlainValue(id: string, value: string): void {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  }
+
+  function renderTeamTable(): void {
+    const tableBody = document.getElementById("team-attendance-body") as HTMLTableSectionElement;
+    const table = document.getElementById("team-attendance-table") as HTMLTableElement;
+    const emptyState = document.getElementById("team-attendance-empty") as HTMLDivElement;
+
+    const keyword = (teamSearch?.value ?? "").trim().toLowerCase();
+    const statusF = teamFilter?.value ?? "";
+    const filtered = teamRows.filter((r) => {
+      if (keyword && !r.name.toLowerCase().includes(keyword)) return false;
+      if (statusF && r.status !== statusF) return false;
+      return true;
+    });
+
+    tableBody.innerHTML = "";
+    const isEmpty = filtered.length === 0;
+    table.classList.toggle("hidden", isEmpty);
+    emptyState.classList.toggle("hidden", !isEmpty);
+
+    filtered.forEach((r) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="font-semibold text-ink">${escapeHtml(r.name)}</td>
+        <td class="hidden sm:table-cell font-mono text-xs text-charcoal">-</td>
+        <td class="font-mono text-xs text-charcoal">${formatTime(r.checkInAt)}</td>
+        <td class="font-mono text-xs text-charcoal">${formatTime(r.checkOutAt)}</td>
+        <td><span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${TEAM_STATUS_BADGE[r.status]}">${TEAM_STATUS_LABEL[r.status]}</span></td>
+      `;
+      tableBody.appendChild(tr);
+    });
+
+    setPlainValue("summary-checked-in", String(teamRows.filter((r) => r.status !== "not_in").length));
+    setPlainValue("summary-not-in", String(teamRows.filter((r) => r.status === "not_in").length));
+    setPlainValue("summary-checked-out", String(teamRows.filter((r) => r.status === "checked_out").length));
+  }
+
+  async function loadTeamAttendance(): Promise<void> {
+    try {
+      const [techRes, teamRes] = await Promise.all([
+        adminApiFetch(`${apiUrl}/api/supervisor/technicians`),
+        adminApiFetch(`${apiUrl}/api/supervisor/attendance/team`),
+      ]);
+      const techJson = await techRes.json();
+      const teamJson = await teamRes.json();
+      if (!techRes.ok || !teamRes.ok) {
+        window.showToast?.(techJson.error ?? teamJson.error ?? "Gagal memuat kehadiran tim", "error");
+        return;
+      }
+      const technicians: Technician[] = techJson.data ?? [];
+      const records: AttendanceRecord[] = teamJson.data ?? [];
+      const recordByAdminId = new Map(records.map((r) => [r.admin?.id, r]));
+
+      teamRows = technicians.map((t) => {
+        const rec = recordByAdminId.get(t.id);
+        let status: TeamRow["status"] = "not_in";
+        if (rec?.checkOutAt) status = "checked_out";
+        else if (rec?.checkInAt) status = "checked_in";
+        return { userId: t.id, name: t.name, checkInAt: rec?.checkInAt ?? null, checkOutAt: rec?.checkOutAt ?? null, status };
+      });
+      renderTeamTable();
+    } catch (err) {
+      console.error("[loadTeamAttendance] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  teamSearch?.addEventListener("input", renderTeamTable);
+  teamFilter?.addEventListener("change", renderTeamTable);
+
+  loadToday();
+  loadHistory();
+  loadTeamAttendance();
 </script>
