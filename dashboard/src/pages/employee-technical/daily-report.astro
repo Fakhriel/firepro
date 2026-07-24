@@ -50,7 +50,7 @@ import PageHeader from "../../components/PageHeader.astro";
               <circle cx="12" cy="13" r="4"/>
             </svg>
             <span class="font-mono text-[10px] text-smoke uppercase tracking-widest">Klik untuk pilih foto</span>
-            <input id="report-photo" type="file" accept="image/*" capture="environment" multiple class="hidden" />
+            <input id="report-photo" type="file" accept="image/*" capture="environment" class="hidden" />
           </label>
           <p id="report-photo-filename" class="font-mono text-[10px] text-smoke mt-1.5"></p>
         </div>
@@ -114,28 +114,137 @@ import PageHeader from "../../components/PageHeader.astro";
 </EmployeeLayout>
 
 <script>
-  // Prototype UI only — belum terhubung ke endpoint daily report.
+  import { adminApiFetch } from "../../lib/auth";
+  import { escapeHtml } from "../../lib/escapeHtml";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
   const dateInput = document.getElementById("report-date") as HTMLInputElement | null;
   if (dateInput) {
     dateInput.value = new Date().toISOString().split("T")[0];
+  }
+
+  interface Assignment {
+    id: string;
+    status: string;
+    project?: { id: number; name: string; code: string };
+  }
+  let taskOptions: Assignment[] = [];
+
+  async function loadTaskOptions(): Promise<void> {
+    const select = document.getElementById("report-task") as HTMLSelectElement;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/technical/tasks`);
+      const json = await res.json();
+      if (!res.ok) return;
+      taskOptions = json.data ?? [];
+      select.innerHTML =
+        `<option value="">Pilih tugas…</option>` +
+        taskOptions
+          .map((t) => `<option value="${t.id}">${escapeHtml(t.project?.name ?? "Proyek")} — ${escapeHtml(t.project?.code ?? "")}</option>`)
+          .join("");
+    } catch (err) {
+      console.error("[loadTaskOptions] gagal fetch backend:", err);
+    }
   }
 
   document.getElementById("report-photo")?.addEventListener("change", (e) => {
     const input = e.target as HTMLInputElement;
     const label = document.getElementById("report-photo-filename");
     if (label) {
-      label.textContent = input.files && input.files.length > 0
-        ? `${input.files.length} foto dipilih`
-        : "";
+      label.textContent = input.files && input.files[0] ? input.files[0].name : "";
     }
   });
 
-  document.getElementById("daily-report-form")?.addEventListener("submit", (e) => {
+  interface DailyReportRow {
+    id: string;
+    reportDate: string;
+    description: string;
+    status: string;
+    project?: { name: string };
+  }
+
+  async function loadHistory(): Promise<void> {
+    const tableBody = document.getElementById("report-body") as HTMLTableSectionElement;
+    const table = document.getElementById("report-table") as HTMLTableElement;
+    const emptyState = document.getElementById("report-empty") as HTMLDivElement;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/technical/daily-report`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat riwayat laporan", "error");
+        return;
+      }
+      const reports: DailyReportRow[] = json.data ?? [];
+      const isEmpty = reports.length === 0;
+      table.classList.toggle("hidden", isEmpty);
+      emptyState.classList.toggle("hidden", !isEmpty);
+      tableBody.innerHTML = reports
+        .map(
+          (r) => `
+        <tr>
+          <td class="font-mono text-xs text-charcoal">${escapeHtml(r.reportDate)}</td>
+          <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${escapeHtml(r.project?.name ?? "-")}</td>
+          <td class="hidden md:table-cell font-mono text-xs text-charcoal truncate max-w-xs">${escapeHtml(r.description)}</td>
+          <td class="font-mono text-xs text-smoke">-</td>
+          <td><span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${r.status === "reviewed" ? "bg-hairline/20 text-smoke border-hairline" : "bg-signal/10 text-signal border-signal"}">${r.status === "reviewed" ? "Ditinjau" : "Terkirim"}</span></td>
+        </tr>
+      `
+        )
+        .join("");
+    } catch (err) {
+      console.error("[loadHistory] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  document.getElementById("daily-report-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    window.showToast?.("Laporan harian terkirim (prototype)", "success");
-    (e.target as HTMLFormElement).reset();
-    if (dateInput) dateInput.value = new Date().toISOString().split("T")[0];
-    const label = document.getElementById("report-photo-filename");
-    if (label) label.textContent = "";
+    const taskId = (document.getElementById("report-task") as HTMLSelectElement).value;
+    const description = (document.getElementById("report-description") as HTMLTextAreaElement).value.trim();
+    const materialsUsed = (document.getElementById("report-materials") as HTMLInputElement).value.trim();
+    const obstacle = (document.getElementById("report-obstacle") as HTMLTextAreaElement).value.trim();
+    const photoInput = document.getElementById("report-photo") as HTMLInputElement;
+
+    if (!description) {
+      window.showToast?.("Deskripsi pekerjaan wajib diisi", "error");
+      return;
+    }
+
+    const selectedTask = taskOptions.find((t) => t.id === taskId);
+
+    const formData = new FormData();
+    if (selectedTask?.project?.id) formData.append("projectId", String(selectedTask.project.id));
+    if (taskId) formData.append("assignmentId", taskId);
+    formData.append("reportDate", dateInput?.value || new Date().toISOString().split("T")[0]);
+    formData.append("description", description);
+    if (materialsUsed) formData.append("materialsUsed", materialsUsed);
+    if (obstacle) formData.append("obstacle", obstacle);
+    if (photoInput.files?.[0]) formData.append("photo", photoInput.files[0]);
+
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/technical/daily-report`, {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal mengirim laporan", "error");
+        return;
+      }
+      window.showToast?.(json.message ?? "Laporan harian terkirim");
+      (document.getElementById("daily-report-form") as HTMLFormElement).reset();
+      if (dateInput) dateInput.value = new Date().toISOString().split("T")[0];
+      const label = document.getElementById("report-photo-filename");
+      if (label) label.textContent = "";
+      await loadHistory();
+    } catch (err) {
+      console.error("[daily-report-form submit] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
   });
+
+  loadTaskOptions();
+  loadHistory();
 </script>
