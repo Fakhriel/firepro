@@ -94,23 +94,125 @@ import PageHeader from "../../components/PageHeader.astro";
 </EmployeeLayout>
 
 <script>
-  // Prototype UI only — belum terhubung ke endpoint profile employee.
-  document.getElementById("profile-edit-form")?.addEventListener("submit", (e) => {
+  import { adminApiFetch, getAdminAuth, setAdminAuth } from "../../lib/auth";
+  import { escapeHtml } from "../../lib/escapeHtml";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface ProfileData {
+    id: number;
+    name: string;
+    username: string;
+    email?: string;
+    phone?: string;
+    createdAt?: string;
+  }
+
+  function formatJoined(iso?: string): string {
+    if (!iso) return "-";
+    try {
+      return new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" });
+    } catch {
+      return "-";
+    }
+  }
+
+  async function loadProfile(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/technical/profile`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat profil", "error");
+        return;
+      }
+      const p: ProfileData = json.data?.admin ?? json.data;
+
+      (document.getElementById("profile-avatar") as HTMLElement).textContent = (p.name || "K").charAt(0).toUpperCase();
+      (document.getElementById("profile-name") as HTMLElement).textContent = p.name || "-";
+      (document.getElementById("profile-employee-id") as HTMLElement).textContent = p.username || String(p.id);
+      (document.getElementById("profile-email") as HTMLElement).textContent = p.email || "-";
+      (document.getElementById("profile-phone") as HTMLElement).textContent = p.phone || "-";
+      (document.getElementById("profile-joined") as HTMLElement).textContent = formatJoined(p.createdAt);
+
+      (document.getElementById("edit-name") as HTMLInputElement).value = p.name || "";
+      (document.getElementById("edit-phone") as HTMLInputElement).value = p.phone || "";
+      (document.getElementById("edit-email") as HTMLInputElement).value = p.email || "";
+    } catch (err) {
+      console.error("[loadProfile] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  document.getElementById("profile-edit-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    window.showToast?.("Data diri tersimpan (prototype)", "success");
+    const name = (document.getElementById("edit-name") as HTMLInputElement).value.trim();
+    const phone = (document.getElementById("edit-phone") as HTMLInputElement).value.trim();
+    const email = (document.getElementById("edit-email") as HTMLInputElement).value.trim();
+
+    if (!name) {
+      window.showToast?.("Nama tidak boleh kosong", "error");
+      return;
+    }
+
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/technical/profile`, {
+        method: "PATCH",
+        body: JSON.stringify({ name, phone: phone || null, email: email || null }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal menyimpan data diri", "error");
+        return;
+      }
+      window.showToast?.("Data diri tersimpan");
+
+      const { token, admin } = getAdminAuth();
+      if (token && admin) setAdminAuth(token, { ...admin, name, phone, email });
+
+      await loadProfile();
+    } catch (err) {
+      console.error("[profile-edit-form submit] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
   });
 
-  document.getElementById("profile-password-form")?.addEventListener("submit", (e) => {
+  document.getElementById("profile-password-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const newPass = (document.getElementById("password-new") as HTMLInputElement | null)?.value ?? "";
-    const confirmPass = (document.getElementById("password-confirm") as HTMLInputElement | null)?.value ?? "";
+    const currentPassword = (document.getElementById("password-current") as HTMLInputElement).value;
+    const newPass = (document.getElementById("password-new") as HTMLInputElement).value;
+    const confirmPass = (document.getElementById("password-confirm") as HTMLInputElement).value;
 
-    if (newPass && newPass !== confirmPass) {
+    if (!currentPassword) {
+      window.showToast?.("Password lama wajib diisi", "error");
+      return;
+    }
+    if (newPass.length < 6) {
+      window.showToast?.("Password baru minimal 6 karakter", "error");
+      return;
+    }
+    if (newPass !== confirmPass) {
       window.showToast?.("Konfirmasi password tidak cocok", "error");
       return;
     }
 
-    window.showToast?.("Password berhasil diperbarui (prototype)", "success");
-    (e.target as HTMLFormElement).reset();
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/technical/profile/password`, {
+        method: "PATCH",
+        body: JSON.stringify({ currentPassword, newPassword: newPass }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memperbarui password", "error");
+        return;
+      }
+      window.showToast?.(json.message ?? "Password berhasil diperbarui");
+      (e.target as HTMLFormElement).reset();
+    } catch (err) {
+      console.error("[profile-password-form submit] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
   });
+
+  loadProfile();
 </script>
