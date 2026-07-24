@@ -73,6 +73,7 @@ import StatCard from "../../components/StatCard.astro";
         </svg>
         <p>Belum ada tugas untuk hari ini</p>
       </div>
+      <ul id="dashboard-tasks-list" class="hidden divide-y divide-hairline"></ul>
     </div>
 
     <!-- Aktivitas terbaru -->
@@ -87,6 +88,137 @@ import StatCard from "../../components/StatCard.astro";
         </svg>
         <p>Belum ada aktivitas tercatat</p>
       </div>
+      <ul id="dashboard-activity-list" class="hidden divide-y divide-hairline"></ul>
     </div>
   </div>
 </EmployeeLayout>
+
+<script>
+  import { adminApiFetch } from "../../lib/auth";
+  import { escapeHtml } from "../../lib/escapeHtml";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  function setStatValue(cardId: string, value: string): void {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
+    if (!valueEl) {
+      const skeleton = card.querySelector(".animate-pulse")?.parentElement;
+      valueEl = document.createElement("p");
+      const isAccent = card.classList.contains("bg-ink");
+      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
+      if (skeleton) {
+        skeleton.replaceWith(valueEl);
+      } else {
+        card.appendChild(valueEl);
+      }
+    }
+    valueEl.textContent = value;
+  }
+
+  const ATTENDANCE_STATUS_LABEL: Record<string, string> = {
+    not_checked_in: "Belum Check In",
+    checked_in: "Sedang Bekerja",
+    checked_out: "Sudah Pulang",
+  };
+
+  async function loadSummary(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/technical/dashboard/summary`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat ringkasan dashboard", "error");
+        return;
+      }
+      const d = json.data ?? {};
+      setStatValue("stat-tasks-today", String(d.tasksActive ?? 0));
+      setStatValue("stat-attendance-status", ATTENDANCE_STATUS_LABEL[d.attendanceStatus] ?? "-");
+      setStatValue("stat-reports-pending", d.reportSubmittedToday ? "0" : "1");
+      setStatValue("stat-requests-active", String(d.requestsPending ?? 0));
+    } catch (err) {
+      console.error("[loadSummary] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  interface Assignment {
+    id: string;
+    status: "assigned" | "in_progress" | "done";
+    notes: string;
+    project?: { id: number; name: string; code: string; location: string };
+  }
+
+  const STATUS_LABEL: Record<string, string> = { assigned: "Ditugaskan", in_progress: "Berjalan", done: "Selesai" };
+
+  async function loadTasks(): Promise<void> {
+    const emptyEl = document.getElementById("dashboard-tasks-empty");
+    const listEl = document.getElementById("dashboard-tasks-list") as HTMLUListElement | null;
+    if (!listEl) return;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/technical/tasks`);
+      const json = await res.json();
+      if (!res.ok) return;
+      const tasks: Assignment[] = (json.data ?? []).filter((t: Assignment) => t.status !== "done");
+      const isEmpty = tasks.length === 0;
+      emptyEl?.classList.toggle("hidden", !isEmpty);
+      listEl.classList.toggle("hidden", isEmpty);
+      listEl.innerHTML = tasks
+        .slice(0, 6)
+        .map(
+          (t) => `
+        <li class="px-5 py-3 flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <p class="font-body text-sm text-ink truncate">${escapeHtml(t.project?.name ?? "Proyek")}</p>
+            <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-0.5">${escapeHtml(t.project?.location ?? "-")}</p>
+          </div>
+          <span class="font-mono text-[9px] uppercase tracking-widest border border-ink px-2 py-1 shrink-0">${STATUS_LABEL[t.status]}</span>
+        </li>
+      `
+        )
+        .join("");
+    } catch (err) {
+      console.error("[loadTasks] gagal fetch backend:", err);
+    }
+  }
+
+  interface DailyReportRow {
+    id: string;
+    reportDate: string;
+    description: string;
+    project?: { name: string };
+  }
+
+  async function loadActivity(): Promise<void> {
+    const emptyEl = document.getElementById("dashboard-activity-empty");
+    const listEl = document.getElementById("dashboard-activity-list") as HTMLUListElement | null;
+    if (!listEl) return;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/technical/daily-report`);
+      const json = await res.json();
+      if (!res.ok) return;
+      const reports: DailyReportRow[] = json.data ?? [];
+      const isEmpty = reports.length === 0;
+      emptyEl?.classList.toggle("hidden", !isEmpty);
+      listEl.classList.toggle("hidden", isEmpty);
+      listEl.innerHTML = reports
+        .slice(0, 6)
+        .map(
+          (r) => `
+        <li class="px-5 py-3">
+          <p class="font-body text-sm text-ink truncate">Laporan harian — ${escapeHtml(r.project?.name ?? "-")}</p>
+          <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-0.5">${escapeHtml(r.reportDate)}</p>
+        </li>
+      `
+        )
+        .join("");
+    } catch (err) {
+      console.error("[loadActivity] gagal fetch backend:", err);
+    }
+  }
+
+  loadSummary();
+  loadTasks();
+  loadActivity();
+</script>
