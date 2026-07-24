@@ -8,11 +8,13 @@ export interface Props {
   activeNav?: string;
 }
 
-const { title = "Dashboard", activeNav = "" } = Astro.props;
+const { title = "FIREPRO Teknisi", activeNav = "" } = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:4000";
 ---
 
 <Base title={`${title} — FIREPRO Teknisi`}>
-  <div id="dashboard-root" class="min-h-screen flex bg-paper">
+  <div id="dashboard-root" data-api-url={API_URL} class="hidden min-h-screen flex bg-paper">
 
     <!-- ─── Sidebar (desktop) ─────────────────────────────── -->
     <EmployeeSidebar activeNav={activeNav} />
@@ -41,14 +43,24 @@ const { title = "Dashboard", activeNav = "" } = Astro.props;
   </div>
 </Base>
 
-<!--
-  CATATAN PROTOTIPE:
-  Layout ini belum memanggil endpoint auth backend (module employee-auth belum dibuat).
-  Guard auth + fetch data asli akan ditambahkan setelah backend RBAC karyawan lapangan siap,
-  mengikuti pola yang sama seperti DashboardLayout.astro (admin).
--->
-
 <script>
+  import { getAdminAuth, clearAdminAuth } from "../lib/auth";
+
+  // Guard client-side: hanya role 'karyawan' yang boleh melihat layout ini.
+  // Role lain / belum login -> redirect ke /login. (Sebelumnya layout ini
+  // TIDAK punya guard sama sekali — siapa pun bisa langsung akses halaman
+  // /employee-technical/* tanpa login.)
+  function guardKaryawanRole(): void {
+    const { isAuthenticated, admin } = getAdminAuth();
+    if (!isAuthenticated || !admin || admin.role !== "karyawan") {
+      clearAdminAuth();
+      window.location.replace("/login");
+      return;
+    }
+    document.getElementById("dashboard-root")?.classList.remove("hidden");
+  }
+  guardKaryawanRole();
+
   // Mobile sidebar toggle
   function initSidebarToggle(): void {
     const toggle = document.getElementById("sidebar-toggle");
@@ -73,7 +85,7 @@ const { title = "Dashboard", activeNav = "" } = Astro.props;
     overlay?.addEventListener("click", close);
   }
 
-  // Global toast helper (dipakai oleh halaman untuk feedback aksi prototipe)
+  // Global toast helper
   function initToast(): void {
     window.showToast = (msg: string, type: "success" | "error" | "info" = "success") => {
       const toast = document.getElementById("toast");
