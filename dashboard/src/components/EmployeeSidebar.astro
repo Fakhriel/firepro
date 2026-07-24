@@ -6,12 +6,13 @@ export interface Props {
 const { activeNav = "" } = Astro.props;
 
 const navItems = [
-  { id: "dashboard",         href: "/employee-technical",                  label: "Dashboard",         icon: "grid" },
-  { id: "my-tasks",          href: "/employee-technical/my-tasks",         label: "My Tasks",          icon: "list" },
-  { id: "attendance",        href: "/employee-technical/attendance",       label: "Attendance",        icon: "clock" },
-  { id: "daily-report",      href: "/employee-technical/daily-report",     label: "Daily Report",      icon: "file" },
-  { id: "inventory-request", href: "/employee-technical/inventory-request",label: "Inventory Request", icon: "box" },
-  { id: "profile",           href: "/employee-technical/profile",          label: "Profile",           icon: "user" },
+  { id: "dashboard", href: "/employee-technical", label: "Dashboard", icon: "grid" },
+  { id: "tugas-saya", href: "/employee-technical/tugas-saya", label: "Tugas Saya", icon: "bag" },
+  { id: "jadwal", href: "/employee-technical/jadwal", label: "Jadwal", icon: "calendar" },
+  { id: "checklist", href: "/employee-technical/checklist", label: "Checklist", icon: "check" },
+  { id: "upload-foto", href: "/employee-technical/upload-foto", label: "Upload Foto", icon: "camera" },
+  { id: "riwayat-pekerjaan", href: "/employee-technical/riwayat-pekerjaan", label: "Riwayat Pekerjaan", icon: "history" },
+  { id: "profil", href: "/employee-technical/profil", label: "Profil", icon: "user" },
 ];
 ---
 
@@ -31,7 +32,7 @@ const navItems = [
   <!-- Nav -->
   <nav class="flex-1 overflow-y-auto py-4 px-3">
     <p class="font-mono text-[9px] uppercase tracking-widest text-paper/35 px-2 mb-1.5">
-      Menu Lapangan
+      Lapangan
     </p>
     <ul class="space-y-0.5">
       {navItems.map((item) => {
@@ -50,27 +51,31 @@ const navItems = [
                   <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
                 </svg>
               )}
-              {item.icon === "list" && (
+              {item.icon === "bag" && (
                 <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4 shrink-0" stroke="currentColor" stroke-width="1.75">
-                  <path d="M9 6h11M9 12h11M9 18h11"/>
-                  <path d="M4.5 6l1 1 2-2M4.5 12l1 1 2-2M4.5 18l1 1 2-2"/>
+                  <path d="M5.5 8H18.5L19.5 21H4.5L5.5 8Z"/><path d="M8.5 8V6C8.5 4.067 9.567 3 12 3C14.433 3 15.5 4.067 15.5 6V8"/>
                 </svg>
               )}
-              {item.icon === "clock" && (
+              {item.icon === "calendar" && (
                 <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4 shrink-0" stroke="currentColor" stroke-width="1.75">
-                  <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/>
+                  <rect x="3" y="4" width="18" height="18" rx="1"/><line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                 </svg>
               )}
-              {item.icon === "file" && (
+              {item.icon === "check" && (
                 <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4 shrink-0" stroke="currentColor" stroke-width="1.75">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>
+                  <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
                 </svg>
               )}
-              {item.icon === "box" && (
+              {item.icon === "camera" && (
                 <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4 shrink-0" stroke="currentColor" stroke-width="1.75">
-                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
+                </svg>
+              )}
+              {item.icon === "history" && (
+                <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4 shrink-0" stroke="currentColor" stroke-width="1.75">
+                  <path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>
                 </svg>
               )}
               {item.icon === "user" && (
@@ -90,11 +95,11 @@ const navItems = [
   <div class="px-4 py-4 border-t border-paper/10 shrink-0">
     <div id="sidebar-user" class="flex items-center gap-3 mb-3">
       <div class="w-8 h-8 bg-signal flex items-center justify-center font-display text-paper text-sm shrink-0">
-        <span id="sidebar-avatar">K</span>
+        <span id="sidebar-avatar">T</span>
       </div>
       <div class="min-w-0">
-        <p id="sidebar-name" class="text-paper text-sm font-semibold truncate">Karyawan</p>
-        <p id="sidebar-role" class="font-mono text-[9px] text-paper/40 uppercase tracking-widest">teknisi lapangan</p>
+        <p id="sidebar-name" class="text-paper text-sm font-semibold truncate">Teknisi Lapangan</p>
+        <p id="sidebar-role" class="font-mono text-[9px] text-paper/40 uppercase tracking-widest">pekerja lapangan</p>
       </div>
     </div>
     <button
@@ -112,8 +117,21 @@ const navItems = [
 </aside>
 
 <script>
-  // Prototype: belum terhubung ke auth backend karyawan — logout hanya redirect ke login.
-  document.getElementById("sidebar-logout")?.addEventListener("click", () => {
-    window.location.href = "/login";
-  });
+  import { getAdminAuth, clearAdminAuth } from "../lib/auth";
+
+  function initSidebar(): void {
+    const { admin } = getAdminAuth();
+    if (admin) {
+      const nameEl = document.getElementById("sidebar-name");
+      const avatarEl = document.getElementById("sidebar-avatar");
+      if (nameEl) nameEl.textContent = admin.name || "Teknisi Lapangan";
+      if (avatarEl) avatarEl.textContent = (admin.name || "T").charAt(0).toUpperCase();
+    }
+
+    document.getElementById("sidebar-logout")?.addEventListener("click", () => {
+      clearAdminAuth();
+      window.location.replace("/login");
+    });
+  }
+  initSidebar();
 </script>
