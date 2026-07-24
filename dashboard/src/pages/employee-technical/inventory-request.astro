@@ -107,10 +107,124 @@ import StatCard from "../../components/StatCard.astro";
 </EmployeeLayout>
 
 <script>
-  // Prototype UI only — belum terhubung ke endpoint inventory request.
-  document.getElementById("inventory-request-form")?.addEventListener("submit", (e) => {
+  import { adminApiFetch } from "../../lib/auth";
+  import { escapeHtml } from "../../lib/escapeHtml";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  function setStatValue(cardId: string, value: string): void {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
+    if (!valueEl) {
+      const skeleton = card.querySelector(".animate-pulse")?.parentElement;
+      valueEl = document.createElement("p");
+      const isAccent = card.classList.contains("bg-ink");
+      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
+      if (skeleton) {
+        skeleton.replaceWith(valueEl);
+      } else {
+        card.appendChild(valueEl);
+      }
+    }
+    valueEl.textContent = value;
+  }
+
+  interface PurchaseRequest {
+    id: string;
+    itemName: string;
+    quantity: number;
+    urgency: string;
+    status: "pending" | "approved" | "rejected";
+    createdAt?: string;
+  }
+
+  const STATUS_LABEL: Record<string, string> = { pending: "Menunggu", approved: "Disetujui", rejected: "Ditolak" };
+  const STATUS_BADGE: Record<string, string> = {
+    pending: "bg-signal/10 text-signal border-signal",
+    approved: "bg-armed/10 text-armed border-armed",
+    rejected: "bg-hairline/20 text-smoke border-hairline",
+  };
+
+  function formatDate(iso?: string): string {
+    if (!iso) return "-";
+    try {
+      return new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+    } catch {
+      return "-";
+    }
+  }
+
+  async function loadRequests(): Promise<void> {
+    const tableBody = document.getElementById("request-body") as HTMLTableSectionElement;
+    const table = document.getElementById("request-table") as HTMLTableElement;
+    const emptyState = document.getElementById("request-empty") as HTMLDivElement;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/technical/inventory-request`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat riwayat permintaan", "error");
+        return;
+      }
+      const requests: PurchaseRequest[] = json.data ?? [];
+      const isEmpty = requests.length === 0;
+      table.classList.toggle("hidden", isEmpty);
+      emptyState.classList.toggle("hidden", !isEmpty);
+      tableBody.innerHTML = requests
+        .map(
+          (r) => `
+        <tr>
+          <td class="font-semibold text-ink">${escapeHtml(r.itemName)}</td>
+          <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${r.quantity}</td>
+          <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${r.urgency === "urgent" ? "Mendesak" : "Normal"}</td>
+          <td class="hidden md:table-cell font-mono text-xs text-charcoal">${formatDate(r.createdAt)}</td>
+          <td><span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${STATUS_BADGE[r.status]}">${STATUS_LABEL[r.status]}</span></td>
+        </tr>
+      `
+        )
+        .join("");
+
+      setStatValue("stat-request-total", String(requests.length));
+      setStatValue("stat-request-pending", String(requests.filter((r) => r.status === "pending").length));
+      setStatValue("stat-request-approved", String(requests.filter((r) => r.status === "approved").length));
+      setStatValue("stat-request-rejected", String(requests.filter((r) => r.status === "rejected").length));
+    } catch (err) {
+      console.error("[loadRequests] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  document.getElementById("inventory-request-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    window.showToast?.("Permintaan alat terkirim (prototype)", "success");
-    (e.target as HTMLFormElement).reset();
+    const itemName = (document.getElementById("request-item") as HTMLInputElement).value.trim();
+    const quantity = Number((document.getElementById("request-qty") as HTMLInputElement).value || 1);
+    const urgency = (document.getElementById("request-urgency") as HTMLSelectElement).value;
+    const note = (document.getElementById("request-note") as HTMLTextAreaElement).value.trim();
+
+    if (!itemName) {
+      window.showToast?.("Nama alat/material wajib diisi", "error");
+      return;
+    }
+
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/technical/inventory-request`, {
+        method: "POST",
+        body: JSON.stringify({ itemName, quantity, urgency, note: note || undefined }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal mengajukan permintaan", "error");
+        return;
+      }
+      window.showToast?.(json.message ?? "Permintaan alat terkirim");
+      (document.getElementById("inventory-request-form") as HTMLFormElement).reset();
+      await loadRequests();
+    } catch (err) {
+      console.error("[inventory-request-form submit] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
   });
+
+  loadRequests();
 </script>
