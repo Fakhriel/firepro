@@ -1,136 +1,282 @@
 ---
 import EmployeeLayout from "../../layouts/EmployeeLayout.astro";
 import PageHeader from "../../components/PageHeader.astro";
-import StatCard from "../../components/StatCard.astro";
 ---
 
-<EmployeeLayout title="My Tasks" activeNav="my-tasks">
-  <PageHeader heading="My Tasks" sub="Tugas lapangan yang ditugaskan kepada Anda" crumbs={[{ label: "Kerja Lapangan" }, { label: "My Tasks" }]} />
+<EmployeeLayout title="Tugas Saya" activeNav="tugas-saya">
+  <PageHeader heading="Tugas Saya" sub="Daftar pekerjaan yang ditugaskan" crumbs={[{ label: "Lapangan" }, { label: "Tugas Saya" }]} />
 
-  <!-- Stat cards -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
-    <StatCard id="stat-tasks-total" label="Total Tugas" accent />
-    <StatCard id="stat-tasks-progress" label="Sedang Dikerjakan" />
-    <StatCard id="stat-tasks-done" label="Selesai" />
-    <StatCard id="stat-tasks-overdue" label="Lewat Tenggat" />
+  <!-- Filter tabs -->
+  <div class="flex items-center gap-2 mb-5 overflow-x-auto pb-1">
+    <button type="button" data-filter="all" class="task-tab active whitespace-nowrap">Semua</button>
+    <button type="button" data-filter="today" class="task-tab whitespace-nowrap">Hari Ini</button>
+    <button type="button" data-filter="in_progress" class="task-tab whitespace-nowrap">Sedang Berjalan</button>
+    <button type="button" data-filter="done" class="task-tab whitespace-nowrap">Selesai</button>
   </div>
 
-  <!-- Filter -->
-  <div class="flex flex-col sm:flex-row gap-3 mb-5">
-    <input id="search-tasks" type="search" placeholder="Cari lokasi / deskripsi tugas…" class="field-input sm:max-w-xs" />
-    <select id="filter-tasks-status" class="field-input sm:w-48">
-      <option value="">Semua Status</option>
-      <option value="todo">Belum Dikerjakan</option>
-      <option value="in_progress">Sedang Berjalan</option>
-      <option value="done">Selesai</option>
-    </select>
+  <!-- Search -->
+  <div class="mb-5">
+    <input id="search-tugas" type="search" placeholder="Cari nama proyek / lokasi…" class="field-input sm:max-w-xs" />
   </div>
 
-  <!-- Table -->
-  <div class="panel overflow-hidden">
-    <div class="overflow-x-auto">
-      <table id="tasks-table" class="data-table">
-        <thead>
-          <tr>
-            <th>Lokasi / Titik Kerja</th>
-            <th class="hidden sm:table-cell">Deskripsi Tugas</th>
-            <th class="hidden md:table-cell">Tenggat</th>
-            <th>Status</th>
-            <th class="text-right">Aksi</th>
-          </tr>
-        </thead>
-        <tbody id="tasks-body"></tbody>
-      </table>
-    </div>
+  <!-- Task list -->
+  <div id="tugas-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
 
-    <div id="tasks-empty" class="empty-state min-h-56">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M9 6h11M9 12h11M9 18h11"/>
-        <path d="M4.5 6l1 1 2-2M4.5 12l1 1 2-2M4.5 18l1 1 2-2"/>
-      </svg>
-      <p>Belum ada tugas yang ditugaskan kepada Anda</p>
-    </div>
+  <div id="tugas-empty" class="empty-state min-h-56 panel">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M5.5 8H18.5L19.5 21H4.5L5.5 8Z"/>
+      <path d="M8.5 8V6C8.5 4.067 9.567 3 12 3C14.433 3 15.5 4.067 15.5 6V8"/>
+    </svg>
+    <p>Belum ada tugas yang ditugaskan</p>
+  </div>
 
-    <div class="flex items-center justify-between px-4 py-3 border-t border-hairline">
-      <span data-tasks-count class="font-mono text-[10px] text-smoke">0 tugas</span>
-      <div class="flex items-center gap-1">
-        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>←</button>
-        <span class="font-mono text-xs px-3 py-1.5 border border-hairline">1</span>
-        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>→</button>
+  <!-- Task Detail Drawer -->
+  <div id="task-drawer" class="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-paper border-l-2 border-ink translate-x-full transition-transform duration-300 ease-out flex flex-col">
+    <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink shrink-0">
+      <h2 class="font-display text-xl text-ink">Detail Pekerjaan</h2>
+      <button id="drawer-close" type="button" class="text-smoke hover:text-ink p-1">
+        <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-5 space-y-5">
+      <div id="drawer-task-info">
+        <p class="font-body text-sm text-smoke">Pilih tugas untuk melihat detail pekerjaan.</p>
       </div>
-    </div>
-  </div>
 
-  <!-- Task detail / update modal (prototype UI only) -->
-  <div id="task-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
-    <div class="panel w-full max-w-lg bg-paper">
-      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
-        <h3 class="font-display text-lg text-ink leading-none">Update Tugas</h3>
-        <button id="task-modal-close" type="button" class="text-smoke hover:text-ink transition-colors" aria-label="Tutup">
-          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      <div>
+        <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-2">Ubah Status</p>
+        <div class="grid grid-cols-2 gap-2">
+          <button id="btn-status-in-progress" type="button" class="btn-secondary text-xs">Mulai Kerjakan</button>
+          <button id="btn-status-done" type="button" class="btn-primary text-xs" style="background-color: var(--color-armed, #1f7a4d); border-color: var(--color-armed, #1f7a4d);">Tandai Selesai</button>
+        </div>
+      </div>
+
+      <div>
+        <label for="task-photo" class="field-label">Upload Foto Pekerjaan</label>
+        <label for="task-photo" class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-hairline hover:border-ink transition-colors py-8 cursor-pointer text-center">
+          <svg viewBox="0 0 24 24" fill="none" class="w-6 h-6 text-smoke" stroke="currentColor" stroke-width="1.5">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
           </svg>
-        </button>
+          <span class="font-mono text-[10px] text-smoke uppercase tracking-widest">Klik untuk pilih foto</span>
+          <input id="task-photo" type="file" accept="image/*" capture="environment" class="hidden" />
+        </label>
+        <p id="task-photo-filename" class="font-mono text-[10px] text-smoke mt-1.5"></p>
+        <button id="btn-upload-photo" type="button" class="btn-secondary text-xs mt-2 w-full" disabled>Upload Foto</button>
       </div>
-      <div class="p-5 space-y-4">
-        <div>
-          <label class="field-label" for="task-status-select">Status Pekerjaan</label>
-          <select id="task-status-select" class="field-input">
-            <option value="todo">Belum Dikerjakan</option>
-            <option value="in_progress">Sedang Berjalan</option>
-            <option value="done">Selesai</option>
-          </select>
-        </div>
-        <div>
-          <label class="field-label" for="task-note">Catatan</label>
-          <textarea id="task-note" rows="3" class="field-input resize-none" placeholder="Catatan pekerjaan…"></textarea>
-        </div>
-        <div>
-          <label class="field-label" for="task-photo">Upload Foto Pekerjaan</label>
-          <label for="task-photo" class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-hairline hover:border-ink transition-colors py-8 cursor-pointer text-center">
-            <svg viewBox="0 0 24 24" fill="none" class="w-6 h-6 text-smoke" stroke="currentColor" stroke-width="1.5">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-              <circle cx="12" cy="13" r="4"/>
-            </svg>
-            <span class="font-mono text-[10px] text-smoke uppercase tracking-widest">Klik untuk pilih foto</span>
-            <input id="task-photo" type="file" accept="image/*" capture="environment" multiple class="hidden" />
-          </label>
-          <p id="task-photo-filename" class="font-mono text-[10px] text-smoke mt-1.5"></p>
-        </div>
-      </div>
-      <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
-        <button id="task-modal-cancel" type="button" class="btn-secondary text-xs">Batal</button>
-        <button id="task-modal-save" type="button" class="btn-primary text-xs">Simpan</button>
-      </div>
+
+      <p class="font-mono text-[9px] text-smoke">Peta lokasi & catatan lapangan belum tersedia — backend belum punya field/endpoint untuk itu di modul tugas.</p>
     </div>
   </div>
+  <div id="drawer-overlay" class="fixed inset-0 bg-ink/40 z-40 hidden"></div>
 </EmployeeLayout>
 
-<script>
-  // Prototype UI only — belum terhubung ke endpoint tasks employee.
-  function openModal(): void {
-    document.getElementById("task-modal")?.classList.remove("hidden");
-    document.getElementById("task-modal")?.classList.add("flex");
+<style>
+  .task-tab {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.5rem 0.875rem;
+    border: 2px solid var(--color-ink);
+    background: transparent;
+    color: var(--color-ink);
+    transition: all 0.15s ease;
   }
-  function closeModal(): void {
-    document.getElementById("task-modal")?.classList.add("hidden");
-    document.getElementById("task-modal")?.classList.remove("flex");
+  .task-tab.active {
+    background: var(--color-ink);
+    color: var(--color-paper);
+  }
+  .task-tab:hover:not(.active) {
+    background: rgba(18, 18, 18, 0.05);
+  }
+</style>
+
+<script>
+  import { adminApiFetch } from "../../lib/auth";
+  import { escapeHtml } from "../../lib/escapeHtml";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface Assignment {
+    id: string;
+    status: "assigned" | "in_progress" | "done";
+    notes: string;
+    project?: { id: number; name: string; code: string; location: string };
   }
 
-  document.getElementById("task-modal-close")?.addEventListener("click", closeModal);
-  document.getElementById("task-modal-cancel")?.addEventListener("click", closeModal);
-  document.getElementById("task-modal-save")?.addEventListener("click", () => {
-    closeModal();
-    window.showToast?.("Update tugas tersimpan (prototype)", "success");
-  });
+  const STATUS_LABEL: Record<string, string> = { assigned: "Ditugaskan", in_progress: "Berjalan", done: "Selesai" };
+  const STATUS_BADGE: Record<string, string> = {
+    assigned: "bg-hairline/20 text-smoke border-hairline",
+    in_progress: "bg-ink/5 text-ink border-ink",
+    done: "bg-armed/10 text-armed border-armed",
+  };
+
+  let allTasks: Assignment[] = [];
+  let currentFilter = "all";
+  let currentTaskId: string | null = null;
+
+  const listEl = document.getElementById("tugas-list") as HTMLDivElement;
+  const emptyEl = document.getElementById("tugas-empty") as HTMLDivElement;
+  const searchInput = document.getElementById("search-tugas") as HTMLInputElement | null;
+
+  const drawer = document.getElementById("task-drawer");
+  const overlay = document.getElementById("drawer-overlay");
+  function openDrawer(): void {
+    drawer?.classList.remove("translate-x-full");
+    overlay?.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+  }
+  function closeDrawer(): void {
+    drawer?.classList.add("translate-x-full");
+    overlay?.classList.add("hidden");
+    document.body.style.overflow = "";
+    currentTaskId = null;
+  }
+  document.getElementById("drawer-close")?.addEventListener("click", closeDrawer);
+  overlay?.addEventListener("click", closeDrawer);
+
+  function renderTasks(): void {
+    const keyword = (searchInput?.value ?? "").trim().toLowerCase();
+    const filtered = allTasks.filter((t) => {
+      if (currentFilter === "in_progress" && t.status !== "in_progress") return false;
+      if (currentFilter === "done" && t.status !== "done") return false;
+      // "Hari Ini" — backend tidak punya tanggal per-tugas, jadi kita anggap semua yang belum selesai relevan hari ini.
+      if (currentFilter === "today" && t.status === "done") return false;
+      if (
+        keyword &&
+        !(t.project?.name ?? "").toLowerCase().includes(keyword) &&
+        !(t.project?.location ?? "").toLowerCase().includes(keyword)
+      )
+        return false;
+      return true;
+    });
+
+    listEl.innerHTML = "";
+    const isEmpty = filtered.length === 0;
+    listEl.classList.toggle("hidden", isEmpty);
+    emptyEl.classList.toggle("hidden", !isEmpty);
+
+    filtered.forEach((t) => {
+      const card = document.createElement("div");
+      card.className = "panel p-4 cursor-pointer hover:brutal-shadow-sm transition-shadow duration-150";
+      card.innerHTML = `
+        <div class="flex items-start justify-between gap-2 mb-2">
+          <h4 class="font-display text-base text-ink leading-tight">${escapeHtml(t.project?.name ?? "Proyek")}</h4>
+          <span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 shrink-0 ${STATUS_BADGE[t.status]}">${STATUS_LABEL[t.status]}</span>
+        </div>
+        <p class="font-mono text-[10px] text-smoke uppercase tracking-widest">${escapeHtml(t.project?.code ?? "")}</p>
+        <p class="font-body text-xs text-charcoal mt-2">${escapeHtml(t.project?.location ?? "-")}</p>
+      `;
+      card.addEventListener("click", () => openTaskDrawer(t));
+      listEl.appendChild(card);
+    });
+  }
+
+  function openTaskDrawer(t: Assignment): void {
+    currentTaskId = t.id;
+    const infoEl = document.getElementById("drawer-task-info");
+    if (infoEl) {
+      infoEl.innerHTML = `
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest">${escapeHtml(t.project?.code ?? "")}</p>
+        <h3 class="font-display text-lg text-ink">${escapeHtml(t.project?.name ?? "-")}</h3>
+        <p class="font-body text-sm text-charcoal mt-1">${escapeHtml(t.project?.location ?? "-")}</p>
+        <span class="inline-block mt-2 font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${STATUS_BADGE[t.status]}">${STATUS_LABEL[t.status]}</span>
+        ${t.notes ? `<p class="font-body text-sm text-charcoal mt-3 border-t border-hairline pt-3">${escapeHtml(t.notes)}</p>` : ""}
+      `;
+    }
+    (document.getElementById("task-photo") as HTMLInputElement).value = "";
+    (document.getElementById("task-photo-filename") as HTMLElement).textContent = "";
+    (document.getElementById("btn-upload-photo") as HTMLButtonElement).disabled = true;
+    openDrawer();
+  }
+
+  async function loadTasks(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/technical/tasks`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat tugas", "error");
+        return;
+      }
+      allTasks = json.data ?? [];
+      renderTasks();
+    } catch (err) {
+      console.error("[loadTasks] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  async function updateStatus(status: "in_progress" | "done"): Promise<void> {
+    if (!currentTaskId) return;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/technical/tasks/${currentTaskId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal mengubah status tugas", "error");
+        return;
+      }
+      window.showToast?.(json.message ?? "Status tugas diperbarui");
+      closeDrawer();
+      await loadTasks();
+    } catch (err) {
+      console.error("[updateStatus] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+  document.getElementById("btn-status-in-progress")?.addEventListener("click", () => updateStatus("in_progress"));
+  document.getElementById("btn-status-done")?.addEventListener("click", () => updateStatus("done"));
 
   document.getElementById("task-photo")?.addEventListener("change", (e) => {
     const input = e.target as HTMLInputElement;
     const label = document.getElementById("task-photo-filename");
-    if (label) {
-      label.textContent = input.files && input.files.length > 0
-        ? `${input.files.length} foto dipilih`
-        : "";
+    const btn = document.getElementById("btn-upload-photo") as HTMLButtonElement;
+    if (label) label.textContent = input.files && input.files[0] ? input.files[0].name : "";
+    btn.disabled = !(input.files && input.files[0]);
+  });
+
+  document.getElementById("btn-upload-photo")?.addEventListener("click", async () => {
+    if (!currentTaskId) return;
+    const input = document.getElementById("task-photo") as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("photo", file);
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/technical/tasks/${currentTaskId}/photo`, {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal upload foto", "error");
+        return;
+      }
+      window.showToast?.(json.message ?? "Foto berhasil diupload");
+      input.value = "";
+      (document.getElementById("task-photo-filename") as HTMLElement).textContent = "";
+      (document.getElementById("btn-upload-photo") as HTMLButtonElement).disabled = true;
+    } catch (err) {
+      console.error("[btn-upload-photo] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
     }
   });
+
+  document.querySelectorAll<HTMLButtonElement>(".task-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".task-tab").forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      currentFilter = tab.dataset.filter ?? "all";
+      renderTasks();
+    });
+  });
+  searchInput?.addEventListener("input", renderTasks);
+
+  loadTasks();
 </script>
