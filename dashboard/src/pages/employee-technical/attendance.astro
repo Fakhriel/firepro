@@ -19,7 +19,7 @@ import PageHeader from "../../components/PageHeader.astro";
         <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="1.75">
           <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
         </svg>
-        <span id="attendance-location">Lokasi akan terdeteksi otomatis</span>
+        <span id="attendance-location">Deteksi lokasi GPS — roadmap tahap berikut</span>
       </div>
 
       <button id="btn-check-in" type="button" class="btn-primary w-full justify-center">
@@ -85,6 +85,19 @@ import PageHeader from "../../components/PageHeader.astro";
 </EmployeeLayout>
 
 <script>
+  import { adminApiFetch } from "../../lib/auth";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface AttendanceRecord {
+    id: string;
+    workDate: string;
+    checkInAt: string | null;
+    checkOutAt: string | null;
+    status: string;
+  }
+
   // Live clock
   function tickClock(): void {
     const now = new Date();
@@ -100,7 +113,6 @@ import PageHeader from "../../components/PageHeader.astro";
   tickClock();
   setInterval(tickClock, 1000);
 
-  // Check in / out toggle — prototype only, belum terhubung backend absensi.
   const btnIn = document.getElementById("btn-check-in");
   const btnOut = document.getElementById("btn-check-out");
   const badge = document.getElementById("attendance-status-badge");
@@ -108,37 +120,134 @@ import PageHeader from "../../components/PageHeader.astro";
   const summaryOut = document.getElementById("summary-check-out");
   const summaryDuration = document.getElementById("summary-duration");
 
-  let checkInTime: Date | null = null;
-
-  btnIn?.addEventListener("click", () => {
-    checkInTime = new Date();
-    const timeStr = checkInTime.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-    if (summaryIn) summaryIn.textContent = timeStr;
-    if (badge) {
-      badge.textContent = "Sedang Bekerja";
-      badge.className = "badge badge-active mb-6";
+  function formatTime(iso: string | null): string {
+    if (!iso) return "--:--";
+    try {
+      return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return "--:--";
     }
-    btnIn?.classList.add("hidden");
-    btnOut?.classList.remove("hidden");
-    window.showToast?.(`Check in berhasil pukul ${timeStr} (prototype)`, "success");
+  }
+  function formatDuration(checkIn: string | null, checkOut: string | null): string {
+    if (!checkIn || !checkOut) return "--";
+    const ms = new Date(checkOut).getTime() - new Date(checkIn).getTime();
+    if (ms <= 0) return "--";
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    return `${h}j ${m}m`;
+  }
+
+  function applyTodayState(record: AttendanceRecord | null): void {
+    if (summaryIn) summaryIn.textContent = formatTime(record?.checkInAt ?? null);
+    if (summaryOut) summaryOut.textContent = formatTime(record?.checkOutAt ?? null);
+    if (summaryDuration) summaryDuration.textContent = formatDuration(record?.checkInAt ?? null, record?.checkOutAt ?? null);
+
+    if (record?.checkOutAt) {
+      if (badge) {
+        badge.textContent = "Selesai Check Out";
+        badge.className = "badge badge-inactive mb-6";
+      }
+      btnIn?.classList.add("hidden");
+      btnOut?.classList.add("hidden");
+    } else if (record?.checkInAt) {
+      if (badge) {
+        badge.textContent = "Sedang Bekerja";
+        badge.className = "badge badge-active mb-6";
+      }
+      btnIn?.classList.add("hidden");
+      btnOut?.classList.remove("hidden");
+    } else {
+      if (badge) {
+        badge.textContent = "Belum Check In";
+        badge.className = "badge badge-inactive mb-6";
+      }
+      btnIn?.classList.remove("hidden");
+      btnOut?.classList.add("hidden");
+    }
+  }
+
+  async function loadToday(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/technical/attendance/today`);
+      const json = await res.json();
+      if (!res.ok) return;
+      applyTodayState(json.data ?? null);
+    } catch (err) {
+      console.error("[loadToday] gagal fetch backend:", err);
+    }
+  }
+
+  async function loadHistory(): Promise<void> {
+    const tableBody = document.getElementById("attendance-body") as HTMLTableSectionElement;
+    const table = document.getElementById("attendance-table") as HTMLTableElement;
+    const emptyState = document.getElementById("attendance-empty") as HTMLDivElement;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/technical/attendance/history`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat riwayat kehadiran", "error");
+        return;
+      }
+      const history: AttendanceRecord[] = json.data ?? [];
+      const isEmpty = history.length === 0;
+      table.classList.toggle("hidden", isEmpty);
+      emptyState.classList.toggle("hidden", !isEmpty);
+      tableBody.innerHTML = history
+        .map((r) => {
+          const d = new Date(r.workDate).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+          const badgeCls = r.checkOutAt ? "bg-hairline/20 text-smoke border-hairline" : "bg-ink/5 text-ink border-ink";
+          const label = r.checkOutAt ? "Sudah Pulang" : "Sedang Bekerja";
+          return `
+        <tr>
+          <td class="font-mono text-xs text-charcoal">${d}</td>
+          <td class="font-mono text-xs text-charcoal">${formatTime(r.checkInAt)}</td>
+          <td class="font-mono text-xs text-charcoal">${formatTime(r.checkOutAt)}</td>
+          <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${formatDuration(r.checkInAt, r.checkOutAt)}</td>
+          <td><span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${badgeCls}">${label}</span></td>
+        </tr>
+      `;
+        })
+        .join("");
+    } catch (err) {
+      console.error("[loadHistory] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  btnIn?.addEventListener("click", async () => {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/technical/attendance/check-in`, { method: "POST", body: JSON.stringify({}) });
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal check in", "error");
+        return;
+      }
+      window.showToast?.(json.message ?? "Check in berhasil");
+      applyTodayState(json.data);
+      await loadHistory();
+    } catch (err) {
+      console.error("[btn-check-in] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
   });
 
-  btnOut?.addEventListener("click", () => {
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-    if (summaryOut) summaryOut.textContent = timeStr;
-    if (checkInTime) {
-      const diffMs = now.getTime() - checkInTime.getTime();
-      const hours = Math.floor(diffMs / 3600000);
-      const minutes = Math.floor((diffMs % 3600000) / 60000);
-      if (summaryDuration) summaryDuration.textContent = `${hours}j ${minutes}m`;
+  btnOut?.addEventListener("click", async () => {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/technical/attendance/check-out`, { method: "POST", body: JSON.stringify({}) });
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal check out", "error");
+        return;
+      }
+      window.showToast?.(json.message ?? "Check out berhasil");
+      applyTodayState(json.data);
+      await loadHistory();
+    } catch (err) {
+      console.error("[btn-check-out] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
     }
-    if (badge) {
-      badge.textContent = "Selesai Check Out";
-      badge.className = "badge badge-inactive mb-6";
-    }
-    btnOut?.classList.add("hidden");
-    btnIn?.classList.remove("hidden");
-    window.showToast?.(`Check out berhasil pukul ${timeStr} (prototype)`, "success");
   });
+
+  loadToday();
+  loadHistory();
 </script>
