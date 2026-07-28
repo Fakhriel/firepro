@@ -1,0 +1,52 @@
+const service = require('../../modules/attendance/attendance.service');
+
+async function checkInHandler(req, res, next) {
+  try {
+    const data = await service.checkIn({ adminId: req.admin.id, location: req.body.location });
+    res.status(201).json({ data, message: 'Check in berhasil.' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function checkOutHandler(req, res, next) {
+  try {
+    const data = await service.checkOut({ adminId: req.admin.id, location: req.body.location });
+    res.status(200).json({ data, message: 'Check out berhasil.' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function todayHandler(req, res, next) {
+  try {
+    const data = await service.getToday(req.admin.id);
+    res.status(200).json({ data });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function historyHandler(req, res, next) {
+  try {
+    const data = await service.listHistory(req.admin.id);
+    res.status(200).json({ data });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Monitoring tim — "Kehadiran Teknisi Hari Ini" di
+// pages/supervisor/attendance.astro. Difokuskan ke role=karyawan karena
+// Supervisor cuma mengawasi teknisi lapangan, bukan sesama supervisor.
+async function teamHandler(req, res, next) {
+  try {
+    const { date } = req.query;
+    const data = await service.listByDate({ date, role: 'karyawan' });
+    res.status(200).json({ data });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { checkInHandler, checkOutHandler, todayHandler, historyHandler, teamHandler };
