@@ -73,12 +73,12 @@ All 6 pages are wired to `/api/technical/*`, including confirmed write actions (
 
 ### Phase 1 — Close remaining gaps (in priority order)
 
-- [ ] **Admin login loop** — reproduce with Network tab (Preserve log on) to confirm actual status codes of `/login` and `/me`, then fix. Static review found no cause — likely needs runtime debugging (check for double `DOMContentLoaded` firing, stale token in another tab, or a backend-side issue not visible from the frontend code).
-- [ ] **Owner logout loop** — same approach: reproduce with Network tab, confirm whether `/login` is even reached or something redirects away from it after landing.
-- [ ] **Fix CORS fallback default** in `backend/src/config/env.js` (`4321` → `4322`) so a missing `.env` fails safely instead of silently blocking all requests.
+- [✅] **Admin login loop** — reproduce with Network tab (Preserve log on) to confirm actual status codes of `/login` and `/me`, then fix. Static review found no cause — likely needs runtime debugging (check for double `DOMContentLoaded` firing, stale token in another tab, or a backend-side issue not visible from the frontend code).
+- [✅] **Owner logout loop** — same approach: reproduce with Network tab, confirm whether `/login` is even reached or something redirects away from it after landing.
+- [✅] **Fix CORS fallback default** in `backend/src/config/env.js` (`4321` → `4322`) so a missing `.env` fails safely instead of silently blocking all requests.
 - [ ] **Owner** — decide (product decision, not code) whether `projects`, `reports`, and invoice-`Create` should get full CRUD or stay export/view-only; implement accordingly
-- [ ] **Owner `maintenance`** — responsive/mobile layout pass
-- [ ] Frontend polish pass on Supervisor & Karyawan Teknisi pages (now functionally wired, but not yet UX/edge-case tested)
+- [✅] **Owner `maintenance`** — responsive/mobile layout pass
+- [✅] Frontend polish pass on Supervisor & Karyawan Teknisi pages (now functionally wired, but not yet UX/edge-case tested)
 
 ### Phase 2 — Backend / feature work
 
