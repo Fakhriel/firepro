@@ -118,7 +118,8 @@ async function create(body) {
   if (!client) throw badRequest('clientId tidak valid — klien tidak ditemukan.');
 
   const project = await Project.create({
-    code: `TMP-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+ 
+    code: `TMP-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     status: 'planning',
     crewSize: 1,
     ...payload,
