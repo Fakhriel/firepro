@@ -1,10 +1,11 @@
 ---
 import DashboardLayout from "../layouts/DashboardLayout.astro";
 import PageHeader from "../components/PageHeader.astro";
+import StatCard from "../components/StatCard.astro";
 ---
 
 <DashboardLayout title="Projects" activeNav="projects">
-  <PageHeader heading="Projects" sub="Daftar proyek berjalan" crumbs={[{ label: "Operasional" }, { label: "Projects" }]}>
+  <PageHeader heading="Projects" sub="Semua proyek lintas tim & supervisor" crumbs={[{ label: "Operasional" }, { label: "Projects" }]}>
     <button id="btn-export-projects" type="button" class="btn-secondary text-xs gap-1.5">
       <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="1.75">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -13,7 +14,21 @@ import PageHeader from "../components/PageHeader.astro";
       </svg>
       Export PDF
     </button>
+    <button id="btn-add-project" type="button" class="btn-primary text-xs gap-1.5">
+      <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Tambah Project
+    </button>
   </PageHeader>
+
+  <!-- Stat cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-projects-total" label="Total Proyek" accent />
+    <StatCard id="stat-projects-running" label="Berjalan" />
+    <StatCard id="stat-projects-value" label="Nilai Total Kontrak" />
+    <StatCard id="stat-projects-completed" label="Selesai Bulan Ini" />
+  </div>
 
   <!-- Filter -->
   <div class="flex flex-col sm:flex-row gap-3 mb-5">
@@ -26,17 +41,20 @@ import PageHeader from "../components/PageHeader.astro";
       <option value="on_hold">Ditunda</option>
       <option value="cancelled">Dibatalkan</option>
     </select>
+    <select id="filter-supervisor" class="field-input sm:w-48">
+      <option value="">Semua Supervisor</option>
+    </select>
   </div>
 
   <!-- Table -->
   <div class="panel overflow-hidden">
     <div class="overflow-x-auto">
-      <table id="projects-table" class="data-table">
+      <table id="projects-table" class="data-table hidden">
         <thead>
           <tr>
             <th>Project ID</th>
             <th>Klien</th>
-            <th class="hidden sm:table-cell">Mulai</th>
+            <th class="hidden sm:table-cell">Supervisor</th>
             <th>Nilai Kontrak</th>
             <th class="hidden md:table-cell">Lokasi</th>
             <th>Status</th>
@@ -46,7 +64,19 @@ import PageHeader from "../components/PageHeader.astro";
         <tbody id="projects-body"></tbody>
       </table>
     </div>
-    <div id="projects-empty" class="empty-state min-h-56">
+    <div id="projects-skeleton">
+      {Array.from({ length: 5 }).map(() => (
+        <div class="skeleton-row">
+          <div class="skeleton w-9 h-9 shrink-0"></div>
+          <div class="flex-1 space-y-2">
+            <div class="skeleton h-3 w-1/3"></div>
+            <div class="skeleton h-2.5 w-1/5"></div>
+          </div>
+          <div class="skeleton h-5 w-16 shrink-0"></div>
+        </div>
+      ))}
+    </div>
+    <div id="projects-empty" class="empty-state min-h-56 hidden">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path d="M5.5 8H18.5L19.5 21H4.5L5.5 8Z"/>
         <path d="M8.5 8V6C8.5 4.067 9.567 3 12 3C14.433 3 15.5 4.067 15.5 6V8"/>
@@ -63,230 +93,472 @@ import PageHeader from "../components/PageHeader.astro";
     </div>
   </div>
 
-  <!-- Project Detail Drawer -->
-  <div id="project-drawer" class="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-paper border-l-2 border-ink translate-x-full transition-transform duration-300 ease-out flex flex-col">
+  <!-- Project detail drawer -->
+  <div id="project-drawer" class="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-surface border-l-2 border-ink translate-x-full transition-transform duration-300 ease-out flex flex-col">
     <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink shrink-0">
       <h2 class="font-display text-xl text-ink">Detail Proyek</h2>
-      <button id="drawer-close" type="button" class="text-smoke hover:text-ink p-1">
+      <button id="drawer-close" type="button" class="text-steel hover:text-ink p-1">
         <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="2">
           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
         </svg>
       </button>
     </div>
     <div class="flex-1 overflow-y-auto p-5">
-      <div id="drawer-content" class="empty-state min-h-40">
+      <div class="empty-state min-h-40">
         <p>Pilih proyek untuk melihat detail</p>
       </div>
     </div>
   </div>
   <div id="drawer-overlay" class="fixed inset-0 bg-ink/40 z-40 hidden"></div>
+
+  <!-- Create / Edit project modal -->
+  <div id="project-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
+    <div class="panel w-full max-w-lg bg-surface max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+        <h3 id="project-modal-title" class="font-display text-lg text-ink leading-none">Tambah Project</h3>
+        <button id="project-modal-close" type="button" class="text-steel hover:text-ink transition-colors" aria-label="Tutup">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="field-label" for="pf-client">Klien</label>
+          <select id="pf-client" class="field-input">
+            <option value="">Pilih klien…</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" for="pf-name">Nama Proyek</label>
+          <input id="pf-name" type="text" class="field-input" placeholder="Instalasi Fire Alarm Gedung A" />
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="field-label" for="pf-location">Lokasi</label>
+            <input id="pf-location" type="text" class="field-input" placeholder="Jakarta Selatan" />
+          </div>
+          <div>
+            <label class="field-label" for="pf-category">Kategori</label>
+            <input id="pf-category" type="text" class="field-input" placeholder="Fire Alarm System" />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="field-label" for="pf-start-date">Tanggal Mulai</label>
+            <input id="pf-start-date" type="date" class="field-input" />
+          </div>
+          <div>
+            <label class="field-label" for="pf-crew-size">Jumlah Kru</label>
+            <input id="pf-crew-size" type="number" min="1" value="1" class="field-input" />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="field-label" for="pf-base-cost">Biaya Dasar (Rp)</label>
+            <input id="pf-base-cost" type="number" min="0" step="1" value="0" class="field-input" />
+          </div>
+          <div>
+            <label class="field-label" for="pf-additional-cost">Biaya Tambahan (Rp)</label>
+            <input id="pf-additional-cost" type="number" min="0" step="1" value="0" class="field-input" />
+          </div>
+        </div>
+        <div>
+          <label class="field-label" for="pf-payment-ref">Referensi Pembayaran</label>
+          <input id="pf-payment-ref" type="text" class="field-input" placeholder="Nomor kontrak / referensi (opsional)" />
+        </div>
+        <div>
+          <label class="field-label" for="pf-status">Status</label>
+          <select id="pf-status" class="field-input">
+            <option value="planning">Perencanaan</option>
+            <option value="in_progress">Berjalan</option>
+            <option value="completed">Selesai</option>
+            <option value="on_hold">Ditunda</option>
+            <option value="cancelled">Dibatalkan</option>
+          </select>
+        </div>
+        <div id="project-modal-error" class="hidden border-2 border-signal bg-signal/5 px-3 py-2">
+          <p id="project-modal-error-msg" class="font-mono text-xs text-signal"></p>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
+        <button id="project-modal-cancel" type="button" class="btn-secondary text-xs">Batal</button>
+        <button id="project-modal-save" type="button" class="btn-primary text-xs">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete confirm modal -->
+  <div id="project-delete-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
+    <div class="panel w-full max-w-sm bg-surface">
+      <div class="px-5 py-4 border-b-2 border-ink">
+        <h3 class="font-display text-lg text-ink leading-none">Hapus Proyek?</h3>
+      </div>
+      <div class="px-5 py-4">
+        <p class="font-body text-sm text-charcoal">Proyek <strong id="project-delete-name" class="text-ink"></strong> akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.</p>
+      </div>
+      <div class="flex gap-3 px-5 py-4 border-t border-hairline">
+        <button id="project-delete-cancel" type="button" class="btn-secondary text-sm flex-1">Batal</button>
+        <button id="project-delete-confirm" type="button" class="btn-danger text-sm flex-1">Hapus</button>
+      </div>
+    </div>
+  </div>
 </DashboardLayout>
 
 <script>
-  import { exportTableToPDF } from "../lib/export";
   import { adminApiFetch } from "../lib/auth";
   import { escapeHtml } from "../lib/escapeHtml";
+  import { exportTableToPDF, formatIDR } from "../lib/export";
 
   const apiUrl =
     document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
 
-  interface AdminProject {
-    projectId: string;
+  interface ProjectRow {
+    id: number;
+    projectCode: string;
+    projectName: string;
     clientName: string;
     clientEmail: string;
-    contractValue: number;
-    status: string;
-    startDate: string;
-    projectName: string;
-    projectCode: string;
     location: string;
-    category: string | null;
+    category: string;
     crewSize: number;
-    additionalCost: number;
     baseCost: number;
-    paymentRef: string | null;
+    additionalCost: number;
+    contractValue: number;
+    paymentRef: string;
+    status: "planning" | "in_progress" | "completed" | "on_hold" | "cancelled";
+    startDate: string;
   }
 
-  let allProjects: AdminProject[] = [];
-
-  const tbody = document.getElementById("projects-body") as HTMLTableSectionElement;
-  const emptyState = document.getElementById("projects-empty") as HTMLDivElement;
-  const countLabel = document.querySelector<HTMLSpanElement>("[data-projects-count]");
-  const table = document.getElementById("projects-table") as HTMLTableElement;
-
-  const STATUS_LABELS: Record<string, string> = {
+  const STATUS_LABEL: Record<string, string> = {
     planning: "Perencanaan",
     in_progress: "Berjalan",
     completed: "Selesai",
     on_hold: "Ditunda",
     cancelled: "Dibatalkan",
   };
-  const STATUS_CLASSES: Record<string, string> = {
-    planning: "border-ink text-ink",
-    in_progress: "border-ink bg-ink text-paper",
-    completed: "border-armed text-armed",
-    on_hold: "border-amber text-amber",
-    cancelled: "border-smoke text-smoke",
-  };
 
-  function formatRupiah(value: number): string {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency", currency: "IDR", minimumFractionDigits: 0,
-    }).format(value);
-  }
-  function formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString("id-ID", {
-      day: "2-digit", month: "short", year: "numeric",
-    });
-  }
+  let allProjects: ProjectRow[] = [];
 
-  function renderTable(projects: AdminProject[]): void {
-    tbody.innerHTML = "";
-    const isEmpty = projects.length === 0;
-    table.classList.toggle("hidden", isEmpty);
-    emptyState.classList.toggle("hidden", !isEmpty);
-    if (countLabel) countLabel.textContent = `${projects.length} proyek`;
+  const tableBody = document.getElementById("projects-body") as HTMLTableSectionElement;
+  const emptyState = document.getElementById("projects-empty") as HTMLDivElement;
+  const table = document.getElementById("projects-table") as HTMLTableElement;
+  const skeletonEl_projects = document.getElementById("projects-skeleton") as HTMLDivElement;
+  const countLabel = document.querySelector("[data-projects-count]") as HTMLElement | null;
+  const searchInput = document.getElementById("search-projects") as HTMLInputElement | null;
+  const statusFilter = document.getElementById("filter-status") as HTMLSelectElement | null;
 
-    projects.forEach((p) => {
-      const statusLabel = STATUS_LABELS[p.status] ?? p.status;
-      const statusClass = STATUS_CLASSES[p.status] ?? "border-smoke text-smoke";
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td class="font-mono text-xs">${escapeHtml(p.projectId)}</td>
-        <td>
-          <p class="font-semibold text-sm text-ink">${escapeHtml(p.clientName)}</p>
-          <p class="font-mono text-[10px] text-smoke">${escapeHtml(p.clientEmail)}</p>
-        </td>
-        <td class="hidden sm:table-cell font-mono text-xs text-smoke">${formatDate(p.startDate)}</td>
-        <td class="font-mono text-xs">${formatRupiah(p.contractValue)}</td>
-        <td class="hidden md:table-cell font-mono text-xs text-smoke">${escapeHtml(p.location ?? "—")}</td>
-        <td>
-          <span class="font-mono text-[10px] uppercase tracking-wide px-2 py-0.5 border-2 ${statusClass}">
-            ${statusLabel}
-          </span>
-        </td>
-        <td class="text-right">
-          <button type="button" class="btn-view-project text-xs px-2 py-1 hover:underline" data-project-id="${escapeHtml(p.projectId)}">
-            Detail
-          </button>
-        </td>
-      `;
-      tbody.appendChild(tr);
-    });
-
-    tbody.querySelectorAll<HTMLButtonElement>(".btn-view-project").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const project = allProjects.find((p) => p.projectId === btn.dataset.projectId);
-        if (project) openDrawer(project);
-      });
-    });
-  }
-
-  function applyFilters(): void {
-    const keyword = (document.getElementById("search-projects") as HTMLInputElement)?.value
-      .trim().toLowerCase() ?? "";
-    const status = (document.getElementById("filter-status") as HTMLSelectElement)?.value ?? "";
-
-    const filtered = allProjects.filter((p) => {
-      if (keyword && !p.projectId.toLowerCase().includes(keyword) &&
-          !p.clientName.toLowerCase().includes(keyword)) return false;
-      if (status && p.status !== status) return false;
-      return true;
-    });
-    renderTable(filtered);
-  }
-
-  async function loadProjects(): Promise<void> {
-    try {
-      const res = await adminApiFetch(`${apiUrl}/api/projects/admin`);
-      const json = await res.json();
-      if (!res.ok) {
-        window.showToast?.(json.error ?? "Gagal memuat proyek", "error");
-        return;
-      }
-      allProjects = json.data ?? [];
-      applyFilters();
-    } catch {
-      window.showToast?.("Tidak bisa terhubung ke server", "error");
-    }
-  }
-
-  document.getElementById("search-projects")?.addEventListener("input", applyFilters);
-  document.getElementById("filter-status")?.addEventListener("change", applyFilters);
-
-  // ─── Drawer detail proyek ────────────────────────────────────────
   const drawer = document.getElementById("project-drawer");
   const overlay = document.getElementById("drawer-overlay");
-  const drawerContent = document.getElementById("drawer-content");
+  const drawerBody = drawer?.querySelector(".flex-1.overflow-y-auto") as HTMLElement | null;
 
-  function openDrawer(project: AdminProject): void {
-    if (drawerContent) {
-      drawerContent.innerHTML = `
-        <div class="space-y-4">
-          <div>
-            <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-1">Project ID</p>
-            <p class="font-mono text-xs text-ink break-all">${escapeHtml(project.projectId)}</p>
-          </div>
-          <div>
-            <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-1">Nama Proyek</p>
-            <p class="font-body text-sm text-ink font-semibold">${escapeHtml(project.projectName)}</p>
-            <p class="font-mono text-xs text-smoke">Lokasi: ${escapeHtml(project.location)}${project.category ? ` / ${escapeHtml(project.category)}` : ""} × ${Number(project.crewSize)} tim</p>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-1">Biaya Dasar</p>
-              <p class="font-mono text-sm text-ink">${formatRupiah(project.baseCost)}</p>
-            </div>
-            <div>
-              <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-1">Biaya Tambahan</p>
-              <p class="font-mono text-sm text-ink">${formatRupiah(project.additionalCost)}</p>
-            </div>
-          </div>
-          <div>
-            <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-1">Nilai Kontrak</p>
-            <p class="font-body text-xl text-ink font-bold">${formatRupiah(project.contractValue)}</p>
-          </div>
-          <hr class="border-hairline" />
-          <div>
-            <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-1">Klien</p>
-            <p class="font-body text-sm text-ink">${escapeHtml(project.clientName)}</p>
-            <p class="font-mono text-xs text-smoke">${escapeHtml(project.clientEmail)}</p>
-          </div>
-          <div>
-            <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-1">Tanggal Mulai</p>
-            <p class="font-mono text-xs text-ink">${formatDate(project.startDate)}</p>
-          </div>
-          ${project.paymentRef ? `
-          <div>
-            <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-1">No. Referensi Pembayaran</p>
-            <p class="font-mono text-xs text-ink break-all">${escapeHtml(project.paymentRef)}</p>
-          </div>` : ""}
-          <div>
-            <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-1">Status</p>
-            <span class="font-mono text-[10px] uppercase tracking-wide px-2 py-0.5 border-2 ${STATUS_CLASSES[project.status] ?? "border-smoke text-smoke"}">
-              ${STATUS_LABELS[project.status] ?? project.status}
-            </span>
-          </div>
-        </div>
-      `;
-    }
+  function openDrawer(): void {
     drawer?.classList.remove("translate-x-full");
     overlay?.classList.remove("hidden");
     document.body.style.overflow = "hidden";
   }
-
   function closeDrawer(): void {
     drawer?.classList.add("translate-x-full");
     overlay?.classList.add("hidden");
     document.body.style.overflow = "";
   }
-
   document.getElementById("drawer-close")?.addEventListener("click", closeDrawer);
   overlay?.addEventListener("click", closeDrawer);
 
+  function statusBadge(status: string): string {
+    const map: Record<string, string> = {
+      planning: "bg-hairline/30 text-smoke border-hairline",
+      in_progress: "bg-ink/5 text-ink border-ink",
+      completed: "bg-hairline/20 text-smoke border-hairline",
+      on_hold: "bg-signal/10 text-signal border-signal",
+      cancelled: "bg-signal/10 text-signal border-signal",
+    };
+    return map[status] ?? map.planning;
+  }
+
+  function showDetail(p: ProjectRow): void {
+    if (!drawerBody) return;
+    drawerBody.innerHTML = `
+      <div class="space-y-4">
+        <div>
+          <p class="font-mono text-[9px] text-smoke uppercase tracking-widest">${escapeHtml(p.projectCode)}</p>
+          <h3 class="font-display text-xl text-ink mt-1">${escapeHtml(p.projectName)}</h3>
+          <span class="inline-block mt-2 font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${statusBadge(p.status)}">${escapeHtml(STATUS_LABEL[p.status] ?? p.status)}</span>
+        </div>
+        <div class="border-t border-hairline pt-4 space-y-2 font-mono text-xs">
+          <div class="flex justify-between"><span class="text-smoke">Klien</span><span class="text-ink">${escapeHtml(p.clientName)}</span></div>
+          <div class="flex justify-between"><span class="text-smoke">Email Klien</span><span class="text-ink">${escapeHtml(p.clientEmail)}</span></div>
+          <div class="flex justify-between"><span class="text-smoke">Lokasi</span><span class="text-ink">${escapeHtml(p.location ?? "-")}</span></div>
+          <div class="flex justify-between"><span class="text-smoke">Kategori</span><span class="text-ink">${escapeHtml(p.category ?? "-")}</span></div>
+          <div class="flex justify-between"><span class="text-smoke">Jumlah Kru</span><span class="text-ink">${p.crewSize ?? "-"}</span></div>
+          <div class="flex justify-between"><span class="text-smoke">Mulai</span><span class="text-ink">${p.startDate ? new Date(p.startDate).toLocaleDateString("id-ID") : "-"}</span></div>
+        </div>
+        <div class="border-t border-hairline pt-4 space-y-2 font-mono text-xs">
+          <div class="flex justify-between"><span class="text-smoke">Biaya Dasar</span><span class="text-ink">${formatIDR(p.baseCost)}</span></div>
+          <div class="flex justify-between"><span class="text-smoke">Biaya Tambahan</span><span class="text-ink">${formatIDR(p.additionalCost)}</span></div>
+          <div class="flex justify-between font-semibold"><span class="text-ink">Nilai Kontrak</span><span class="text-ink">${formatIDR(p.contractValue)}</span></div>
+          <div class="flex justify-between"><span class="text-smoke">Ref. Pembayaran</span><span class="text-ink">${escapeHtml(p.paymentRef ?? "-")}</span></div>
+        </div>
+        <div class="border-t border-hairline pt-4 flex gap-2">
+          <button id="drawer-edit-project" type="button" class="btn-secondary text-xs flex-1">Edit</button>
+          <button id="drawer-delete-project" type="button" class="btn-danger text-xs flex-1">Hapus</button>
+        </div>
+      </div>
+    `;
+    drawerBody.querySelector("#drawer-edit-project")?.addEventListener("click", () => openProjectModal(p));
+    drawerBody.querySelector("#drawer-delete-project")?.addEventListener("click", () => openDeleteModal(p));
+    openDrawer();
+  }
+
+  function renderTable(projects: ProjectRow[]): void {
+    tableBody.innerHTML = "";
+
+    const isEmpty = projects.length === 0;
+    skeletonEl_projects.classList.add("hidden");
+    table.classList.toggle("hidden", isEmpty);
+    emptyState.classList.toggle("hidden", !isEmpty);
+    if (countLabel) countLabel.textContent = `${projects.length} proyek`;
+
+    projects.forEach((p) => {
+      const tr = document.createElement("tr");
+      tr.className = "cursor-pointer hover:bg-hairline/10";
+      tr.innerHTML = `
+        <td class="font-mono text-xs text-ink">${escapeHtml(p.projectCode)}</td>
+        <td class="font-semibold text-ink">${escapeHtml(p.clientName)}</td>
+        <td class="hidden sm:table-cell font-mono text-xs text-charcoal">-</td>
+        <td class="font-mono text-xs text-charcoal">${formatIDR(p.contractValue)}</td>
+        <td class="hidden md:table-cell font-mono text-xs text-charcoal">${escapeHtml(p.location ?? "-")}</td>
+        <td><span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${statusBadge(p.status)}">${escapeHtml(STATUS_LABEL[p.status] ?? p.status)}</span></td>
+        <td class="text-right font-mono text-[10px] text-smoke">Lihat →</td>
+      `;
+      tr.addEventListener("click", () => showDetail(p));
+      tableBody.appendChild(tr);
+    });
+  }
+
+  function setStatValue(cardId: string, value: string): void {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
+    if (!valueEl) {
+      const skeleton = card.querySelector(".skeleton")?.parentElement;
+      valueEl = document.createElement("p");
+      const isAccent = card.classList.contains("bg-ink");
+      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
+      if (skeleton) {
+        skeleton.replaceWith(valueEl);
+      } else {
+        card.appendChild(valueEl);
+      }
+    }
+    valueEl.textContent = value;
+  }
+
+  function updateStats(projects: ProjectRow[]): void {
+    const total = projects.length;
+    const running = projects.filter((p) => p.status === "in_progress").length;
+    const totalValue = projects.reduce((sum, p) => sum + p.contractValue, 0);
+    const now = new Date();
+    const completedThisMonth = projects.filter((p) => {
+      if (p.status !== "completed") return false;
+      const d = new Date(p.startDate);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }).length;
+
+    setStatValue("stat-projects-total", String(total));
+    setStatValue("stat-projects-running", String(running));
+    setStatValue("stat-projects-value", formatIDR(totalValue));
+    setStatValue("stat-projects-completed", String(completedThisMonth));
+  }
+
+  async function loadProjects(): Promise<void> {
+    try {
+      const params = new URLSearchParams();
+      if (searchInput?.value) params.set("search", searchInput.value);
+      if (statusFilter?.value) params.set("status", statusFilter.value);
+
+      const res = await adminApiFetch(`${apiUrl}/api/projects/admin?${params.toString()}`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat data proyek", "error");
+        return;
+      }
+      allProjects = json.data ?? [];
+      renderTable(allProjects);
+      updateStats(allProjects);
+    } catch (err) {
+      console.error("[loadProjects] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  let searchDebounce: ReturnType<typeof setTimeout>;
+  searchInput?.addEventListener("input", () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(loadProjects, 300);
+  });
+  statusFilter?.addEventListener("change", loadProjects);
   document.getElementById("btn-export-projects")?.addEventListener("click", () => {
-    exportTableToPDF("projects-table", { title: "Daftar Proyek", subtitle: "Laporan proyek FIREPRO" });
+    exportTableToPDF("projects-table", { title: "Daftar Proyek", subtitle: "Semua proyek lintas tim & supervisor — FIREPRO" });
   });
 
+  // ─── Create / Edit modal ────────────────────────────────────────────
+  interface ClientOption {
+    id: number;
+    name: string;
+  }
+  let clientOptions: ClientOption[] = [];
+  let editingProjectId: number | null = null;
+  let projectPendingDelete: ProjectRow | null = null;
+
+  function openModal(id: string): void {
+    document.getElementById(id)?.classList.replace("hidden", "flex");
+  }
+  function closeModal(id: string): void {
+    document.getElementById(id)?.classList.replace("flex", "hidden");
+  }
+
+  async function loadClientOptions(): Promise<void> {
+    const select = document.getElementById("pf-client") as HTMLSelectElement;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/clients`);
+      const json = await res.json();
+      if (!res.ok) return;
+      clientOptions = json.data ?? [];
+      select.innerHTML =
+        `<option value="">Pilih klien…</option>` +
+        clientOptions.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
+    } catch (err) {
+      console.error("[loadClientOptions] gagal fetch backend:", err);
+    }
+  }
+
+  function resetProjectForm(): void {
+    (document.getElementById("pf-client") as HTMLSelectElement).value = "";
+    (document.getElementById("pf-name") as HTMLInputElement).value = "";
+    (document.getElementById("pf-location") as HTMLInputElement).value = "";
+    (document.getElementById("pf-category") as HTMLInputElement).value = "";
+    (document.getElementById("pf-start-date") as HTMLInputElement).value = new Date().toISOString().split("T")[0];
+    (document.getElementById("pf-crew-size") as HTMLInputElement).value = "1";
+    (document.getElementById("pf-base-cost") as HTMLInputElement).value = "0";
+    (document.getElementById("pf-additional-cost") as HTMLInputElement).value = "0";
+    (document.getElementById("pf-payment-ref") as HTMLInputElement).value = "";
+    (document.getElementById("pf-status") as HTMLSelectElement).value = "planning";
+    document.getElementById("project-modal-error")?.classList.add("hidden");
+  }
+
+  function openProjectModal(project: ProjectRow | null): void {
+    editingProjectId = project?.id ?? null;
+    resetProjectForm();
+    const title = document.getElementById("project-modal-title") as HTMLElement;
+
+    if (project) {
+      title.textContent = "Edit Project";
+      (document.getElementById("pf-client") as HTMLSelectElement).value = String(project.clientId ?? "");
+      (document.getElementById("pf-name") as HTMLInputElement).value = project.projectName;
+      (document.getElementById("pf-location") as HTMLInputElement).value = project.location ?? "";
+      (document.getElementById("pf-category") as HTMLInputElement).value = project.category ?? "";
+      (document.getElementById("pf-start-date") as HTMLInputElement).value = project.startDate ? project.startDate.split("T")[0] : "";
+      (document.getElementById("pf-crew-size") as HTMLInputElement).value = String(project.crewSize ?? 1);
+      (document.getElementById("pf-base-cost") as HTMLInputElement).value = String(project.baseCost ?? 0);
+      (document.getElementById("pf-additional-cost") as HTMLInputElement).value = String(project.additionalCost ?? 0);
+      (document.getElementById("pf-payment-ref") as HTMLInputElement).value = project.paymentRef ?? "";
+      (document.getElementById("pf-status") as HTMLSelectElement).value = project.status;
+    } else {
+      title.textContent = "Tambah Project";
+    }
+    closeDrawer();
+    openModal("project-modal");
+  }
+
+  document.getElementById("btn-add-project")?.addEventListener("click", () => openProjectModal(null));
+  document.getElementById("project-modal-close")?.addEventListener("click", () => closeModal("project-modal"));
+  document.getElementById("project-modal-cancel")?.addEventListener("click", () => closeModal("project-modal"));
+
+  function showProjectFormError(msg: string): void {
+    const box = document.getElementById("project-modal-error");
+    const msgEl = document.getElementById("project-modal-error-msg");
+    if (msgEl) msgEl.textContent = msg;
+    box?.classList.remove("hidden");
+  }
+
+  document.getElementById("project-modal-save")?.addEventListener("click", async () => {
+    const clientId = (document.getElementById("pf-client") as HTMLSelectElement).value;
+    const name = (document.getElementById("pf-name") as HTMLInputElement).value.trim();
+    const location = (document.getElementById("pf-location") as HTMLInputElement).value.trim();
+    const category = (document.getElementById("pf-category") as HTMLInputElement).value.trim();
+    const startDate = (document.getElementById("pf-start-date") as HTMLInputElement).value;
+    const crewSize = Number((document.getElementById("pf-crew-size") as HTMLInputElement).value || 1);
+    const baseCost = Number((document.getElementById("pf-base-cost") as HTMLInputElement).value || 0);
+    const additionalCost = Number((document.getElementById("pf-additional-cost") as HTMLInputElement).value || 0);
+    const paymentRef = (document.getElementById("pf-payment-ref") as HTMLInputElement).value.trim();
+    const status = (document.getElementById("pf-status") as HTMLSelectElement).value;
+
+    if (!clientId) return showProjectFormError("Klien wajib dipilih.");
+    if (!name) return showProjectFormError("Nama proyek wajib diisi.");
+    if (!startDate) return showProjectFormError("Tanggal mulai wajib diisi.");
+
+    const payload = {
+      clientId: Number(clientId),
+      name,
+      location: location || null,
+      category: category || null,
+      startDate,
+      crewSize,
+      baseCost,
+      additionalCost,
+      paymentRef: paymentRef || null,
+      status,
+    };
+
+    try {
+      const url = editingProjectId ? `${apiUrl}/api/projects/${editingProjectId}` : `${apiUrl}/api/projects`;
+      const res = await adminApiFetch(url, {
+        method: editingProjectId ? "PATCH" : "POST",
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        showProjectFormError(json.error ?? "Gagal menyimpan proyek");
+        return;
+      }
+      window.showToast?.(editingProjectId ? "Proyek berhasil diperbarui" : "Proyek berhasil dibuat");
+      closeModal("project-modal");
+      await loadProjects();
+    } catch (err) {
+      console.error("[project-modal-save] gagal fetch backend:", err);
+      showProjectFormError("Tidak bisa terhubung ke server");
+    }
+  });
+
+  // ─── Delete ─────────────────────────────────────────────────────────
+  function openDeleteModal(project: ProjectRow): void {
+    projectPendingDelete = project;
+    (document.getElementById("project-delete-name") as HTMLElement).textContent = project.projectName;
+    closeDrawer();
+    openModal("project-delete-modal");
+  }
+  document.getElementById("project-delete-cancel")?.addEventListener("click", () => closeModal("project-delete-modal"));
+
+  document.getElementById("project-delete-confirm")?.addEventListener("click", async () => {
+    if (!projectPendingDelete) return;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/projects/${projectPendingDelete.id}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal menghapus proyek", "error");
+        return;
+      }
+      window.showToast?.("Proyek berhasil dihapus");
+      closeModal("project-delete-modal");
+      projectPendingDelete = null;
+      await loadProjects();
+    } catch (err) {
+      console.error("[project-delete-confirm] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  });
+
+  loadClientOptions();
   loadProjects();
 </script>
