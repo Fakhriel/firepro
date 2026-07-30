@@ -13,6 +13,12 @@ import PageHeader from "../components/PageHeader.astro";
       </svg>
       Export PDF
     </button>
+    <button id="btn-add-invoice" type="button" class="btn-primary text-xs gap-1.5">
+      <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Tambah Invoice
+    </button>
   </PageHeader>
 
   <!-- Filter -->
@@ -31,7 +37,7 @@ import PageHeader from "../components/PageHeader.astro";
   <!-- Table -->
   <div class="panel overflow-hidden">
     <div class="overflow-x-auto">
-      <table id="invoices-table" class="data-table">
+      <table id="invoices-table" class="data-table hidden">
         <thead>
           <tr>
             <th>No. Invoice</th>
@@ -45,7 +51,19 @@ import PageHeader from "../components/PageHeader.astro";
         <tbody id="invoices-body"></tbody>
       </table>
     </div>
-    <div id="invoices-empty" class="empty-state min-h-56">
+    <div id="invoices-skeleton">
+      {Array.from({ length: 5 }).map(() => (
+        <div class="skeleton-row">
+          <div class="skeleton w-9 h-9 shrink-0"></div>
+          <div class="flex-1 space-y-2">
+            <div class="skeleton h-3 w-1/3"></div>
+            <div class="skeleton h-2.5 w-1/5"></div>
+          </div>
+          <div class="skeleton h-5 w-16 shrink-0"></div>
+        </div>
+      ))}
+    </div>
+    <div id="invoices-empty" class="empty-state min-h-56 hidden">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <rect x="1" y="4" width="22" height="16" rx="2"/>
         <line x1="1" y1="10" x2="23" y2="10"/>
@@ -58,6 +76,51 @@ import PageHeader from "../components/PageHeader.astro";
         <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>←</button>
         <span class="font-mono text-xs px-3 py-1.5 border border-hairline">1</span>
         <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>→</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create invoice modal -->
+  <div id="invoice-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
+    <div class="panel w-full max-w-md bg-surface">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+        <h3 class="font-display text-lg text-ink leading-none">Tambah Invoice</h3>
+        <button id="invoice-modal-close" type="button" class="text-steel hover:text-ink transition-colors" aria-label="Tutup">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="field-label" for="if-client">Klien</label>
+          <select id="if-client" class="field-input">
+            <option value="">Pilih klien…</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" for="if-project">Proyek <span class="text-smoke normal-case">(opsional)</span></label>
+          <select id="if-project" class="field-input">
+            <option value="">Pilih klien dulu…</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="field-label" for="if-amount">Jumlah (Rp)</label>
+            <input id="if-amount" type="number" min="0" step="1" value="0" class="field-input" />
+          </div>
+          <div>
+            <label class="field-label" for="if-issued-date">Tanggal Terbit</label>
+            <input id="if-issued-date" type="date" class="field-input" />
+          </div>
+        </div>
+        <div id="invoice-modal-error" class="hidden border-2 border-signal bg-signal/5 px-3 py-2">
+          <p id="invoice-modal-error-msg" class="font-mono text-xs text-signal"></p>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
+        <button id="invoice-modal-cancel" type="button" class="btn-secondary text-xs">Batal</button>
+        <button id="invoice-modal-save" type="button" class="btn-primary text-xs">Simpan</button>
       </div>
     </div>
   </div>
@@ -86,6 +149,7 @@ import PageHeader from "../components/PageHeader.astro";
   const emptyState = document.getElementById("invoices-empty") as HTMLDivElement;
   const countLabel = document.querySelector<HTMLSpanElement>("[data-invoices-count]");
   const table = document.getElementById("invoices-table") as HTMLTableElement;
+  const skeletonEl_invoices = document.getElementById("invoices-skeleton") as HTMLDivElement;
 
   const STATUS_LABELS: Record<string, string> = {
     pending: "Pending",
@@ -116,6 +180,7 @@ import PageHeader from "../components/PageHeader.astro";
   function renderTable(invoices: AdminInvoice[]): void {
     tbody.innerHTML = "";
     const isEmpty = invoices.length === 0;
+    skeletonEl_invoices.classList.add("hidden");
     table.classList.toggle("hidden", isEmpty);
     emptyState.classList.toggle("hidden", !isEmpty);
     if (countLabel) countLabel.textContent = `${invoices.length} invoice`;
@@ -176,5 +241,124 @@ import PageHeader from "../components/PageHeader.astro";
     exportTableToPDF("invoices-table", { title: "Rekap Invoice", subtitle: "Data tagihan proyek FIREPRO" });
   });
 
+  // ─── Create invoice modal ───────────────────────────────────────────
+  interface ClientOption {
+    id: number;
+    name: string;
+  }
+  interface ProjectOption {
+    id: number;
+    projectName: string;
+    clientId: number;
+  }
+  let clientOptions: ClientOption[] = [];
+  let allProjectOptions: ProjectOption[] = [];
+
+  function openModal(id: string): void {
+    document.getElementById(id)?.classList.replace("hidden", "flex");
+  }
+  function closeModal(id: string): void {
+    document.getElementById(id)?.classList.replace("flex", "hidden");
+  }
+
+  async function loadClientOptions(): Promise<void> {
+    const select = document.getElementById("if-client") as HTMLSelectElement;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/clients`);
+      const json = await res.json();
+      if (!res.ok) return;
+      clientOptions = json.data ?? [];
+      select.innerHTML =
+        `<option value="">Pilih klien…</option>` +
+        clientOptions.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
+    } catch (err) {
+      console.error("[loadClientOptions] gagal fetch backend:", err);
+    }
+  }
+
+  async function loadProjectOptions(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/projects/admin`);
+      const json = await res.json();
+      if (!res.ok) return;
+      allProjectOptions = json.data ?? [];
+    } catch (err) {
+      console.error("[loadProjectOptions] gagal fetch backend:", err);
+    }
+  }
+
+  function updateProjectOptionsForClient(clientId: string): void {
+    const projectSelect = document.getElementById("if-project") as HTMLSelectElement;
+    if (!clientId) {
+      projectSelect.innerHTML = `<option value="">Pilih klien dulu…</option>`;
+      return;
+    }
+    const filtered = allProjectOptions.filter((p) => String(p.clientId) === clientId);
+    projectSelect.innerHTML =
+      `<option value="">Tanpa proyek terkait</option>` +
+      filtered.map((p) => `<option value="${p.id}">${escapeHtml(p.projectName)}</option>`).join("");
+  }
+  document.getElementById("if-client")?.addEventListener("change", (e) => {
+    updateProjectOptionsForClient((e.target as HTMLSelectElement).value);
+  });
+
+  function resetInvoiceForm(): void {
+    (document.getElementById("if-client") as HTMLSelectElement).value = "";
+    updateProjectOptionsForClient("");
+    (document.getElementById("if-amount") as HTMLInputElement).value = "0";
+    (document.getElementById("if-issued-date") as HTMLInputElement).value = new Date().toISOString().split("T")[0];
+    document.getElementById("invoice-modal-error")?.classList.add("hidden");
+  }
+
+  document.getElementById("btn-add-invoice")?.addEventListener("click", () => {
+    resetInvoiceForm();
+    openModal("invoice-modal");
+  });
+  document.getElementById("invoice-modal-close")?.addEventListener("click", () => closeModal("invoice-modal"));
+  document.getElementById("invoice-modal-cancel")?.addEventListener("click", () => closeModal("invoice-modal"));
+
+  function showInvoiceFormError(msg: string): void {
+    const box = document.getElementById("invoice-modal-error");
+    const msgEl = document.getElementById("invoice-modal-error-msg");
+    if (msgEl) msgEl.textContent = msg;
+    box?.classList.remove("hidden");
+  }
+
+  document.getElementById("invoice-modal-save")?.addEventListener("click", async () => {
+    const clientId = (document.getElementById("if-client") as HTMLSelectElement).value;
+    const projectId = (document.getElementById("if-project") as HTMLSelectElement).value;
+    const amount = Number((document.getElementById("if-amount") as HTMLInputElement).value || 0);
+    const issuedDate = (document.getElementById("if-issued-date") as HTMLInputElement).value;
+
+    if (!clientId) return showInvoiceFormError("Klien wajib dipilih.");
+    if (!issuedDate) return showInvoiceFormError("Tanggal terbit wajib diisi.");
+    if (Number.isNaN(amount) || amount < 0) return showInvoiceFormError("Jumlah harus angka >= 0.");
+
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/invoices`, {
+        method: "POST",
+        body: JSON.stringify({
+          clientId: Number(clientId),
+          projectId: projectId ? Number(projectId) : null,
+          amount,
+          issuedDate,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        showInvoiceFormError(json.error ?? "Gagal membuat invoice");
+        return;
+      }
+      window.showToast?.("Invoice berhasil dibuat");
+      closeModal("invoice-modal");
+      await loadInvoices();
+    } catch (err) {
+      console.error("[invoice-modal-save] gagal fetch backend:", err);
+      showInvoiceFormError("Tidak bisa terhubung ke server");
+    }
+  });
+
+  loadClientOptions();
+  loadProjectOptions();
   loadInvoices();
 </script>
