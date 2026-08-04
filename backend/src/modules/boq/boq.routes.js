@@ -11,7 +11,10 @@ const { requireAdminAuth, requireRole } = require('../../middleware/auth');
 
 const router = express.Router();
 
-router.use(requireAdminAuth, requireRole('admin', 'superadmin'));
+// Owner wajib bisa CRUD BOQ penuh (lihat spesifikasi role), makanya
+// 'owner' harus ikut di daftar ini — sebelumnya cuma admin/superadmin,
+// bikin Owner ke-block 403 padahal harusnya full access.
+router.use(requireAdminAuth, requireRole('admin', 'superadmin', 'owner'));
 
 // GET /api/boq/admin?projectId=&quotationId=&category=&search=&sortBy=&sortDir=
 router.get('/admin', listHandler);
