@@ -34,6 +34,12 @@ const Admin = sequelize.define('Admin', {
     type: DataTypes.STRING(150),
     allowNull: true,
   },
+  isActive: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: true,
+    field: 'is_active',
+  },
 }, {
   tableName: 'admins',
 });
