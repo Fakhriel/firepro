@@ -20,7 +20,7 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:4000";
     <EmployeeSidebar activeNav={activeNav} />
 
     <!-- ─── Main area ─────────────────────────────────────── -->
-    <div class="flex-1 flex flex-col min-w-0 lg:ml-60">
+    <div class="flex-1 flex flex-col min-w-0 lg:ml-64">
 
       <!-- Mobile overlay (backdrop saat sidebar terbuka) -->
       <div
@@ -44,7 +44,7 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:4000";
 </Base>
 
 <script>
-  import { getAdminAuth, clearAdminAuth } from "../lib/auth";
+  import { getAdminAuth, clearAdminAuth, getDashboardByRole } from "../lib/auth";
 
   // Guard client-side: hanya role 'karyawan' yang boleh melihat layout ini.
   // Role lain / belum login -> redirect ke /login. (Sebelumnya layout ini
@@ -52,14 +52,24 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:4000";
   // /employee-technical/* tanpa login.)
   function guardKaryawanRole(): void {
     const { isAuthenticated, admin } = getAdminAuth();
-    if (!isAuthenticated || !admin || admin.role !== "karyawan") {
+    if (!isAuthenticated || !admin) {
       clearAdminAuth();
       window.location.replace("/login");
+      return;
+    }
+    if (admin.role !== "karyawan") {
+      window.location.replace(getDashboardByRole(admin.role));
       return;
     }
     document.getElementById("dashboard-root")?.classList.remove("hidden");
   }
   guardKaryawanRole();
+
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) {
+      window.location.reload();
+    }
+  });
 
   // Mobile sidebar toggle
   function initSidebarToggle(): void {
