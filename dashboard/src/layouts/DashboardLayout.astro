@@ -20,7 +20,7 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:4000";
     <Sidebar activeNav={activeNav} />
 
     <!-- ─── Main area ─────────────────────────────────────── -->
-    <div class="flex-1 flex flex-col min-w-0 lg:ml-60">
+    <div class="flex-1 flex flex-col min-w-0 lg:ml-64">
 
       <!-- Mobile overlay (backdrop saat sidebar terbuka) -->
       <div
@@ -44,30 +44,39 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:4000";
 </Base>
 
 <script>
-  import { getAdminAuth, adminApiFetch, clearAdminAuth, setAdminAuth, API_URL } from "../lib/auth";
+  import { getAdminAuth, adminApiFetch, clearAdminAuth, setAdminAuth, API_URL, getDashboardByRole } from "../lib/auth";
 
   async function guardAuth(): Promise<void> {
-    const { isAuthenticated } = getAdminAuth();
-    if (!isAuthenticated) {
+    const { isAuthenticated, admin } = getAdminAuth();
+    if (!isAuthenticated || !admin) {
       window.location.replace("/login");
+      return;
+    }
+    if (admin.role !== "admin" && admin.role !== "superadmin") {
+      window.location.replace(getDashboardByRole(admin.role));
       return;
     }
 
     try {
       const res = await adminApiFetch(`${API_URL}/api/admin-auth/me`);
-      if (!res.ok) {
-        clearAdminAuth();
-        window.location.replace("/login");
+
+      if (res.status === 401) {
         return;
       }
-     
-      const json = await res.json().catch(() => null);
-      const { token } = getAdminAuth();
-      if (json?.data?.admin && token) {
-        setAdminAuth(token, json.data.admin);
+
+      // Error server/jaringan lain (mis. 500, backend belum jalan) TIDAK
+      // boleh menghapus sesi yang sebenarnya valid — kalau tidak, dashboard
+      // akan terus memantul balik ke /login setiap kali dibuka.
+      if (res.ok) {
+        const json = await res.json().catch(() => null);
+        const { token } = getAdminAuth();
+        if (json?.data?.admin && token) {
+          setAdminAuth(token, json.data.admin);
+        }
       }
     } catch {
-      
+      // Error jaringan: biarkan dashboard tetap tampil dengan data sesi yang
+      // sudah ada di sessionStorage, jangan paksa logout.
     }
 
     document.getElementById("dashboard-root")?.classList.remove("hidden");
@@ -121,6 +130,12 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:4000";
   }
 
   guardAuth();
+
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) {
+      window.location.reload();
+    }
+  });
   initSidebarToggle();
   initToast();
 </script>
