@@ -12,13 +12,13 @@ const { title = "Dashboard", activeNav = "" } = Astro.props;
 ---
 
 <Base title={`${title} — FIREPRO Supervisor`}>
-  <div id="dashboard-root" class="min-h-screen flex bg-paper">
+  <div id="dashboard-root" class="hidden min-h-screen flex bg-paper">
 
     <!-- ─── Sidebar (desktop) ─────────────────────────────── -->
     <SupervisorSidebar activeNav={activeNav} />
 
     <!-- ─── Main area ─────────────────────────────────────── -->
-    <div class="flex-1 flex flex-col min-w-0 lg:ml-60">
+    <div class="flex-1 flex flex-col min-w-0 lg:ml-64">
 
       <!-- Mobile overlay (backdrop saat sidebar terbuka) -->
       <div
@@ -41,12 +41,36 @@ const { title = "Dashboard", activeNav = "" } = Astro.props;
   </div>
 </Base>
 
-<!--
-  CATATAN PROTOTIPE:
-  Layout ini belum memanggil endpoint auth backend (module supervisor-auth belum dibuat).
-  Guard auth + fetch data asli akan ditambahkan setelah backend RBAC supervisor siap,
-  mengikuti pola yang sama seperti DashboardLayout.astro (admin).
--->
+<script>
+  import { getAdminAuth, clearAdminAuth, getDashboardByRole } from "../lib/auth";
+
+  // Guard client-side: hanya role 'supervisor' yang boleh melihat layout ini.
+  // Role lain / belum login -> redirect ke /login.
+  function guardSupervisorRole(): void {
+    const { isAuthenticated, admin } = getAdminAuth();
+    if (!isAuthenticated || !admin) {
+      clearAdminAuth();
+      window.location.replace("/login");
+      return;
+    }
+    if (admin.role !== "supervisor") {
+      // Sesi VALID tapi bukan role supervisor — arahkan ke dashboard
+      // milik role dia sendiri, JANGAN logout paksa dan JANGAN redirect
+      // ke Admin/Owner (sesuai aturan di master brief).
+      window.location.replace(getDashboardByRole(admin.role));
+      return;
+    }
+    document.getElementById("dashboard-root")?.classList.remove("hidden");
+  }
+
+  guardSupervisorRole();
+
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) {
+      window.location.reload();
+    }
+  });
+</script>
 
 <script>
   // Mobile sidebar toggle
