@@ -16,6 +16,22 @@ export interface AdminAuthState {
 
 const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:4000";
 
+
+export function getDashboardByRole(role: AdminUser["role"]): string {
+  switch (role) {
+    case "owner":
+      return "/owner";
+    case "supervisor":
+      return "/supervisor";
+    case "karyawan":
+      return "/employee-technical";
+    case "admin":
+    case "superadmin":
+    default:
+      return "/";
+  }
+}
+
 export function getAdminAuth(): AdminAuthState {
   if (typeof window === "undefined") {
     return { isAuthenticated: false, admin: null, token: null };
