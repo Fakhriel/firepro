@@ -1,6 +1,3 @@
-// Instance Sequelize tunggal yang dipakai semua model di seluruh
-// module (clients, inventory, invoices, dst). Jangan buat instance
-// baru di file lain — import `sequelize` dari sini.
 const { Sequelize } = require('sequelize');
 const env = require('./env');
 
@@ -16,9 +13,6 @@ const sequelize = new Sequelize(env.db.name, env.db.user, env.db.password, {
   },
 });
 
-// Dipanggil sekali saat server start (lihat server.js). Melempar error
-// asli ke pemanggil supaya server.js bisa keluar dengan pesan yang jelas
-// kalau DB tidak bisa dihubungi, daripada silent fail.
 async function connectDB() {
   await sequelize.authenticate();
 }
