@@ -4,7 +4,7 @@ An internal dashboard for managing fire protection service operations.
 
 This project is being built to manage clients, projects, quotations, invoices, maintenance schedules, inventory, and basic business reports from a single dashboard — with role-based access for Admin, Owner, Supervisor, and Karyawan Teknisi (field technician).
 
-> **Status:** 🚧 Under active development. Backend is functionally complete for all role tiers and has been through a deep security/logic testing pass. Frontend is mostly wired across Owner, Supervisor, and Karyawan Teknisi. **Update: the foundational Admin/Owner architecture issue and both bugs found in the last QA pass (Maintenance crash, Overview blank stats) have now all been fixed and verified in code. Current focus shifts to the remaining Phase 1 items: upload security hardening and technician-role validation on assignment creation.**
+> **Status:** 🚧 Under active development. Backend is functionally complete for all role tiers and has been through a deep security/logic testing pass. Frontend is mostly wired across Owner, Supervisor, and Techical Employee. **Update: the foundational Admin/Owner architecture issue and both bugs found in the last QA pass (Maintenance crash, Overview blank stats) have now all been fixed and verified in code. Current focus shifts to the remaining Phase 1 items: upload security hardening and technician-role validation on assignment creation.**
 
 ---
 
