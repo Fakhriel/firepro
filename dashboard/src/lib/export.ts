@@ -1,5 +1,5 @@
 // PDF export utility — pakai browser print API (no external library needed).
-// Bisa diganti dengan jsPDF / Puppeteer endpoint setelah backend tersambung.
+// Bisa diganti dengan jsPDF / Puppeteer 
 
 export interface ExportOptions {
   title: string;
