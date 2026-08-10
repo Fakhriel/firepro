@@ -23,8 +23,12 @@ const navGroups = [
   {
     label: "Operasional",
     items: [
-      { id: "projects", href: "/projects", label: "Projects", icon: "bag" },
-      { id: "invoices", href: "/invoices", label: "Invoices", icon: "credit" },
+      { id: "projects",    href: "/projects",    label: "Projects",    icon: "bag" },
+      { id: "boq",         href: "/boq",          label: "BOQ",         icon: "layers" },
+      { id: "quotations",  href: "/quotations",  label: "Quotations",  icon: "chart" },
+      { id: "invoices",    href: "/invoices",    label: "Invoices",    icon: "credit" },
+      { id: "documents",   href: "/documents",   label: "Documents",   icon: "folder" },
+      { id: "maintenance", href: "/maintenance",  label: "Maintenance", icon: "wrench" },
     ],
   },
   {
@@ -45,12 +49,20 @@ const navGroups = [
 
 <aside
   id="sidebar"
-  class="fixed top-0 left-0 h-full w-60 bg-ink text-paper z-40 flex flex-col border-r-2 border-ink
+  class="fixed top-0 left-0 h-full w-64 bg-ink text-paper z-40 flex flex-col border-r-2 border-ink
          -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-out"
 >
   <!-- Brand -->
   <div class="flex items-center justify-between px-5 h-16 border-b border-paper/10 shrink-0">
-    <a href="/" class="font-display text-2xl text-paper tracking-tight">FIREPRO</a>
+    <a href="/" class="flex items-center gap-2.5">
+      <span class="w-7 h-7 shrink-0 flex items-center justify-center bg-signal">
+        <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4 text-paper" stroke="currentColor" stroke-width="2">
+          <path d="M12 2c1.5 3 4 4.5 4 8a4 4 0 0 1-8 0c0-1 .3-1.8.8-2.6.3.9 1 1.6 1.7 1.6-.4-2 .3-4 1.5-7z"/>
+          <path d="M8.5 14.5A3.5 3.5 0 0 0 12 18a3.5 3.5 0 0 0 3.5-3.5"/>
+        </svg>
+      </span>
+      <span class="font-display text-xl text-paper tracking-tight leading-none">FIREPRO</span>
+    </a>
     <span class="font-mono text-[9px] text-paper/40 uppercase tracking-widest border border-paper/20 px-1.5 py-0.5">
       admin
     </span>
@@ -71,7 +83,7 @@ const navGroups = [
                 <a
                   href={item.href}
                   class={`sidebar-link rounded-sm ${isActive ? "active" : ""}`}
-                  style={isActive ? "background-color: rgba(240,239,233,0.1); color: #f0efe9; border-color: rgba(240,239,233,0.3);" : "color: rgba(240,239,233,0.55);"}
+                  style={isActive ? "background-color: rgba(250,250,250,0.1); color: #fafafa; border-color: var(--color-signal);" : "color: rgba(250,250,250,0.55);"}
                   aria-current={isActive ? "page" : undefined}
                 >
                   <!-- Icons inline SVG -->
@@ -90,6 +102,17 @@ const navGroups = [
                     <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4 shrink-0" stroke="currentColor" stroke-width="1.75">
                       <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
                       <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+                    </svg>
+                  )}
+                  {item.icon === "layers" && (
+                    <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4 shrink-0" stroke="currentColor" stroke-width="1.75">
+                      <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+                      <polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+                    </svg>
+                  )}
+                  {item.icon === "folder" && (
+                    <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4 shrink-0" stroke="currentColor" stroke-width="1.75">
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                     </svg>
                   )}
                   {item.icon === "tag" && (
@@ -125,6 +148,11 @@ const navGroups = [
                       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                     </svg>
                   )}
+                  {item.icon === "wrench" && (
+                    <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4 shrink-0" stroke="currentColor" stroke-width="1.75">
+                      <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L2 19l3 3 7.3-7.3a4 4 0 0 0 5.4-5.4l-2.65 2.65a1.5 1.5 0 0 1-2.12-2.12L14.7 6.3z"/>
+                    </svg>
+                  )}
                   <span>{item.label}</span>
                 </a>
               </li>
@@ -138,18 +166,18 @@ const navGroups = [
   <!-- User info + logout -->
   <div class="px-4 py-4 border-t border-paper/10 shrink-0">
     <div id="sidebar-user" class="flex items-center gap-3 mb-3">
-      <div class="w-8 h-8 bg-signal flex items-center justify-center font-display text-paper text-sm shrink-0">
+      <div class="w-9 h-9 bg-signal flex items-center justify-center font-display text-paper text-sm shrink-0 border border-paper/15">
         <span id="sidebar-avatar">A</span>
       </div>
       <div class="min-w-0">
-        <p id="sidebar-name" class="text-paper text-sm font-semibold truncate">Admin</p>
+        <p id="sidebar-name" class="text-paper text-sm font-semibold truncate leading-tight">Admin</p>
         <p id="sidebar-role" class="font-mono text-[9px] text-paper/40 uppercase tracking-widest">admin</p>
       </div>
     </div>
     <button
       id="sidebar-logout"
       type="button"
-      class="w-full flex items-center gap-2 px-3 py-2 font-body text-xs font-semibold text-signal hover:bg-signal/10 transition-colors duration-150 rounded-sm"
+      class="w-full flex items-center gap-2 px-3 py-2 font-body text-xs font-semibold text-paper/70 hover:text-signal hover:bg-signal/10 transition-colors duration-150 rounded-sm border border-transparent hover:border-signal/30"
     >
       <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
