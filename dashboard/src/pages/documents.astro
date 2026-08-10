@@ -1,0 +1,399 @@
+---
+import DashboardLayout from "../layouts/DashboardLayout.astro";
+import PageHeader from "../components/PageHeader.astro";
+---
+
+<DashboardLayout title="Documents" activeNav="documents">
+  <PageHeader heading="Document Management" sub="Dokumen proyek — kontrak, gambar, BAST, laporan, dan lainnya" crumbs={[{ label: "Operasional" }, { label: "Documents" }]}>
+    <button id="btn-upload-document" type="button" class="btn-primary text-xs gap-1.5">
+      <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      Upload Dokumen
+    </button>
+  </PageHeader>
+
+  <!-- Filter -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-5">
+    <select id="filter-doc-project" class="field-input sm:w-56">
+      <option value="">Semua Proyek</option>
+    </select>
+    <select id="filter-doc-category" class="field-input sm:w-44">
+      <option value="">Semua Kategori</option>
+      <option value="quotation">Quotation</option>
+      <option value="boq">BOQ</option>
+      <option value="contract">Kontrak</option>
+      <option value="po">PO</option>
+      <option value="drawing">Gambar (Drawing)</option>
+      <option value="bast">BAST</option>
+      <option value="report">Laporan</option>
+      <option value="invoice">Invoice</option>
+      <option value="maintenance">Maintenance</option>
+      <option value="other">Lainnya</option>
+    </select>
+    <input id="search-doc" type="search" placeholder="Cari judul / nama file…" class="field-input sm:max-w-xs" />
+  </div>
+
+  <!-- List -->
+  <div id="doc-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+  <div id="doc-empty" class="empty-state min-h-56 panel">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+    </svg>
+    <p>Belum ada dokumen yang diunggah</p>
+  </div>
+
+  <!-- Upload modal -->
+  <div id="doc-upload-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
+    <div class="panel w-full max-w-md bg-surface">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+        <h3 class="font-display text-lg text-ink leading-none">Upload Dokumen</h3>
+        <button id="doc-upload-close" type="button" class="text-steel hover:text-ink transition-colors" aria-label="Tutup">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="field-label" for="df-project">Proyek</label>
+          <select id="df-project" class="field-input">
+            <option value="">Pilih proyek…</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" for="df-title">Judul Dokumen <span class="text-smoke normal-case">(opsional, default nama file)</span></label>
+          <input id="df-title" type="text" class="field-input" placeholder="Contoh: Kontrak Kerja PT ABC" />
+        </div>
+        <div>
+          <label class="field-label" for="df-category">Kategori</label>
+          <select id="df-category" class="field-input">
+            <option value="quotation">Quotation</option>
+            <option value="boq">BOQ</option>
+            <option value="contract">Kontrak</option>
+            <option value="po">PO</option>
+            <option value="drawing">Gambar (Drawing)</option>
+            <option value="bast">BAST</option>
+            <option value="report">Laporan</option>
+            <option value="invoice">Invoice</option>
+            <option value="maintenance">Maintenance</option>
+            <option value="other" selected>Lainnya</option>
+          </select>
+        </div>
+        <div>
+          <label for="df-file" class="field-label">File</label>
+          <label for="df-file" class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-hairline hover:border-ink transition-colors py-8 cursor-pointer text-center">
+            <svg viewBox="0 0 24 24" fill="none" class="w-6 h-6 text-smoke" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <span class="font-mono text-[10px] text-smoke uppercase tracking-widest">Klik untuk pilih file</span>
+            <input id="df-file" type="file" class="hidden" />
+          </label>
+          <p id="df-file-name" class="font-mono text-[10px] text-smoke mt-1.5"></p>
+        </div>
+        <div id="doc-upload-error" class="hidden border-2 border-signal bg-signal/5 px-3 py-2">
+          <p id="doc-upload-error-msg" class="font-mono text-xs text-signal"></p>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
+        <button id="doc-upload-cancel" type="button" class="btn-secondary text-xs">Batal</button>
+        <button id="doc-upload-save" type="button" class="btn-primary text-xs">Upload</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete confirm modal -->
+  <div id="doc-delete-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
+    <div class="panel w-full max-w-sm bg-surface">
+      <div class="px-5 py-4 border-b-2 border-ink">
+        <h3 class="font-display text-lg text-ink leading-none">Hapus Dokumen?</h3>
+      </div>
+      <div class="px-5 py-4">
+        <p class="font-body text-sm text-charcoal">Dokumen <strong id="doc-delete-name" class="text-ink"></strong> akan dihapus permanen dari server.</p>
+      </div>
+      <div class="flex gap-3 px-5 py-4 border-t border-hairline">
+        <button id="doc-delete-cancel" type="button" class="btn-secondary text-sm flex-1">Batal</button>
+        <button id="doc-delete-confirm" type="button" class="btn-danger text-sm flex-1">Hapus</button>
+      </div>
+    </div>
+  </div>
+</DashboardLayout>
+
+<script>
+  import { adminApiFetch } from "../lib/auth";
+  import { escapeHtml } from "../lib/escapeHtml";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface DocRow {
+    id: number;
+    projectId: number;
+    projectName?: string;
+    title: string;
+    category: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    uploadedBy?: string;
+    createdAt: string;
+    downloadUrl: string;
+  }
+  interface ProjectOption {
+    id: number;
+    projectName: string;
+  }
+
+  const CATEGORY_LABEL: Record<string, string> = {
+    quotation: "Quotation",
+    boq: "BOQ",
+    contract: "Kontrak",
+    po: "PO",
+    drawing: "Gambar",
+    bast: "BAST",
+    report: "Laporan",
+    invoice: "Invoice",
+    maintenance: "Maintenance",
+    other: "Lainnya",
+  };
+
+  let allDocs: DocRow[] = [];
+  let projectOptions: ProjectOption[] = [];
+  let docPendingDelete: DocRow | null = null;
+
+  const listEl = document.getElementById("doc-list") as HTMLDivElement;
+  const emptyEl = document.getElementById("doc-empty") as HTMLDivElement;
+  const projectFilter = document.getElementById("filter-doc-project") as HTMLSelectElement | null;
+  const categoryFilter = document.getElementById("filter-doc-category") as HTMLSelectElement | null;
+  const searchInput = document.getElementById("search-doc") as HTMLInputElement | null;
+
+  function openModal(id: string): void {
+    document.getElementById(id)?.classList.replace("hidden", "flex");
+  }
+  function closeModal(id: string): void {
+    document.getElementById(id)?.classList.replace("flex", "hidden");
+  }
+
+  function formatSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  function formatDate(iso: string): string {
+    try {
+      return new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+    } catch {
+      return iso;
+    }
+  }
+
+  function renderDocs(): void {
+    listEl.innerHTML = "";
+    const isEmpty = allDocs.length === 0;
+    listEl.classList.toggle("hidden", isEmpty);
+    emptyEl.classList.toggle("hidden", !isEmpty);
+
+    allDocs.forEach((doc) => {
+      const card = document.createElement("div");
+      card.className = "panel p-4 flex flex-col gap-2";
+      card.innerHTML = `
+        <div class="flex items-start justify-between gap-2">
+          <span class="font-mono text-[9px] uppercase tracking-widest border border-ink px-2 py-1 shrink-0">${CATEGORY_LABEL[doc.category] ?? doc.category}</span>
+          <span class="font-mono text-[9px] text-smoke shrink-0">${formatSize(doc.sizeBytes)}</span>
+        </div>
+        <h4 class="font-display text-base text-ink leading-tight">${escapeHtml(doc.title)}</h4>
+        <p class="font-mono text-[10px] text-smoke truncate">${escapeHtml(doc.fileName)}</p>
+        <p class="font-mono text-[10px] text-smoke">${escapeHtml(doc.projectName ?? "-")} — ${formatDate(doc.createdAt)}</p>
+        <p class="font-mono text-[10px] text-smoke">Oleh: ${escapeHtml(doc.uploadedBy ?? "-")}</p>
+        <div class="flex gap-2 mt-2 pt-2 border-t border-hairline">
+          <button type="button" data-id="${doc.id}" class="btn-download-doc btn-secondary text-xs flex-1">Download</button>
+          <button type="button" data-id="${doc.id}" data-title="${escapeHtml(doc.title)}" class="btn-delete-doc text-xs text-steel hover:text-signal font-mono underline-offset-2 hover:underline px-2">Hapus</button>
+        </div>
+      `;
+      listEl.appendChild(card);
+    });
+
+    listEl.querySelectorAll<HTMLButtonElement>(".btn-download-doc").forEach((btn) => {
+      btn.addEventListener("click", () => downloadDocument(btn.dataset.id!));
+    });
+    listEl.querySelectorAll<HTMLButtonElement>(".btn-delete-doc").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const doc = allDocs.find((d) => String(d.id) === btn.dataset.id);
+        if (doc) openDeleteModal(doc);
+      });
+    });
+  }
+
+  // Endpoint download butuh header Authorization, jadi tidak bisa pakai
+  // <a href> polos (browser tidak menyertakan Bearer token). Ambil lewat
+  // fetch, ubah jadi blob, baru trigger download di sisi client.
+  async function downloadDocument(id: string): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/documents/${id}/download`);
+      if (!res.ok) {
+        window.showToast?.("Gagal mengunduh dokumen", "error");
+        return;
+      }
+      const doc = allDocs.find((d) => String(d.id) === id);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = doc?.fileName ?? "dokumen";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("[downloadDocument] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  async function loadDocs(): Promise<void> {
+    try {
+      const params = new URLSearchParams();
+      if (projectFilter?.value) params.set("projectId", projectFilter.value);
+      if (categoryFilter?.value) params.set("category", categoryFilter.value);
+      if (searchInput?.value) params.set("search", searchInput.value);
+
+      const res = await adminApiFetch(`${apiUrl}/api/documents/admin?${params.toString()}`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat dokumen", "error");
+        return;
+      }
+      allDocs = json.data ?? [];
+      renderDocs();
+    } catch (err) {
+      console.error("[loadDocs] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  async function loadProjectOptions(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/projects/admin`);
+      const json = await res.json();
+      if (!res.ok) return;
+      projectOptions = (json.data ?? []).map((p: any) => ({ id: p.id, projectName: p.projectName }));
+
+      if (projectFilter) {
+        projectFilter.innerHTML =
+          `<option value="">Semua Proyek</option>` +
+          projectOptions.map((p) => `<option value="${p.id}">${escapeHtml(p.projectName)}</option>`).join("");
+      }
+      const formSelect = document.getElementById("df-project") as HTMLSelectElement;
+      formSelect.innerHTML =
+        `<option value="">Pilih proyek…</option>` +
+        projectOptions.map((p) => `<option value="${p.id}">${escapeHtml(p.projectName)}</option>`).join("");
+    } catch (err) {
+      console.error("[loadProjectOptions] gagal fetch backend:", err);
+    }
+  }
+
+  // ─── Upload modal ───────────────────────────────────────────────────
+  function resetUploadForm(): void {
+    (document.getElementById("df-project") as HTMLSelectElement).value = "";
+    (document.getElementById("df-title") as HTMLInputElement).value = "";
+    (document.getElementById("df-category") as HTMLSelectElement).value = "other";
+    (document.getElementById("df-file") as HTMLInputElement).value = "";
+    (document.getElementById("df-file-name") as HTMLElement).textContent = "";
+    document.getElementById("doc-upload-error")?.classList.add("hidden");
+  }
+
+  document.getElementById("btn-upload-document")?.addEventListener("click", () => {
+    resetUploadForm();
+    openModal("doc-upload-modal");
+  });
+  document.getElementById("doc-upload-close")?.addEventListener("click", () => closeModal("doc-upload-modal"));
+  document.getElementById("doc-upload-cancel")?.addEventListener("click", () => closeModal("doc-upload-modal"));
+
+  document.getElementById("df-file")?.addEventListener("change", (e) => {
+    const input = e.target as HTMLInputElement;
+    const label = document.getElementById("df-file-name");
+    if (label) label.textContent = input.files && input.files[0] ? input.files[0].name : "";
+  });
+
+  function showUploadError(msg: string): void {
+    const box = document.getElementById("doc-upload-error");
+    const msgEl = document.getElementById("doc-upload-error-msg");
+    if (msgEl) msgEl.textContent = msg;
+    box?.classList.remove("hidden");
+  }
+
+  document.getElementById("doc-upload-save")?.addEventListener("click", async () => {
+    const projectId = (document.getElementById("df-project") as HTMLSelectElement).value;
+    const title = (document.getElementById("df-title") as HTMLInputElement).value.trim();
+    const category = (document.getElementById("df-category") as HTMLSelectElement).value;
+    const fileInput = document.getElementById("df-file") as HTMLInputElement;
+    const file = fileInput.files?.[0];
+
+    if (!projectId) return showUploadError("Proyek wajib dipilih.");
+    if (!file) return showUploadError("File wajib dipilih.");
+
+    const formData = new FormData();
+    formData.append("projectId", projectId);
+    if (title) formData.append("title", title);
+    formData.append("category", category);
+    formData.append("file", file);
+
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/documents`, {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        showUploadError(json.error ?? "Gagal mengunggah dokumen");
+        return;
+      }
+      window.showToast?.(json.message ?? "Dokumen berhasil diunggah");
+      closeModal("doc-upload-modal");
+      await loadDocs();
+    } catch (err) {
+      console.error("[doc-upload-save] gagal fetch backend:", err);
+      showUploadError("Tidak bisa terhubung ke server");
+    }
+  });
+
+  // ─── Delete ─────────────────────────────────────────────────────────
+  function openDeleteModal(doc: DocRow): void {
+    docPendingDelete = doc;
+    (document.getElementById("doc-delete-name") as HTMLElement).textContent = doc.title;
+    openModal("doc-delete-modal");
+  }
+  document.getElementById("doc-delete-cancel")?.addEventListener("click", () => closeModal("doc-delete-modal"));
+  document.getElementById("doc-delete-confirm")?.addEventListener("click", async () => {
+    if (!docPendingDelete) return;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/documents/${docPendingDelete.id}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal menghapus dokumen", "error");
+        return;
+      }
+      window.showToast?.(json.message ?? "Dokumen berhasil dihapus");
+      closeModal("doc-delete-modal");
+      docPendingDelete = null;
+      await loadDocs();
+    } catch (err) {
+      console.error("[doc-delete-confirm] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  });
+
+  let searchDebounce: ReturnType<typeof setTimeout>;
+  searchInput?.addEventListener("input", () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(loadDocs, 300);
+  });
+  projectFilter?.addEventListener("change", loadDocs);
+  categoryFilter?.addEventListener("change", loadDocs);
+
+  loadProjectOptions();
+  loadDocs();
+</script>
