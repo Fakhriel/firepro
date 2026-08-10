@@ -1,0 +1,510 @@
+---
+import DashboardLayout from "../layouts/DashboardLayout.astro";
+import PageHeader from "../components/PageHeader.astro";
+import StatCard from "../components/StatCard.astro";
+---
+
+<DashboardLayout title="BOQ" activeNav="boq">
+  <PageHeader heading="Bill of Quantity (BOQ)" sub="Rincian item, biaya, dan asal nilai penawaran per proyek" crumbs={[{ label: "Operasional" }, { label: "BOQ" }]}>
+    <button id="btn-add-boq" type="button" class="btn-primary text-xs gap-1.5">
+      <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Tambah Item
+    </button>
+  </PageHeader>
+
+  <!-- Filter -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-5">
+    <select id="filter-boq-project" class="field-input sm:w-56">
+      <option value="">Semua Proyek</option>
+    </select>
+    <select id="filter-boq-category" class="field-input sm:w-44">
+      <option value="">Semua Kategori</option>
+      <option value="material">Material</option>
+      <option value="labor">Tenaga Kerja</option>
+      <option value="service">Jasa</option>
+      <option value="equipment">Peralatan</option>
+      <option value="other">Lainnya</option>
+    </select>
+    <input id="search-boq" type="search" placeholder="Cari nama item / spesifikasi…" class="field-input sm:max-w-xs" />
+  </div>
+
+  <!-- Summary panel — muncul kalau filter proyek dipilih -->
+  <div id="boq-summary-panel" class="hidden grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-boq-total-cost" label="Total Biaya BOQ" accent />
+    <StatCard id="stat-boq-material" label="Material" />
+    <StatCard id="stat-boq-labor" label="Tenaga Kerja" />
+    <StatCard id="stat-boq-service" label="Jasa" />
+    <StatCard id="stat-boq-equipment" label="Peralatan" />
+  </div>
+
+  <!-- Table -->
+  <div class="panel overflow-hidden">
+    <div class="overflow-x-auto">
+      <table id="boq-table" class="data-table hidden">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th class="hidden sm:table-cell">Proyek</th>
+            <th>Kategori</th>
+            <th>Qty</th>
+            <th class="hidden md:table-cell">Harga Satuan</th>
+            <th>Total</th>
+            <th class="text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="boq-body"></tbody>
+      </table>
+    </div>
+    <div id="boq-empty" class="empty-state min-h-56">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+        <polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+      </svg>
+      <p>Belum ada item BOQ</p>
+    </div>
+    <div class="flex items-center justify-between px-4 py-3 border-t border-hairline">
+      <span data-boq-count class="font-mono text-[10px] text-smoke">0 item</span>
+      <span id="boq-grand-total" class="font-mono text-xs text-ink font-semibold"></span>
+    </div>
+  </div>
+
+  <!-- Create / Edit modal -->
+  <div id="boq-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
+    <div class="panel w-full max-w-lg bg-surface max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+        <h3 id="boq-modal-title" class="font-display text-lg text-ink leading-none">Tambah Item BOQ</h3>
+        <button id="boq-modal-close" type="button" class="text-steel hover:text-ink transition-colors" aria-label="Tutup">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="field-label" for="bf-project">Proyek</label>
+          <select id="bf-project" class="field-input">
+            <option value="">Pilih proyek…</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" for="bf-quotation">Penawaran (Quotation) <span class="text-smoke normal-case">(opsional)</span></label>
+          <select id="bf-quotation" class="field-input">
+            <option value="">Tanpa penawaran terkait</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" for="bf-item-name">Nama Item</label>
+          <input id="bf-item-name" type="text" class="field-input" placeholder="Contoh: Pipa sprinkler 1 inch" />
+        </div>
+        <div>
+          <label class="field-label" for="bf-description">Deskripsi <span class="text-smoke normal-case">(opsional)</span></label>
+          <textarea id="bf-description" rows="2" class="field-input resize-none"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="field-label" for="bf-category">Kategori</label>
+            <select id="bf-category" class="field-input">
+              <option value="material">Material</option>
+              <option value="labor">Tenaga Kerja</option>
+              <option value="service">Jasa</option>
+              <option value="equipment">Peralatan</option>
+              <option value="other">Lainnya</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label" for="bf-specification">Spesifikasi <span class="text-smoke normal-case">(opsional)</span></label>
+            <input id="bf-specification" type="text" class="field-input" />
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label class="field-label" for="bf-qty">Qty</label>
+            <input id="bf-qty" type="number" min="0" step="0.01" value="1" class="field-input" />
+          </div>
+          <div>
+            <label class="field-label" for="bf-unit">Satuan</label>
+            <input id="bf-unit" type="text" class="field-input" placeholder="pcs, m, m2, ls…" />
+          </div>
+          <div>
+            <label class="field-label" for="bf-unit-price">Harga Satuan (Rp)</label>
+            <input id="bf-unit-price" type="number" min="0" step="1" value="0" class="field-input" />
+          </div>
+        </div>
+        <p class="font-mono text-[10px] text-smoke">Total dihitung otomatis oleh server (qty × harga satuan) — tidak perlu diisi manual.</p>
+        <div id="boq-modal-error" class="hidden border-2 border-signal bg-signal/5 px-3 py-2">
+          <p id="boq-modal-error-msg" class="font-mono text-xs text-signal"></p>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
+        <button id="boq-modal-cancel" type="button" class="btn-secondary text-xs">Batal</button>
+        <button id="boq-modal-save" type="button" class="btn-primary text-xs">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete confirm modal -->
+  <div id="boq-delete-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
+    <div class="panel w-full max-w-sm bg-surface">
+      <div class="px-5 py-4 border-b-2 border-ink">
+        <h3 class="font-display text-lg text-ink leading-none">Hapus Item BOQ?</h3>
+      </div>
+      <div class="px-5 py-4">
+        <p class="font-body text-sm text-charcoal">Item <strong id="boq-delete-name" class="text-ink"></strong> akan dihapus permanen.</p>
+      </div>
+      <div class="flex gap-3 px-5 py-4 border-t border-hairline">
+        <button id="boq-delete-cancel" type="button" class="btn-secondary text-sm flex-1">Batal</button>
+        <button id="boq-delete-confirm" type="button" class="btn-danger text-sm flex-1">Hapus</button>
+      </div>
+    </div>
+  </div>
+</DashboardLayout>
+
+<script>
+  import { adminApiFetch } from "../lib/auth";
+  import { escapeHtml } from "../lib/escapeHtml";
+  import { formatIDR } from "../lib/export";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface BoqRow {
+    id: number;
+    projectId: number;
+    projectName?: string;
+    quotationId: number | null;
+    quotationNumber?: string;
+    itemName: string;
+    description: string;
+    category: "material" | "labor" | "service" | "equipment" | "other";
+    specification: string;
+    qty: number;
+    unit: string;
+    unitPrice: number;
+    total: number;
+  }
+  interface ProjectOption {
+    id: number;
+    projectName: string;
+  }
+  interface QuotationOption {
+    id: number;
+    number: string;
+    projectId?: number;
+  }
+
+  const CATEGORY_LABEL: Record<string, string> = {
+    material: "Material",
+    labor: "Tenaga Kerja",
+    service: "Jasa",
+    equipment: "Peralatan",
+    other: "Lainnya",
+  };
+
+  let allItems: BoqRow[] = [];
+  let projectOptions: ProjectOption[] = [];
+  let quotationOptions: QuotationOption[] = [];
+  let editingId: number | null = null;
+  let itemPendingDelete: BoqRow | null = null;
+
+  const tableBody = document.getElementById("boq-body") as HTMLTableSectionElement;
+  const table = document.getElementById("boq-table") as HTMLTableElement;
+  const emptyState = document.getElementById("boq-empty") as HTMLDivElement;
+  const countLabel = document.querySelector("[data-boq-count]") as HTMLElement | null;
+  const grandTotalLabel = document.getElementById("boq-grand-total") as HTMLElement | null;
+
+  const projectFilter = document.getElementById("filter-boq-project") as HTMLSelectElement | null;
+  const categoryFilter = document.getElementById("filter-boq-category") as HTMLSelectElement | null;
+  const searchInput = document.getElementById("search-boq") as HTMLInputElement | null;
+
+  function openModal(id: string): void {
+    document.getElementById(id)?.classList.replace("hidden", "flex");
+  }
+  function closeModal(id: string): void {
+    document.getElementById(id)?.classList.replace("flex", "hidden");
+  }
+
+  function setStatValue(cardId: string, value: string): void {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
+    if (!valueEl) {
+      const skeleton = card.querySelector(".skeleton")?.parentElement;
+      valueEl = document.createElement("p");
+      const isAccent = card.classList.contains("bg-ink");
+      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
+      if (skeleton) {
+        skeleton.replaceWith(valueEl);
+      } else {
+        card.appendChild(valueEl);
+      }
+    }
+    valueEl.textContent = value;
+  }
+
+  function renderTable(): void {
+    tableBody.innerHTML = "";
+    const isEmpty = allItems.length === 0;
+    table.classList.toggle("hidden", isEmpty);
+    emptyState.classList.toggle("hidden", !isEmpty);
+    if (countLabel) countLabel.textContent = `${allItems.length} item`;
+
+    const grandTotal = allItems.reduce((sum, i) => sum + i.total, 0);
+    if (grandTotalLabel) grandTotalLabel.textContent = `Total: ${formatIDR(grandTotal)}`;
+
+    allItems.forEach((item) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>
+          <p class="font-semibold text-ink">${escapeHtml(item.itemName)}</p>
+          ${item.specification ? `<p class="font-mono text-[10px] text-smoke">${escapeHtml(item.specification)}</p>` : ""}
+        </td>
+        <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${escapeHtml(item.projectName ?? "-")}</td>
+        <td><span class="font-mono text-[9px] uppercase tracking-widest border border-ink px-2 py-1">${CATEGORY_LABEL[item.category]}</span></td>
+        <td class="font-mono text-xs text-charcoal">${item.qty} ${escapeHtml(item.unit)}</td>
+        <td class="hidden md:table-cell font-mono text-xs text-charcoal">${formatIDR(item.unitPrice)}</td>
+        <td class="font-mono text-xs text-ink font-semibold">${formatIDR(item.total)}</td>
+        <td class="text-right whitespace-nowrap">
+          <button type="button" data-id="${item.id}" class="btn-edit-boq text-xs text-steel hover:text-ink font-mono underline-offset-2 hover:underline mr-3">Edit</button>
+          <button type="button" data-id="${item.id}" class="btn-delete-boq text-xs text-steel hover:text-signal font-mono underline-offset-2 hover:underline">Hapus</button>
+        </td>
+      `;
+      tableBody.appendChild(tr);
+    });
+
+    tableBody.querySelectorAll<HTMLButtonElement>(".btn-edit-boq").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const item = allItems.find((i) => String(i.id) === btn.dataset.id);
+        if (item) openBoqModal(item);
+      });
+    });
+    tableBody.querySelectorAll<HTMLButtonElement>(".btn-delete-boq").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const item = allItems.find((i) => String(i.id) === btn.dataset.id);
+        if (item) openDeleteModal(item);
+      });
+    });
+  }
+
+  async function loadBoqSummary(projectId: string): Promise<void> {
+    const panel = document.getElementById("boq-summary-panel");
+    if (!projectId) {
+      panel?.classList.add("hidden");
+      return;
+    }
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/boq/summary/${projectId}`);
+      const json = await res.json();
+      if (!res.ok) return;
+      const d = json.data ?? {};
+      panel?.classList.remove("hidden");
+      setStatValue("stat-boq-total-cost", formatIDR(d.totalCost ?? 0));
+      setStatValue("stat-boq-material", formatIDR(d.byCategory?.material ?? 0));
+      setStatValue("stat-boq-labor", formatIDR(d.byCategory?.labor ?? 0));
+      setStatValue("stat-boq-service", formatIDR(d.byCategory?.service ?? 0));
+      setStatValue("stat-boq-equipment", formatIDR(d.byCategory?.equipment ?? 0));
+    } catch (err) {
+      console.error("[loadBoqSummary] gagal fetch backend:", err);
+    }
+  }
+
+  async function loadBoq(): Promise<void> {
+    try {
+      const params = new URLSearchParams();
+      if (projectFilter?.value) params.set("projectId", projectFilter.value);
+      if (categoryFilter?.value) params.set("category", categoryFilter.value);
+      if (searchInput?.value) params.set("search", searchInput.value);
+
+      const res = await adminApiFetch(`${apiUrl}/api/boq/admin?${params.toString()}`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat data BOQ", "error");
+        return;
+      }
+      allItems = json.data ?? [];
+      renderTable();
+      await loadBoqSummary(projectFilter?.value ?? "");
+    } catch (err) {
+      console.error("[loadBoq] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  async function loadProjectOptions(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/projects/admin`);
+      const json = await res.json();
+      if (!res.ok) return;
+      projectOptions = (json.data ?? []).map((p: any) => ({ id: p.id, projectName: p.projectName }));
+
+      const filterSelect = projectFilter;
+      if (filterSelect) {
+        filterSelect.innerHTML =
+          `<option value="">Semua Proyek</option>` +
+          projectOptions.map((p) => `<option value="${p.id}">${escapeHtml(p.projectName)}</option>`).join("");
+      }
+      const formSelect = document.getElementById("bf-project") as HTMLSelectElement;
+      formSelect.innerHTML =
+        `<option value="">Pilih proyek…</option>` +
+        projectOptions.map((p) => `<option value="${p.id}">${escapeHtml(p.projectName)}</option>`).join("");
+    } catch (err) {
+      console.error("[loadProjectOptions] gagal fetch backend:", err);
+    }
+  }
+
+  async function loadQuotationOptions(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/quotations/admin`);
+      const json = await res.json();
+      if (!res.ok) return;
+      quotationOptions = json.data ?? [];
+    } catch (err) {
+      console.error("[loadQuotationOptions] gagal fetch backend:", err);
+    }
+  }
+
+  function refreshQuotationSelectForProject(projectId: string): void {
+    const select = document.getElementById("bf-quotation") as HTMLSelectElement;
+    const filtered = projectId ? quotationOptions.filter((q) => String(q.projectId) === projectId) : quotationOptions;
+    select.innerHTML =
+      `<option value="">Tanpa penawaran terkait</option>` +
+      filtered.map((q) => `<option value="${q.id}">${escapeHtml(q.number)}</option>`).join("");
+  }
+  document.getElementById("bf-project")?.addEventListener("change", (e) => {
+    refreshQuotationSelectForProject((e.target as HTMLSelectElement).value);
+  });
+
+  function resetBoqForm(): void {
+    (document.getElementById("bf-project") as HTMLSelectElement).value = "";
+    refreshQuotationSelectForProject("");
+    (document.getElementById("bf-item-name") as HTMLInputElement).value = "";
+    (document.getElementById("bf-description") as HTMLTextAreaElement).value = "";
+    (document.getElementById("bf-category") as HTMLSelectElement).value = "material";
+    (document.getElementById("bf-specification") as HTMLInputElement).value = "";
+    (document.getElementById("bf-qty") as HTMLInputElement).value = "1";
+    (document.getElementById("bf-unit") as HTMLInputElement).value = "";
+    (document.getElementById("bf-unit-price") as HTMLInputElement).value = "0";
+    document.getElementById("boq-modal-error")?.classList.add("hidden");
+  }
+
+  function openBoqModal(item: BoqRow | null): void {
+    editingId = item?.id ?? null;
+    resetBoqForm();
+    const title = document.getElementById("boq-modal-title") as HTMLElement;
+
+    if (item) {
+      title.textContent = "Edit Item BOQ";
+      (document.getElementById("bf-project") as HTMLSelectElement).value = String(item.projectId);
+      refreshQuotationSelectForProject(String(item.projectId));
+      (document.getElementById("bf-quotation") as HTMLSelectElement).value = item.quotationId ? String(item.quotationId) : "";
+      (document.getElementById("bf-item-name") as HTMLInputElement).value = item.itemName;
+      (document.getElementById("bf-description") as HTMLTextAreaElement).value = item.description;
+      (document.getElementById("bf-category") as HTMLSelectElement).value = item.category;
+      (document.getElementById("bf-specification") as HTMLInputElement).value = item.specification;
+      (document.getElementById("bf-qty") as HTMLInputElement).value = String(item.qty);
+      (document.getElementById("bf-unit") as HTMLInputElement).value = item.unit;
+      (document.getElementById("bf-unit-price") as HTMLInputElement).value = String(item.unitPrice);
+    } else {
+      title.textContent = "Tambah Item BOQ";
+    }
+    openModal("boq-modal");
+  }
+
+  document.getElementById("btn-add-boq")?.addEventListener("click", () => openBoqModal(null));
+  document.getElementById("boq-modal-close")?.addEventListener("click", () => closeModal("boq-modal"));
+  document.getElementById("boq-modal-cancel")?.addEventListener("click", () => closeModal("boq-modal"));
+
+  function showBoqFormError(msg: string): void {
+    const box = document.getElementById("boq-modal-error");
+    const msgEl = document.getElementById("boq-modal-error-msg");
+    if (msgEl) msgEl.textContent = msg;
+    box?.classList.remove("hidden");
+  }
+
+  document.getElementById("boq-modal-save")?.addEventListener("click", async () => {
+    const projectId = (document.getElementById("bf-project") as HTMLSelectElement).value;
+    const quotationId = (document.getElementById("bf-quotation") as HTMLSelectElement).value;
+    const itemName = (document.getElementById("bf-item-name") as HTMLInputElement).value.trim();
+    const description = (document.getElementById("bf-description") as HTMLTextAreaElement).value.trim();
+    const category = (document.getElementById("bf-category") as HTMLSelectElement).value;
+    const specification = (document.getElementById("bf-specification") as HTMLInputElement).value.trim();
+    const qty = Number((document.getElementById("bf-qty") as HTMLInputElement).value || 0);
+    const unit = (document.getElementById("bf-unit") as HTMLInputElement).value.trim();
+    const unitPrice = Number((document.getElementById("bf-unit-price") as HTMLInputElement).value || 0);
+
+    if (!projectId) return showBoqFormError("Proyek wajib dipilih.");
+    if (!itemName) return showBoqFormError("Nama item wajib diisi.");
+    if (!unit) return showBoqFormError("Satuan wajib diisi.");
+    if (Number.isNaN(qty) || qty < 0) return showBoqFormError("Qty harus angka >= 0.");
+    if (Number.isNaN(unitPrice) || unitPrice < 0) return showBoqFormError("Harga satuan harus angka >= 0.");
+
+    const payload = {
+      projectId: Number(projectId),
+      quotationId: quotationId ? Number(quotationId) : null,
+      itemName,
+      description: description || null,
+      category,
+      specification: specification || null,
+      qty,
+      unit,
+      unitPrice,
+    };
+
+    try {
+      const url = editingId ? `${apiUrl}/api/boq/${editingId}` : `${apiUrl}/api/boq`;
+      const res = await adminApiFetch(url, {
+        method: editingId ? "PATCH" : "POST",
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        showBoqFormError(json.error ?? "Gagal menyimpan item BOQ");
+        return;
+      }
+      window.showToast?.(editingId ? "Item BOQ berhasil diperbarui" : "Item BOQ berhasil ditambahkan");
+      closeModal("boq-modal");
+      await loadBoq();
+    } catch (err) {
+      console.error("[boq-modal-save] gagal fetch backend:", err);
+      showBoqFormError("Tidak bisa terhubung ke server");
+    }
+  });
+
+  function openDeleteModal(item: BoqRow): void {
+    itemPendingDelete = item;
+    (document.getElementById("boq-delete-name") as HTMLElement).textContent = item.itemName;
+    openModal("boq-delete-modal");
+  }
+  document.getElementById("boq-delete-cancel")?.addEventListener("click", () => closeModal("boq-delete-modal"));
+  document.getElementById("boq-delete-confirm")?.addEventListener("click", async () => {
+    if (!itemPendingDelete) return;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/boq/${itemPendingDelete.id}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal menghapus item BOQ", "error");
+        return;
+      }
+      window.showToast?.("Item BOQ berhasil dihapus");
+      closeModal("boq-delete-modal");
+      itemPendingDelete = null;
+      await loadBoq();
+    } catch (err) {
+      console.error("[boq-delete-confirm] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  });
+
+  let searchDebounce: ReturnType<typeof setTimeout>;
+  searchInput?.addEventListener("input", () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(loadBoq, 300);
+  });
+  projectFilter?.addEventListener("change", loadBoq);
+  categoryFilter?.addEventListener("change", loadBoq);
+
+  loadProjectOptions();
+  loadQuotationOptions();
+  loadBoq();
+</script>
