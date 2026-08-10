@@ -12,7 +12,7 @@ const { makeDocumentUploader } = require('../../utils/uploadStorage');
 const router = express.Router();
 const upload = makeDocumentUploader('documents');
 
-router.use(requireAdminAuth, requireRole('admin', 'superadmin'));
+router.use(requireAdminAuth, requireRole('admin', 'superadmin', 'owner'));
 
 // GET /api/documents/admin?projectId=&category=&relatedType=&relatedId=&search=&sortBy=&sortDir=
 router.get('/admin', listHandler);
