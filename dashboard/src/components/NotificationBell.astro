@@ -1,0 +1,168 @@
+---
+---
+
+<div id="notification-bell-wrap" class="relative">
+  <button
+    id="notification-bell-btn"
+    type="button"
+    aria-label="Notifikasi"
+    class="relative p-2 text-ink hover:text-signal transition-colors border border-transparent hover:border-line"
+  >
+    <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+    <span id="notification-bell-badge" class="hidden absolute top-0.5 right-0.5 min-w-[16px] h-[16px] px-1 bg-signal text-paper rounded-full text-[9px] font-mono font-bold leading-[16px] text-center"></span>
+  </button>
+
+  <!-- Dropdown -->
+  <div id="notification-dropdown" class="hidden absolute right-0 top-full mt-2 w-80 max-w-[90vw] bg-surface border-2 border-ink z-50 max-h-[70vh] flex flex-col shadow-lg">
+    <div class="flex items-center justify-between px-4 py-3 border-b-2 border-ink shrink-0">
+      <h3 class="font-display text-sm text-ink leading-none">Notifikasi</h3>
+      <button id="notification-mark-all" type="button" class="font-mono text-[10px] text-smoke hover:text-ink underline-offset-2 hover:underline">
+        Tandai semua dibaca
+      </button>
+    </div>
+    <div id="notification-list" class="overflow-y-auto flex-1 divide-y divide-hairline"></div>
+    <div id="notification-empty" class="hidden px-4 py-8 text-center">
+      <p class="font-mono text-[11px] text-smoke">Tidak ada notifikasi</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { adminApiFetch } from "../lib/auth";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface NotificationRow {
+    id: number;
+    type: string;
+    title: string;
+    message: string;
+    link: string | null;
+    isRead: boolean;
+    createdAt: string;
+  }
+
+  const btn = document.getElementById("notification-bell-btn");
+  const dropdown = document.getElementById("notification-dropdown");
+  const badge = document.getElementById("notification-bell-badge");
+  const listEl = document.getElementById("notification-list") as HTMLDivElement;
+  const emptyEl = document.getElementById("notification-empty") as HTMLDivElement;
+
+  let isOpen = false;
+
+  function timeAgo(iso: string): string {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return "Baru saja";
+    if (mins < 60) return `${mins} menit lalu`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours} jam lalu`;
+    const days = Math.floor(hours / 24);
+    return `${days} hari lalu`;
+  }
+
+  function escapeText(s: string): string {
+    const div = document.createElement("div");
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  async function refreshUnreadCount(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/notifications/unread-count`);
+      const json = await res.json();
+      if (!res.ok) return;
+      const count = json.data?.count ?? 0;
+      if (count > 0) {
+        badge!.textContent = count > 99 ? "99+" : String(count);
+        badge!.classList.remove("hidden");
+      } else {
+        badge!.classList.add("hidden");
+      }
+    } catch (err) {
+      console.error("[refreshUnreadCount] gagal fetch backend:", err);
+    }
+  }
+
+  function renderList(notifications: NotificationRow[]): void {
+    listEl.innerHTML = "";
+    const isEmpty = notifications.length === 0;
+    listEl.classList.toggle("hidden", isEmpty);
+    emptyEl.classList.toggle("hidden", !isEmpty);
+
+    notifications.forEach((n) => {
+      const item = document.createElement("div");
+      item.className = `px-4 py-3 cursor-pointer hover:bg-hairline/10 transition-colors ${n.isRead ? "" : "bg-ink/[0.03]"}`;
+      item.innerHTML = `
+        <div class="flex items-start gap-2">
+          ${!n.isRead ? '<span class="w-1.5 h-1.5 rounded-full bg-signal mt-1.5 shrink-0"></span>' : '<span class="w-1.5 h-1.5 shrink-0"></span>'}
+          <div class="min-w-0 flex-1">
+            <p class="font-body text-xs text-ink font-semibold leading-snug">${escapeText(n.title)}</p>
+            ${n.message ? `<p class="font-body text-[11px] text-charcoal leading-snug mt-0.5">${escapeText(n.message)}</p>` : ""}
+            <p class="font-mono text-[9px] text-smoke mt-1">${timeAgo(n.createdAt)}</p>
+          </div>
+        </div>
+      `;
+      item.addEventListener("click", async () => {
+        if (!n.isRead) {
+          try {
+            await adminApiFetch(`${apiUrl}/api/notifications/${n.id}/read`, { method: "PATCH" });
+            await refreshUnreadCount();
+          } catch (err) {
+            console.error("[notification click] gagal fetch backend:", err);
+          }
+        }
+        if (n.link) window.location.href = n.link;
+      });
+      listEl.appendChild(item);
+    });
+  }
+
+  async function loadNotifications(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/notifications`);
+      const json = await res.json();
+      if (!res.ok) return;
+      renderList(json.data ?? []);
+    } catch (err) {
+      console.error("[loadNotifications] gagal fetch backend:", err);
+    }
+  }
+
+  function toggleDropdown(): void {
+    isOpen = !isOpen;
+    dropdown?.classList.toggle("hidden", !isOpen);
+    if (isOpen) loadNotifications();
+  }
+
+  btn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleDropdown();
+  });
+  document.addEventListener("click", (e) => {
+    if (isOpen && !dropdown?.contains(e.target as Node) && e.target !== btn) {
+      isOpen = false;
+      dropdown?.classList.add("hidden");
+    }
+  });
+
+  document.getElementById("notification-mark-all")?.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    try {
+      await adminApiFetch(`${apiUrl}/api/notifications/read-all`, { method: "PATCH" });
+      await refreshUnreadCount();
+      await loadNotifications();
+    } catch (err) {
+      console.error("[notification-mark-all] gagal fetch backend:", err);
+    }
+  });
+
+  // Polling ringan setiap 30 detik — cukup untuk internal tool, tidak
+  // perlu websocket/real-time untuk kebutuhan ini.
+  refreshUnreadCount();
+  setInterval(refreshUnreadCount, 30000);
+</script>
