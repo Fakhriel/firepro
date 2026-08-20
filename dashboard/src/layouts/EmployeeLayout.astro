@@ -46,10 +46,7 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:4000";
 <script>
   import { getAdminAuth, clearAdminAuth, getDashboardByRole } from "../lib/auth";
 
-  // Guard client-side: hanya role 'karyawan' yang boleh melihat layout ini.
-  // Role lain / belum login -> redirect ke /login. (Sebelumnya layout ini
-  // TIDAK punya guard sama sekali — siapa pun bisa langsung akses halaman
-  // /employee-technical/* tanpa login.)
+
   function guardKaryawanRole(): void {
     const { isAuthenticated, admin } = getAdminAuth();
     if (!isAuthenticated || !admin) {
