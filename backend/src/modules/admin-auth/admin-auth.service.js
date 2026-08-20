@@ -7,7 +7,7 @@ const { escapeLike } = require('../../utils/escapeLike');
 
 
 const INVALID_CREDENTIALS_MESSAGE = 'Username atau password salah.';
-const ROLES = ['admin', 'superadmin', 'owner', 'supervisor', 'karyawan'];
+const ROLES = ['admin', 'owner', 'supervisor', 'karyawan'];
 const MANAGEABLE_ROLES = ROLES.filter((r) => r !== 'owner');
 
 async function login(username, password) {
@@ -174,6 +174,20 @@ async function remove(id, requesterId) {
   await admin.destroy();
 }
 
+
+async function setActive(id, isActive, requesterId) {
+  if (String(id) === String(requesterId)) {
+    throw forbidden('Tidak bisa menonaktifkan akun sendiri.');
+  }
+  const admin = await Admin.findByPk(id);
+  if (!admin) throw notFound();
+  if (admin.role === 'owner') {
+    throw forbidden('Akun Owner tidak bisa dinonaktifkan lewat sini.');
+  }
+  await admin.update({ isActive: Boolean(isActive) });
+  return getById(id);
+}
+
 async function changePassword(id, body, requester) {
   const { currentPassword, newPassword } = body;
   if (!newPassword || String(newPassword).length < 6) {
@@ -183,21 +197,17 @@ async function changePassword(id, body, requester) {
   const admin = await Admin.findByPk(id);
   if (!admin) throw notFound();
 
-  const isSelf = String(admin.id) === String(requester.id);
-  const isSuperadmin = requester.role === 'superadmin';
-
-  if (!isSelf && !isSuperadmin) {
-    throw forbidden('Tidak punya izin mengganti password admin lain.');
+   const isSelf = String(admin.id) === String(requester.id);
+  if (!isSelf) {
+    throw forbidden('Tidak bisa mengganti password akun lain — setiap orang mengelola passwordnya sendiri.');
   }
 
-  if (isSelf) {
-    if (!currentPassword) throw badRequest('Password saat ini wajib diisi.');
-    const isMatch = await bcrypt.compare(currentPassword, admin.passwordHash);
-    if (!isMatch) throw badRequest('Password saat ini salah.');
-  }
+  if (!currentPassword) throw badRequest('Password saat ini wajib diisi.');
+  const isMatch = await bcrypt.compare(currentPassword, admin.passwordHash);
+  if (!isMatch) throw badRequest('Password saat ini salah.');
 
   admin.passwordHash = await bcrypt.hash(newPassword, 10);
   await admin.save();
 }
 
-module.exports = { login, getById, list, create, update, remove, changePassword, ROLES, MANAGEABLE_ROLES };
+module.exports = { login, getById, list, create, update, remove, setActive, changePassword, ROLES, MANAGEABLE_ROLES };
