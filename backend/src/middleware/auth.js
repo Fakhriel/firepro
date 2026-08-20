@@ -1,7 +1,8 @@
 const jwt = require('jsonwebtoken');
 const env = require('../config/env');
+const { Admin } = require('../modules/admin-auth/admin.model');
 
-function requireAdminAuth(req, res, next) {
+async function requireAdminAuth(req, res, next) {
   const header = req.headers.authorization;
 
   if (!header || !header.startsWith('Bearer ')) {
@@ -10,20 +11,24 @@ function requireAdminAuth(req, res, next) {
 
   const token = header.slice('Bearer '.length).trim();
 
+  let payload;
   try {
-    const payload = jwt.verify(token, env.jwt.secret);
-    req.admin = { id: payload.sub, username: payload.username, role: payload.role };
-    next();
+    payload = jwt.verify(token, env.jwt.secret);
   } catch (err) {
     return res.status(401).json({ error: 'Sesi tidak valid atau sudah kedaluwarsa. Silakan login kembali.' });
   }
-}
 
-function requireSuperadmin(req, res, next) {
-  if (!req.admin || req.admin.role !== 'superadmin') {
-    return res.status(403).json({ error: 'Hanya superadmin yang boleh mengakses fitur ini.' });
+  try {
+    
+    const admin = await Admin.findByPk(payload.sub, { attributes: ['id', 'isActive'] });
+    if (!admin || !admin.isActive) {
+      return res.status(401).json({ error: 'Akun ini sudah tidak aktif. Silakan hubungi Owner.' });
+    }
+    req.admin = { id: payload.sub, username: payload.username, role: payload.role };
+    next();
+  } catch (err) {
+    next(err);
   }
-  next();
 }
 
 function requireRole(...allowedRoles) {
@@ -35,4 +40,4 @@ function requireRole(...allowedRoles) {
   };
 }
 
-module.exports = { requireAdminAuth, requireSuperadmin, requireRole };
+module.exports = { requireAdminAuth, requireRole };
