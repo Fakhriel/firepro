@@ -2,7 +2,7 @@
 
 An internal dashboard for managing fire protection service operations.
 
-This project is being built to manage clients, projects, quotations, invoices, maintenance schedules, inventory, and basic business reports from a single dashboard — with role-based access for **Owner, Admin, Supervisor, and Technical Employee (field technician)**.
+This project is being built to manage clients, projects, quotations, invoices, maintenance schedules, inventory, and basic business reports from a single dashboard — with role-based access for **Owner, Admin, Supervisor, and Technical Employee (Field technician)**.
 
 > **Status:** 🚧 Under active development. A role-model decision was just made that changes the shape of the whole permission system: **`superadmin` is being removed entirely** (it turned out to be a leftover developer-login role, not a real business role), and **Admin is being redefined as a zero-account-control operational role** — Admin gets full CRUD on business data (clients, projects, quotations, invoices, inventory, etc.) but **cannot create, edit, or delete any user account, cannot touch any role, and cannot change any password — not even its own.** Owner becomes the sole holder of account control. **This decision has not been executed or verified yet** — it's documented here so the next pass can check it was implemented cleanly. Separately, the first real manual click-through QA pass (not API testing) found a hard blocker (`export.ts` fails to compile) plus a batch of role-boundary and UI issues across all four roles.
 
