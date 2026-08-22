@@ -7,7 +7,6 @@ const { errorHandler } = require('./middleware/errorHandler');
 const { generalLimiter } = require('./middleware/rateLimiter');
 
 const adminAuthRoutes = require('./modules/admin-auth/admin-auth.routes');
-const adminsRoutes = require('./modules/admin-auth/admins-auth.routes');
 const clientsRoutes = require('./modules/clients/clients.routes');
 const inventoryRoutes = require('./modules/inventory/inventory.routes');
 const invoicesRoutes = require('./modules/invoices/invoices.routes');
@@ -31,6 +30,10 @@ const app = express();
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: env.corsOrigin, credentials: true }));
 app.use(express.json());
+app.use((req, res, next) => {
+  if (req.body === undefined) req.body = {};
+  next();
+});
 app.use('/uploads', express.static(require('path').join(__dirname, '..', 'uploads')));
 
 
@@ -41,7 +44,6 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/admin-auth', adminAuthRoutes);
-app.use('/api/admins', adminsRoutes);
 app.use('/api/clients', clientsRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/invoices', invoicesRoutes);
@@ -56,7 +58,7 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/owner', ownerRoutes);
 app.use('/api/supervisor', supervisorRoutes);
 app.use('/api/technical', technicalRoutes);
-app.use('/api/admin/users', requireAdminAuth, requireRole('admin'), adminUsersRoutes);
+app.use('/api/admin/users', requireAdminAuth, requireRole('owner'), adminUsersRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
