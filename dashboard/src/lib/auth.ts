@@ -5,7 +5,7 @@ export interface AdminUser {
   id: string;
   username: string;
   name: string;
-  role: "admin" | "superadmin" | "owner" | "supervisor" | "karyawan";
+  role: "admin" | "owner" | "supervisor" | "karyawan";
 }
 
 export interface AdminAuthState {
@@ -26,7 +26,6 @@ export function getDashboardByRole(role: AdminUser["role"]): string {
     case "karyawan":
       return "/employee-technical";
     case "admin":
-    case "superadmin":
     default:
       return "/";
   }
