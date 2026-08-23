@@ -1,0 +1,168 @@
+---
+import DashboardLayout from "../layouts/DashboardLayout.astro";
+import PageHeader from "../components/PageHeader.astro";
+---
+
+<DashboardLayout title="Announcements" activeNav="announcements">
+  <PageHeader heading="Pengumuman" sub="Kirim pengumuman ke Supervisor dan/atau Karyawan Teknisi" crumbs={[{ label: "Komunikasi" }, { label: "Pengumuman" }]} />
+
+  <div class="panel p-5 mb-8 space-y-4">
+    <div>
+      <label class="field-label" for="ann-title">Judul</label>
+      <input id="ann-title" type="text" class="field-input" placeholder="Contoh: Libur Hari Raya" />
+    </div>
+    <div>
+      <label class="field-label" for="ann-message">Isi Pengumuman</label>
+      <textarea id="ann-message" rows="4" class="field-input resize-none" placeholder="Tulis isi pengumuman di sini…"></textarea>
+    </div>
+    <div>
+      <p class="field-label mb-2">Kirim ke</p>
+      <div class="flex gap-4">
+        <label class="flex items-center gap-2 font-mono text-xs text-charcoal cursor-pointer">
+          <input id="ann-target-supervisor" type="checkbox" class="w-4 h-4" checked />
+          Supervisor
+        </label>
+        <label class="flex items-center gap-2 font-mono text-xs text-charcoal cursor-pointer">
+          <input id="ann-target-karyawan" type="checkbox" class="w-4 h-4" checked />
+          Karyawan Teknisi
+        </label>
+      </div>
+    </div>
+    <div id="ann-error" class="hidden border-2 border-signal bg-signal/5 px-3 py-2">
+      <p id="ann-error-msg" class="font-mono text-xs text-signal"></p>
+    </div>
+    <button id="btn-send-announcement" type="button" class="btn-primary text-xs">Kirim Pengumuman</button>
+  </div>
+
+  <div class="panel overflow-hidden">
+    <div class="px-5 py-4 border-b-2 border-ink">
+      <h3 class="font-display text-lg text-ink leading-none">Riwayat Pengumuman</h3>
+    </div>
+    <div class="overflow-x-auto">
+      <table id="ann-table" class="data-table hidden">
+        <thead>
+          <tr>
+            <th>Judul</th>
+            <th class="hidden sm:table-cell">Isi</th>
+            <th>Target</th>
+            <th>Penerima</th>
+            <th class="hidden md:table-cell">Dikirim Oleh</th>
+            <th>Tanggal</th>
+          </tr>
+        </thead>
+        <tbody id="ann-body"></tbody>
+      </table>
+    </div>
+    <div id="ann-empty" class="empty-state min-h-52">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+      </svg>
+      <p>Belum ada pengumuman yang dikirim</p>
+    </div>
+  </div>
+</DashboardLayout>
+
+<script>
+  import { adminApiFetch } from "../lib/auth";
+  import { escapeHtml } from "../lib/escapeHtml";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  const ROLE_LABEL: Record<string, string> = { supervisor: "Supervisor", karyawan: "Karyawan Teknisi" };
+
+  interface AnnouncementRow {
+    id: number;
+    title: string;
+    message: string;
+    targetRoles: string[];
+    recipientCount: number;
+    authorName: string;
+    createdAt: string;
+  }
+
+  function formatDate(iso: string): string {
+    try {
+      return new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return iso;
+    }
+  }
+
+  async function loadHistory(): Promise<void> {
+    const tableBody = document.getElementById("ann-body") as HTMLTableSectionElement;
+    const table = document.getElementById("ann-table") as HTMLTableElement;
+    const emptyState = document.getElementById("ann-empty") as HTMLDivElement;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/announcements`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat riwayat pengumuman", "error");
+        return;
+      }
+      const rows: AnnouncementRow[] = json.data ?? [];
+      const isEmpty = rows.length === 0;
+      table.classList.toggle("hidden", isEmpty);
+      emptyState.classList.toggle("hidden", !isEmpty);
+      tableBody.innerHTML = rows
+        .map(
+          (a) => `
+        <tr>
+          <td class="font-semibold text-ink">${escapeHtml(a.title)}</td>
+          <td class="hidden sm:table-cell font-body text-xs text-charcoal truncate max-w-xs">${escapeHtml(a.message)}</td>
+          <td class="font-mono text-[10px] text-charcoal">${a.targetRoles.map((r) => ROLE_LABEL[r] ?? r).join(", ")}</td>
+          <td class="font-mono text-xs text-charcoal">${a.recipientCount} orang</td>
+          <td class="hidden md:table-cell font-mono text-xs text-charcoal">${escapeHtml(a.authorName)}</td>
+          <td class="font-mono text-xs text-smoke">${formatDate(a.createdAt)}</td>
+        </tr>
+      `
+        )
+        .join("");
+    } catch (err) {
+      console.error("[loadHistory] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  function showError(msg: string): void {
+    const box = document.getElementById("ann-error");
+    const msgEl = document.getElementById("ann-error-msg");
+    if (msgEl) msgEl.textContent = msg;
+    box?.classList.remove("hidden");
+  }
+
+  document.getElementById("btn-send-announcement")?.addEventListener("click", async () => {
+    document.getElementById("ann-error")?.classList.add("hidden");
+    const title = (document.getElementById("ann-title") as HTMLInputElement).value.trim();
+    const message = (document.getElementById("ann-message") as HTMLTextAreaElement).value.trim();
+    const targetRoles: string[] = [];
+    if ((document.getElementById("ann-target-supervisor") as HTMLInputElement).checked) targetRoles.push("supervisor");
+    if ((document.getElementById("ann-target-karyawan") as HTMLInputElement).checked) targetRoles.push("karyawan");
+
+    if (!title) return showError("Judul wajib diisi.");
+    if (!message) return showError("Isi pengumuman wajib diisi.");
+    if (targetRoles.length === 0) return showError("Pilih minimal satu target penerima.");
+
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/announcements`, {
+        method: "POST",
+        body: JSON.stringify({ title, message, targetRoles }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        showError(json.error ?? "Gagal mengirim pengumuman");
+        return;
+      }
+      window.showToast?.(json.message ?? "Pengumuman terkirim");
+      (document.getElementById("ann-title") as HTMLInputElement).value = "";
+      (document.getElementById("ann-message") as HTMLTextAreaElement).value = "";
+      await loadHistory();
+    } catch (err) {
+      console.error("[btn-send-announcement] gagal fetch backend:", err);
+      showError("Tidak bisa terhubung ke server");
+    }
+  });
+
+  loadHistory();
+</script>
