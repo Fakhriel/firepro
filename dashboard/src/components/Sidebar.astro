@@ -35,7 +35,12 @@ const navGroups = [
     label: "Pengguna",
     items: [
       { id: "clients", href: "/clients", label: "Clients", icon: "users" },
-      { id: "admins",  href: "/admins",  label: "Admin",   icon: "shield" },
+    ],
+  },
+  {
+    label: "Komunikasi",
+    items: [
+      { id: "announcements", href: "/announcements", label: "Announcements", icon: "megaphone" },
     ],
   },
   {
@@ -151,6 +156,12 @@ const navGroups = [
                   {item.icon === "wrench" && (
                     <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4 shrink-0" stroke="currentColor" stroke-width="1.75">
                       <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L2 19l3 3 7.3-7.3a4 4 0 0 0 5.4-5.4l-2.65 2.65a1.5 1.5 0 0 1-2.12-2.12L14.7 6.3z"/>
+                    </svg>
+                  )}
+                  {item.icon === "megaphone" && (
+                    <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4 shrink-0" stroke="currentColor" stroke-width="1.75">
+                      <path d="M3 11v2a2 2 0 0 0 2 2h1l3.5 5v-5H14l6 4V6l-6 4H6a2 2 0 0 0-2 2z"/>
+                      <path d="M14 6v14"/>
                     </svg>
                   )}
                   <span>{item.label}</span>
