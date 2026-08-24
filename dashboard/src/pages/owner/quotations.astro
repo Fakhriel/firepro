@@ -37,7 +37,7 @@ import StatCard from "../../components/StatCard.astro";
   <!-- Table -->
   <div class="panel overflow-hidden">
     <div class="overflow-x-auto">
-      <table id="quotations-table" class="data-table">
+      <table id="quotations-table" class="data-table hidden">
         <thead>
           <tr>
             <th>No. Penawaran</th>
@@ -52,7 +52,19 @@ import StatCard from "../../components/StatCard.astro";
         <tbody id="quotations-body"></tbody>
       </table>
     </div>
-    <div id="quotations-empty" class="empty-state min-h-56">
+    <div id="quotations-skeleton">
+      {Array.from({ length: 5 }).map(() => (
+        <div class="skeleton-row">
+          <div class="skeleton w-9 h-9 shrink-0"></div>
+          <div class="flex-1 space-y-2">
+            <div class="skeleton h-3 w-1/3"></div>
+            <div class="skeleton h-2.5 w-1/5"></div>
+          </div>
+          <div class="skeleton h-5 w-16 shrink-0"></div>
+        </div>
+      ))}
+    </div>
+    <div id="quotations-empty" class="empty-state min-h-56 hidden">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
         <polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>
@@ -70,10 +82,10 @@ import StatCard from "../../components/StatCard.astro";
   </div>
   <!-- Add / edit quotation modal -->
   <div id="quotation-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
-    <div class="panel w-full max-w-md bg-paper">
+    <div class="panel w-full max-w-md bg-surface">
       <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
         <h3 id="quotation-modal-title" class="font-display text-lg text-ink leading-none">Buat Penawaran</h3>
-        <button id="quotation-modal-close" type="button" class="text-smoke hover:text-ink transition-colors" aria-label="Tutup">
+        <button id="quotation-modal-close" type="button" class="text-steel hover:text-ink transition-colors" aria-label="Tutup">
           <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
@@ -111,7 +123,7 @@ import StatCard from "../../components/StatCard.astro";
             <option value="expired">Kedaluwarsa</option>
           </select>
         </div>
-        <div id="quotation-modal-error" class="hidden border-2 border-signal bg-signal/5 px-3 py-2">
+        <div id="quotation-modal-error" class="hidden border-2 border-signal bg-signal-dim px-3 py-2">
           <p id="quotation-modal-error-msg" class="font-mono text-xs text-signal"></p>
         </div>
       </div>
@@ -155,6 +167,7 @@ import StatCard from "../../components/StatCard.astro";
   const tableBody = document.getElementById("quotations-body") as HTMLTableSectionElement;
   const emptyState = document.getElementById("quotations-empty") as HTMLDivElement;
   const table = document.getElementById("quotations-table") as HTMLTableElement;
+  const skeletonEl_quotations = document.getElementById("quotations-skeleton") as HTMLDivElement;
   const countLabel = document.querySelector("[data-quotations-count]") as HTMLElement | null;
   const searchInput = document.getElementById("search-quotations") as HTMLInputElement | null;
   const statusFilter = document.getElementById("filter-quotation-status") as HTMLSelectElement | null;
@@ -182,7 +195,7 @@ import StatCard from "../../components/StatCard.astro";
     if (!card) return;
     let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
     if (!valueEl) {
-      const skeleton = card.querySelector(".animate-pulse")?.parentElement;
+      const skeleton = card.querySelector(".skeleton")?.parentElement;
       valueEl = document.createElement("p");
       const isAccent = card.classList.contains("bg-ink");
       valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
@@ -199,6 +212,7 @@ import StatCard from "../../components/StatCard.astro";
     tableBody.innerHTML = "";
 
     const isEmpty = quotations.length === 0;
+    skeletonEl_quotations.classList.add("hidden");
     table.classList.toggle("hidden", isEmpty);
     emptyState.classList.toggle("hidden", !isEmpty);
     if (countLabel) countLabel.textContent = `${quotations.length} penawaran`;
@@ -213,11 +227,34 @@ import StatCard from "../../components/StatCard.astro";
         <td class="hidden md:table-cell font-mono text-xs text-charcoal">${q.validUntil ? new Date(q.validUntil).toLocaleDateString("id-ID") : "-"}</td>
         <td><span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${statusBadge(q.status)}">${escapeHtml(STATUS_LABEL[q.status] ?? q.status)}</span></td>
         <td class="text-right whitespace-nowrap">
-          <button type="button" data-id="${q.id}" class="btn-edit-quotation text-xs text-smoke hover:text-ink font-mono underline-offset-2 hover:underline mr-3">Edit</button>
-          <button type="button" data-id="${q.id}" data-number="${escapeHtml(q.number)}" class="btn-delete-quotation text-xs text-smoke hover:text-signal font-mono underline-offset-2 hover:underline">Hapus</button>
+          ${q.status === "accepted" ? `<button type="button" data-id="${q.id}" class="btn-convert-quotation text-xs text-armed hover:underline font-mono underline-offset-2 mr-3">Buat Invoice</button>` : ""}
+          <button type="button" data-id="${q.id}" class="btn-edit-quotation text-xs text-steel hover:text-ink font-mono underline-offset-2 hover:underline mr-3">Edit</button>
+          <button type="button" data-id="${q.id}" data-number="${escapeHtml(q.number)}" class="btn-delete-quotation text-xs text-steel hover:text-signal font-mono underline-offset-2 hover:underline">Hapus</button>
         </td>
       `;
       tableBody.appendChild(tr);
+    });
+
+    tableBody.querySelectorAll<HTMLButtonElement>(".btn-convert-quotation").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id;
+        if (!window.confirm("Buat invoice dari penawaran ini?")) return;
+        btn.disabled = true;
+        try {
+          const res = await adminApiFetch(`${apiUrl}/api/owner/invoices/from-quotation/${id}`, { method: "POST" });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            window.showToast?.(json.error ?? "Gagal membuat invoice dari penawaran", "error");
+            return;
+          }
+          window.showToast?.(json.message ?? "Invoice berhasil dibuat dari penawaran");
+          window.location.href = "/owner/invoices";
+        } catch {
+          window.showToast?.("Tidak bisa terhubung ke server", "error");
+        } finally {
+          btn.disabled = false;
+        }
+      });
     });
 
     tableBody.querySelectorAll<HTMLButtonElement>(".btn-edit-quotation").forEach((btn) => {
