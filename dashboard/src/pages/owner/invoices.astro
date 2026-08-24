@@ -22,38 +22,37 @@ import StatCard from "../../components/StatCard.astro";
     </button>
   </PageHeader>
 
-  <!-- Stat cards -->
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
     <StatCard id="stat-invoices-total" label="Total Tagihan" accent />
-    <StatCard id="stat-invoices-paid" label="Sudah Dibayar" />
-    <StatCard id="stat-invoices-unpaid" label="Belum Dibayar" />
-    <StatCard id="stat-invoices-overdue" label="Gagal / Dibatalkan" />
+    <StatCard id="stat-invoices-paid" label="Lunas" />
+    <StatCard id="stat-invoices-outstanding" label="Belum Lunas" />
+    <StatCard id="stat-invoices-overdue" label="Jatuh Tempo / Batal" />
   </div>
 
-  <!-- Filter -->
   <div class="flex flex-col sm:flex-row gap-3 mb-5">
     <input id="search-invoices" type="search" placeholder="Cari no. invoice / klien…" class="field-input sm:max-w-xs" />
-    <select id="filter-invoice-status" class="field-input sm:w-40">
+    <select id="filter-invoice-status" class="field-input sm:w-44">
       <option value="">Semua Status</option>
+      <option value="draft">Draft</option>
+      <option value="issued">Terbit</option>
+      <option value="unpaid">Belum Dibayar</option>
+      <option value="partially_paid">Dibayar Sebagian</option>
       <option value="paid">Lunas</option>
-      <option value="pending">Belum Bayar</option>
-      <option value="failed">Gagal</option>
-      <option value="expired">Kedaluwarsa</option>
+      <option value="overdue">Jatuh Tempo</option>
       <option value="cancelled">Dibatalkan</option>
     </select>
   </div>
 
-  <!-- Table -->
   <div class="panel overflow-hidden">
     <div class="overflow-x-auto">
       <table id="invoices-table" class="data-table hidden">
         <thead>
           <tr>
             <th>No. Invoice</th>
-            <th>Klien</th>
-            <th class="hidden sm:table-cell">Proyek</th>
+            <th class="hidden sm:table-cell">Klien</th>
             <th>Jumlah</th>
-            <th class="hidden md:table-cell">Tanggal Terbit</th>
+            <th class="hidden md:table-cell">Sisa</th>
+            <th class="hidden md:table-cell">Jatuh Tempo</th>
             <th>Status</th>
             <th class="text-right">Aksi</th>
           </tr>
@@ -75,18 +74,13 @@ import StatCard from "../../components/StatCard.astro";
     </div>
     <div id="invoices-empty" class="empty-state min-h-56 hidden">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M4 2h16v20l-3-2-3 2-3-2-3 2-3-2-1 2z"/>
-        <line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="16" y2="11"/>
+        <rect x="1" y="4" width="22" height="16" rx="2"/>
+        <line x1="1" y1="10" x2="23" y2="10"/>
       </svg>
-      <p>Belum ada invoice diterbitkan</p>
+      <p>Belum ada data invoice</p>
     </div>
     <div class="flex items-center justify-between px-4 py-3 border-t border-hairline">
       <span data-invoices-count class="font-mono text-[10px] text-smoke">0 invoice</span>
-      <div class="flex items-center gap-1">
-        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>←</button>
-        <span class="font-mono text-xs px-3 py-1.5 border border-hairline">1</span>
-        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>→</button>
-      </div>
     </div>
   </div>
 
@@ -124,6 +118,10 @@ import StatCard from "../../components/StatCard.astro";
             <input id="if-issued-date" type="date" class="field-input" />
           </div>
         </div>
+        <div>
+          <label class="field-label" for="if-due-date">Jatuh Tempo <span class="text-smoke normal-case">(opsional)</span></label>
+          <input id="if-due-date" type="date" class="field-input" />
+        </div>
         <div id="invoice-modal-error" class="hidden border-2 border-signal bg-signal/5 px-3 py-2">
           <p id="invoice-modal-error-msg" class="font-mono text-xs text-signal"></p>
         </div>
@@ -134,55 +132,137 @@ import StatCard from "../../components/StatCard.astro";
       </div>
     </div>
   </div>
+
+  <!-- Detail invoice modal: ringkasan, payment ledger -->
+  <div id="detail-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
+    <div class="panel w-full max-w-lg bg-surface max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink sticky top-0 bg-surface">
+        <div>
+          <h3 id="detail-invoice-number" class="font-display text-lg text-ink leading-none">—</h3>
+          <p id="detail-invoice-client" class="font-mono text-[10px] text-smoke mt-1"></p>
+        </div>
+        <button id="detail-modal-close" type="button" class="text-steel hover:text-ink transition-colors" aria-label="Tutup">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <div class="grid grid-cols-3 gap-3 text-center">
+          <div class="border border-hairline p-2.5">
+            <p class="font-mono text-[9px] uppercase text-smoke">Total</p>
+            <p id="detail-amount" class="font-mono text-sm mt-1">-</p>
+          </div>
+          <div class="border border-hairline p-2.5">
+            <p class="font-mono text-[9px] uppercase text-smoke">Dibayar</p>
+            <p id="detail-paid" class="font-mono text-sm mt-1">-</p>
+          </div>
+          <div class="border border-hairline p-2.5">
+            <p class="font-mono text-[9px] uppercase text-smoke">Sisa</p>
+            <p id="detail-outstanding" class="font-mono text-sm mt-1">-</p>
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <button id="btn-view-print" type="button" class="btn-secondary text-xs flex-1">Print / Lihat</button>
+          <button id="btn-download-pdf" type="button" class="btn-secondary text-xs flex-1">Download PDF</button>
+        </div>
+
+        <div class="pt-3 border-t border-hairline space-y-2.5">
+          <p class="field-label">Catat Pembayaran</p>
+          <div class="grid grid-cols-2 gap-2.5">
+            <input id="payment-amount" type="number" min="1" placeholder="Jumlah (Rp)" class="field-input" />
+            <input id="payment-date" type="date" class="field-input" />
+          </div>
+          <select id="payment-method" class="field-input">
+            <option value="bank_transfer">Transfer Bank</option>
+            <option value="cash">Tunai</option>
+            <option value="cheque">Cek/Giro</option>
+            <option value="other">Lainnya</option>
+          </select>
+          <input id="payment-note" type="text" placeholder="Catatan (opsional)" class="field-input" />
+          <div id="payment-error" class="hidden border-2 border-signal bg-signal/5 px-3 py-2">
+            <p id="payment-error-msg" class="font-mono text-xs text-signal"></p>
+          </div>
+          <button id="btn-record-payment" type="button" class="btn-primary text-xs w-full">Simpan Pembayaran</button>
+        </div>
+
+        <div class="pt-3 border-t border-hairline">
+          <p class="field-label mb-2">Riwayat Pembayaran</p>
+          <div id="payment-history" class="space-y-1.5 max-h-40 overflow-y-auto"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </OwnerLayout>
 
 <script>
+  import { exportTableToPDF, exportInvoiceDocument, formatIDR } from "../../lib/export";
   import { adminApiFetch } from "../../lib/auth";
   import { escapeHtml } from "../../lib/escapeHtml";
-  import { exportTableToPDF, formatIDR } from "../../lib/export";
 
   const apiUrl =
     document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
 
-  interface InvoiceRow {
+  interface InvoicePayment {
     id: number;
-    invoiceNumber: string;
-    projectId: string;
     amount: number;
-    status: "pending" | "paid" | "failed" | "expired" | "cancelled";
-    issuedDate: string;
-    clientId: number;
-    clientName: string;
+    paidDate: string;
+    method: string;
+    note: string | null;
   }
 
-  const STATUS_LABEL: Record<string, string> = {
-    pending: "Belum Bayar",
-    paid: "Lunas",
-    failed: "Gagal",
-    expired: "Kedaluwarsa",
-    cancelled: "Dibatalkan",
-  };
+  interface OwnerInvoice {
+    id: number;
+    invoiceNumber: string | null;
+    projectId: string;
+    amount: number;
+    status: string;
+    issuedDate: string;
+    dueDate: string | null;
+    notes: string | null;
+    clientName: string;
+    paidAmount: number;
+    outstandingAmount: number;
+    payments: InvoicePayment[];
+  }
 
-  let allInvoices: InvoiceRow[] = [];
+  let allInvoices: OwnerInvoice[] = [];
+  let currentDetailInvoice: OwnerInvoice | null = null;
 
-  const tableBody = document.getElementById("invoices-body") as HTMLTableSectionElement;
+  const tbody = document.getElementById("invoices-body") as HTMLTableSectionElement;
   const emptyState = document.getElementById("invoices-empty") as HTMLDivElement;
+  const countLabel = document.querySelector<HTMLSpanElement>("[data-invoices-count]");
   const table = document.getElementById("invoices-table") as HTMLTableElement;
   const skeletonEl_invoices = document.getElementById("invoices-skeleton") as HTMLDivElement;
-  const countLabel = document.querySelector("[data-invoices-count]") as HTMLElement | null;
   const searchInput = document.getElementById("search-invoices") as HTMLInputElement | null;
   const statusFilter = document.getElementById("filter-invoice-status") as HTMLSelectElement | null;
 
-  function statusBadge(status: string): string {
-    const map: Record<string, string> = {
-      pending: "bg-hairline/30 text-smoke border-hairline",
-      paid: "bg-ink text-paper border-ink",
-      failed: "bg-signal/10 text-signal border-signal",
-      expired: "bg-signal/10 text-signal border-signal",
-      cancelled: "bg-signal/10 text-signal border-signal",
-    };
-    return map[status] ?? map.pending;
-  }
+  const STATUS_LABELS: Record<string, string> = {
+    draft: "Draft",
+    issued: "Terbit",
+    unpaid: "Belum Dibayar",
+    partially_paid: "Dibayar Sebagian",
+    paid: "Lunas",
+    overdue: "Jatuh Tempo",
+    cancelled: "Dibatalkan",
+  };
+  const STATUS_CLASSES: Record<string, string> = {
+    draft: "border-smoke text-smoke",
+    issued: "border-ink text-ink",
+    unpaid: "border-amber text-amber",
+    partially_paid: "border-amber text-amber",
+    paid: "border-armed bg-armed text-paper",
+    overdue: "border-signal text-signal",
+    cancelled: "border-smoke text-smoke",
+  };
+  const PAYMENT_METHOD_LABELS: Record<string, string> = {
+    cash: "Tunai",
+    bank_transfer: "Transfer Bank",
+    cheque: "Cek/Giro",
+    other: "Lainnya",
+  };
 
   function setStatValue(cardId: string, value: string): void {
     const card = document.getElementById(cardId);
@@ -202,9 +282,32 @@ import StatCard from "../../components/StatCard.astro";
     valueEl.textContent = value;
   }
 
-  function renderTable(invoices: InvoiceRow[]): void {
-    tableBody.innerHTML = "";
+  function formatDate(iso: string | null): string {
+    if (!iso) return "-";
+    return new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+  }
 
+  function openModal(id: string): void {
+    document.getElementById(id)?.classList.replace("hidden", "flex");
+  }
+  function closeModal(id: string): void {
+    document.getElementById(id)?.classList.replace("flex", "hidden");
+  }
+
+  function updateStats(invoices: OwnerInvoice[]): void {
+    const totalAmount = invoices.reduce((sum, inv) => sum + inv.amount, 0);
+    const paid = invoices.filter((inv) => inv.status === "paid").length;
+    const outstanding = invoices.filter((inv) => ["unpaid", "partially_paid", "issued"].includes(inv.status)).length;
+    const overdueOrCancelled = invoices.filter((inv) => ["overdue", "cancelled"].includes(inv.status)).length;
+
+    setStatValue("stat-invoices-total", formatIDR(totalAmount));
+    setStatValue("stat-invoices-paid", String(paid));
+    setStatValue("stat-invoices-outstanding", String(outstanding));
+    setStatValue("stat-invoices-overdue", String(overdueOrCancelled));
+  }
+
+  function renderTable(invoices: OwnerInvoice[]): void {
+    tbody.innerHTML = "";
     const isEmpty = invoices.length === 0;
     skeletonEl_invoices.classList.add("hidden");
     table.classList.toggle("hidden", isEmpty);
@@ -212,90 +315,58 @@ import StatCard from "../../components/StatCard.astro";
     if (countLabel) countLabel.textContent = `${invoices.length} invoice`;
 
     invoices.forEach((inv) => {
+      const statusLabel = STATUS_LABELS[inv.status] ?? inv.status;
+      const statusClass = STATUS_CLASSES[inv.status] ?? "border-smoke text-smoke";
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td class="font-mono text-xs text-ink">${escapeHtml(inv.invoiceNumber)}</td>
-        <td class="font-semibold text-ink">${escapeHtml(inv.clientName)}</td>
-        <td class="hidden sm:table-cell font-mono text-xs text-charcoal">#${escapeHtml(inv.projectId)}</td>
-        <td class="font-mono text-xs text-charcoal">${formatIDR(inv.amount)}</td>
-        <td class="hidden md:table-cell font-mono text-xs text-charcoal">${inv.issuedDate ? new Date(inv.issuedDate).toLocaleDateString("id-ID") : "-"}</td>
-        <td><span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${statusBadge(inv.status)}">${escapeHtml(STATUS_LABEL[inv.status] ?? inv.status)}</span></td>
+        <td class="font-mono text-xs break-all">${escapeHtml(inv.invoiceNumber ?? "—")}</td>
+        <td class="hidden sm:table-cell text-xs">${escapeHtml(inv.clientName)}</td>
+        <td class="font-mono text-xs">${formatIDR(inv.amount)}</td>
+        <td class="hidden md:table-cell font-mono text-xs ${inv.outstandingAmount > 0 ? "text-signal" : ""}">${formatIDR(inv.outstandingAmount)}</td>
+        <td class="hidden md:table-cell font-mono text-xs text-smoke">${formatDate(inv.dueDate)}</td>
+        <td>
+          <span class="font-mono text-[10px] uppercase tracking-wide px-2 py-0.5 border-2 ${statusClass}">
+            ${statusLabel}
+          </span>
+        </td>
         <td class="text-right whitespace-nowrap">
-          ${inv.status === "pending" ? `<button type="button" data-id="${inv.id}" class="btn-mark-paid text-xs text-steel hover:text-ink font-mono underline-offset-2 hover:underline mr-3">Tandai Lunas</button>` : ""}
-          <button type="button" data-id="${inv.id}" data-number="${escapeHtml(inv.invoiceNumber)}" class="btn-delete-invoice text-xs text-steel hover:text-signal font-mono underline-offset-2 hover:underline">Hapus</button>
+          <button type="button" class="btn-view-invoice text-xs px-2 py-1 hover:underline" data-id="${inv.id}">Lihat</button>
         </td>
       `;
-      tableBody.appendChild(tr);
+      tbody.appendChild(tr);
     });
 
-    tableBody.querySelectorAll<HTMLButtonElement>(".btn-mark-paid").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const id = btn.dataset.id;
-        try {
-          const res = await adminApiFetch(`${apiUrl}/api/owner/invoices/${id}`, {
-            method: "PATCH",
-            body: JSON.stringify({ status: "paid" }),
-          });
-          const json = await res.json();
-          if (!res.ok) {
-            window.showToast?.(json.error ?? "Gagal menandai invoice lunas", "error");
-            return;
-          }
-          window.showToast?.("Invoice ditandai lunas");
-          await loadInvoices();
-        } catch {
-          window.showToast?.("Tidak bisa terhubung ke server", "error");
-        }
-      });
-    });
-
-    tableBody.querySelectorAll<HTMLButtonElement>(".btn-delete-invoice").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const id = btn.dataset.id;
-        const number = btn.dataset.number ?? "";
-        if (!window.confirm(`Hapus invoice "${number}"? Aksi ini tidak bisa dibatalkan.`)) return;
-        try {
-          const res = await adminApiFetch(`${apiUrl}/api/owner/invoices/${id}`, { method: "DELETE" });
-          const json = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            window.showToast?.(json.error ?? "Gagal menghapus invoice", "error");
-            return;
-          }
-          window.showToast?.("Invoice berhasil dihapus");
-          await loadInvoices();
-        } catch {
-          window.showToast?.("Tidak bisa terhubung ke server", "error");
-        }
-      });
+    table.querySelectorAll<HTMLButtonElement>(".btn-view-invoice").forEach((btn) => {
+      btn.addEventListener("click", () => openDetailModal(Number(btn.dataset.id)));
     });
   }
 
-  function updateStats(invoices: InvoiceRow[]): void {
-    const totalAmount = invoices.reduce((sum, inv) => sum + inv.amount, 0);
-    const paid = invoices.filter((inv) => inv.status === "paid").length;
-    const unpaid = invoices.filter((inv) => inv.status === "pending").length;
-    const failedOrCancelled = invoices.filter((inv) => inv.status === "failed" || inv.status === "cancelled").length;
-
-    setStatValue("stat-invoices-total", formatIDR(totalAmount));
-    setStatValue("stat-invoices-paid", String(paid));
-    setStatValue("stat-invoices-unpaid", String(unpaid));
-    setStatValue("stat-invoices-overdue", String(failedOrCancelled));
+  function applyFilters(): void {
+    const keyword = (searchInput?.value ?? "").trim().toLowerCase();
+    const status = statusFilter?.value ?? "";
+    const filtered = allInvoices.filter((inv) => {
+      if (
+        keyword &&
+        !(inv.invoiceNumber ?? "").toLowerCase().includes(keyword) &&
+        !inv.clientName.toLowerCase().includes(keyword)
+      )
+        return false;
+      if (status && inv.status !== status) return false;
+      return true;
+    });
+    renderTable(filtered);
   }
 
   async function loadInvoices(): Promise<void> {
     try {
-      const params = new URLSearchParams();
-      if (searchInput?.value) params.set("search", searchInput.value);
-      if (statusFilter?.value) params.set("status", statusFilter.value);
-
-      const res = await adminApiFetch(`${apiUrl}/api/owner/invoices/admin?${params.toString()}`);
+      const res = await adminApiFetch(`${apiUrl}/api/owner/invoices/admin`);
       const json = await res.json();
       if (!res.ok) {
         window.showToast?.(json.error ?? "Gagal memuat data invoice", "error");
         return;
       }
       allInvoices = json.data ?? [];
-      renderTable(allInvoices);
+      applyFilters();
       updateStats(allInvoices);
     } catch (err) {
       console.error("[loadInvoices] gagal fetch backend:", err);
@@ -303,18 +374,137 @@ import StatCard from "../../components/StatCard.astro";
     }
   }
 
-  let searchDebounce: ReturnType<typeof setTimeout>;
-  searchInput?.addEventListener("input", () => {
-    clearTimeout(searchDebounce);
-    searchDebounce = setTimeout(loadInvoices, 300);
-  });
-  statusFilter?.addEventListener("change", loadInvoices);
+  searchInput?.addEventListener("input", applyFilters);
+  statusFilter?.addEventListener("change", applyFilters);
 
   document.getElementById("btn-export-invoices")?.addEventListener("click", () => {
-    exportTableToPDF("invoices-table", { title: "Daftar Invoice", subtitle: "Rekap tagihan & pembayaran proyek — FIREPRO" });
+    exportTableToPDF("invoices-table", { title: "Rekap Invoice", subtitle: "Data tagihan proyek FIREPRO" });
   });
 
-  // ─── Create invoice modal ───────────────────────────────────────────
+  function renderPaymentHistory(payments: InvoicePayment[]): void {
+    const container = document.getElementById("payment-history") as HTMLDivElement;
+    if (!payments.length) {
+      container.innerHTML = '<p class="font-mono text-[10px] text-smoke">Belum ada pembayaran tercatat.</p>';
+      return;
+    }
+    container.innerHTML = payments
+      .map(
+        (p) => `
+        <div class="flex items-center justify-between text-xs border-b border-hairline pb-1.5">
+          <div class="min-w-0">
+            <p class="font-mono">${formatDate(p.paidDate)} · ${PAYMENT_METHOD_LABELS[p.method] ?? p.method}</p>
+            ${p.note ? `<p class="text-[10px] text-smoke truncate">${escapeHtml(p.note)}</p>` : ""}
+          </div>
+          <span class="font-mono shrink-0">${formatIDR(p.amount)}</span>
+        </div>
+      `
+      )
+      .join("");
+  }
+
+  function toDocumentData(inv: OwnerInvoice) {
+    return {
+      invoiceNumber: inv.invoiceNumber ?? "-",
+      clientName: inv.clientName,
+      projectName: inv.projectId !== "-" ? `Project #${inv.projectId}` : null,
+      issuedDate: inv.issuedDate,
+      dueDate: inv.dueDate,
+      amount: inv.amount,
+      paidAmount: inv.paidAmount,
+      outstandingAmount: inv.outstandingAmount,
+      status: inv.status,
+      statusLabel: STATUS_LABELS[inv.status] ?? inv.status,
+      notes: inv.notes,
+      payments: inv.payments,
+    };
+  }
+
+  function openDetailModal(id: number): void {
+    const inv = allInvoices.find((i) => i.id === id);
+    if (!inv) return;
+    currentDetailInvoice = inv;
+
+    (document.getElementById("detail-invoice-number") as HTMLElement).textContent = inv.invoiceNumber ?? "-";
+    (document.getElementById("detail-invoice-client") as HTMLElement).textContent = inv.clientName;
+    (document.getElementById("detail-amount") as HTMLElement).textContent = formatIDR(inv.amount);
+    (document.getElementById("detail-paid") as HTMLElement).textContent = formatIDR(inv.paidAmount);
+    (document.getElementById("detail-outstanding") as HTMLElement).textContent = formatIDR(inv.outstandingAmount);
+
+    (document.getElementById("payment-amount") as HTMLInputElement).value = "";
+    (document.getElementById("payment-date") as HTMLInputElement).value = new Date().toISOString().split("T")[0];
+    (document.getElementById("payment-note") as HTMLInputElement).value = "";
+    document.getElementById("payment-error")?.classList.add("hidden");
+
+    const canPay = !["draft", "cancelled", "paid"].includes(inv.status);
+    (document.getElementById("btn-record-payment") as HTMLButtonElement).disabled = !canPay;
+    (document.getElementById("btn-record-payment") as HTMLButtonElement).style.opacity = canPay ? "1" : "0.5";
+
+    renderPaymentHistory(inv.payments);
+    openModal("detail-modal");
+  }
+
+  document.getElementById("detail-modal-close")?.addEventListener("click", () => closeModal("detail-modal"));
+
+  document.getElementById("btn-view-print")?.addEventListener("click", () => {
+    if (!currentDetailInvoice) return;
+    exportInvoiceDocument(toDocumentData(currentDetailInvoice), "print");
+  });
+  document.getElementById("btn-download-pdf")?.addEventListener("click", () => {
+    if (!currentDetailInvoice) return;
+    exportInvoiceDocument(toDocumentData(currentDetailInvoice), "download");
+  });
+
+  document.getElementById("btn-record-payment")?.addEventListener("click", async () => {
+    if (!currentDetailInvoice) return;
+    const errorBox = document.getElementById("payment-error") as HTMLDivElement;
+    const errorMsg = document.getElementById("payment-error-msg") as HTMLElement;
+    errorBox.classList.add("hidden");
+
+    const amount = (document.getElementById("payment-amount") as HTMLInputElement).value;
+    const paidDate = (document.getElementById("payment-date") as HTMLInputElement).value;
+    const method = (document.getElementById("payment-method") as HTMLSelectElement).value;
+    const note = (document.getElementById("payment-note") as HTMLInputElement).value.trim();
+
+    if (!amount || Number(amount) <= 0) {
+      errorMsg.textContent = "Jumlah pembayaran wajib diisi dan lebih dari 0.";
+      errorBox.classList.remove("hidden");
+      return;
+    }
+    if (!paidDate) {
+      errorMsg.textContent = "Tanggal pembayaran wajib diisi.";
+      errorBox.classList.remove("hidden");
+      return;
+    }
+
+    const btn = document.getElementById("btn-record-payment") as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = "Menyimpan…";
+
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/owner/invoices/${currentDetailInvoice.id}/payments`, {
+        method: "POST",
+        body: JSON.stringify({ amount: Number(amount), paidDate, method, note: note || null }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        errorMsg.textContent = json.error ?? "Gagal mencatat pembayaran.";
+        errorBox.classList.remove("hidden");
+        return;
+      }
+      window.showToast?.(json.message ?? "Pembayaran tersimpan");
+      await loadInvoices();
+      const updated = allInvoices.find((i) => i.id === currentDetailInvoice!.id);
+      if (updated) openDetailModal(updated.id);
+    } catch (err) {
+      console.error("[btn-record-payment] gagal fetch backend:", err);
+      errorMsg.textContent = "Tidak bisa terhubung ke server.";
+      errorBox.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Simpan Pembayaran";
+    }
+  });
+
   interface ClientOption {
     id: number;
     name: string;
@@ -326,13 +516,6 @@ import StatCard from "../../components/StatCard.astro";
   }
   let clientOptions: ClientOption[] = [];
   let allProjectOptions: ProjectOption[] = [];
-
-  function openModal(id: string): void {
-    document.getElementById(id)?.classList.replace("hidden", "flex");
-  }
-  function closeModal(id: string): void {
-    document.getElementById(id)?.classList.replace("flex", "hidden");
-  }
 
   async function loadClientOptions(): Promise<void> {
     const select = document.getElementById("if-client") as HTMLSelectElement;
@@ -380,6 +563,7 @@ import StatCard from "../../components/StatCard.astro";
     updateProjectOptionsForClient("");
     (document.getElementById("if-amount") as HTMLInputElement).value = "0";
     (document.getElementById("if-issued-date") as HTMLInputElement).value = new Date().toISOString().split("T")[0];
+    (document.getElementById("if-due-date") as HTMLInputElement).value = "";
     document.getElementById("invoice-modal-error")?.classList.add("hidden");
   }
 
@@ -402,6 +586,7 @@ import StatCard from "../../components/StatCard.astro";
     const projectId = (document.getElementById("if-project") as HTMLSelectElement).value;
     const amount = Number((document.getElementById("if-amount") as HTMLInputElement).value || 0);
     const issuedDate = (document.getElementById("if-issued-date") as HTMLInputElement).value;
+    const dueDate = (document.getElementById("if-due-date") as HTMLInputElement).value;
 
     if (!clientId) return showInvoiceFormError("Klien wajib dipilih.");
     if (!issuedDate) return showInvoiceFormError("Tanggal terbit wajib diisi.");
@@ -415,6 +600,7 @@ import StatCard from "../../components/StatCard.astro";
           projectId: projectId ? Number(projectId) : null,
           amount,
           issuedDate,
+          dueDate: dueDate || null,
         }),
       });
       const json = await res.json();
