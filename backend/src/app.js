@@ -31,7 +31,7 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: env.corsOrigin, credentials: true }));
 app.use(express.json());
 app.use((req, res, next) => {
-  if (req.body === undefined) req.body = {};
+  if (req.body === undefined || req.body === null) req.body = {};
   next();
 });
 app.use('/uploads', express.static(require('path').join(__dirname, '..', 'uploads')));
