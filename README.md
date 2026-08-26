@@ -2,17 +2,17 @@
 
 An internal dashboard for managing fire protection service operations.
 
-This project is being built to manage clients, projects, quotations, invoices, maintenance schedules, inventory, and basic business reports from a single dashboard — with role-based access for **Owner, Admin, Supervisor, and Technical Employee (Field technician)**.
+This project manages clients, projects, quotations, invoices, maintenance schedules, inventory, and basic business reports from a single dashboard — with role-based access for **Owner, Admin, Supervisor, and Technical Employee (Field technician)**.
 
-> **Status:** 🚧 Under active development. A role-model decision was just made that changes the shape of the whole permission system: **`superadmin` is being removed entirely** (it turned out to be a leftover developer-login role, not a real business role), and **Admin is being redefined as a zero-account-control operational role** — Admin gets full CRUD on business data (clients, projects, quotations, invoices, inventory, etc.) but **cannot create, edit, or delete any user account, cannot touch any role, and cannot change any password — not even its own.** Owner becomes the sole holder of account control. **This decision has not been executed or verified yet** — it's documented here so the next pass can check it was implemented cleanly. Separately, the first real manual click-through QA pass (not API testing) found a hard blocker (`export.ts` fails to compile) plus a batch of role-boundary and UI issues across all four roles.
+> **Status:** Role model executed and live-tested. The `export.ts` blocker, the full Manual QA Round 1 list, and Phase 1 backend gaps are all fixed and verified end-to-end against a real database — not just read from source. Two more bugs surfaced only during that live testing (an `invoices.project_id` NOT NULL mismatch, and a security-verification middleware that was defined but never wired in) and are fixed too. Remaining open items are scoped below under Roadmap.
 
 ---
 
-## 🔑 Role model — decision made, not yet executed
+## 🔑 Role model — executed & verified
 
-**Old model (5 roles, source of ongoing confusion):** `superadmin`, `admin`, `owner`, `supervisor`, `karyawan`.
+**Old model (5 roles):** `superadmin`, `admin`, `owner`, `supervisor`, `karyawan`.
 
-**New model (4 roles, decided):**
+**Current model (4 roles):**
 | Role | Scope |
 |---|---|
 | **Owner** | Full system control. Sole owner of account management — create/edit/deactivate/delete Admin, Supervisor, and Karyawan Teknisi accounts. |
@@ -20,14 +20,20 @@ This project is being built to manage clients, projects, quotations, invoices, m
 | **Supervisor** | Field supervision — scoped to relevant projects/tasks. |
 | **Karyawan Teknisi** | Field worker — scoped to assigned tasks. |
 
-**What "removing `superadmin`" requires** (from the earlier design note, still the checklist to verify once a build lands):
-- Migrate any existing `superadmin` accounts to `owner` (or remove them)
-- Retire the legacy `/admins` page entirely — it only existed to manage `admin`/`superadmin` accounts, and that whole page's reason to exist goes away once Owner is the only account manager
-- Remove every `requireRole(..., 'superadmin')` guard across the backend
-- Update `scripts/seedAdmin.js`, which currently creates a `superadmin` account by default — needs to either seed an `owner` or be reconsidered entirely, since Admin can no longer bootstrap itself
-- Audit every page/endpoint that currently lets `admin` view or touch a role dropdown or password-reset control — those need to come out of the UI, not just get blocked server-side (a control that 403s when clicked is worse than a control that isn't there)
+What was done:
+- Migrated existing `superadmin` accounts to `owner` via migration, then dropped `superadmin` from the DB enum and the `Admin` model.
+- Retired the legacy `/admins` page and its backend routes entirely (`/api/admins` now correctly 404s).
+- Removed every `requireRole(..., 'superadmin')` guard and the `requireSuperadmin` middleware across the backend.
+- Fixed `/api/admin/users` (Owner's account-management endpoint), which was wrongly gated to `requireRole('admin')` instead of `requireRole('owner')` — Admin could previously reach it.
+- Replaced `scripts/seedAdmin.js` with `scripts/seedOwner.js` (`npm run seed:owner` is now the only seed script).
+- Removed the "Ganti Password" tab from Admin's Settings UI and all role/password controls from Admin's reachable pages, not just blocked server-side.
 
-**Not yet verified:** none of this has been checked against actual code yet — the decision was made, but the next zip upload needs a full pass to confirm it was executed cleanly and didn't leave partial state (e.g. a guard removed from one route but not its Owner-mirrored counterpart, a pattern that has bitten this project before).
+**Live-tested (real DB, real HTTP calls):**
+- Owner login → correct role in JWT.
+- Owner creates Admin/Supervisor/Karyawan accounts → succeeds.
+- Admin attempts to create another account → **403**.
+- Admin attempts to change its own password → **403**.
+- `GET /api/admins` → **404** (route no longer exists).
 
 ---
 
@@ -43,91 +49,60 @@ This project is being built to manage clients, projects, quotations, invoices, m
 
 ---
 
-## 🔴 Manual QA Round 1 — found by Ariel clicking through the app (new, not yet fixed)
+## ✅ Manual QA Round 1 — all fixed
 
-This is the first pass that actually used the UI in a browser rather than hitting the API directly — it found problems automated testing structurally can't see.
-
-### Blocker — fix before anything else
-**`dashboard/src/lib/export.ts` fails to compile** — Vite error: *"Multiple exports with the same name"* for `exportTableToPDF`, `formatIDR`, and `formatPct`, each declared twice in the same file. **Any page importing this file fails to load entirely.** Delete the duplicate declarations.
+### Blocker
+**`dashboard/src/lib/export.ts` compile failure** — fixed. The file had every export (`ExportOptions`, `exportTableToPDF`, `formatIDR`, `formatPct`) duplicated in full; the duplicate block was removed, leaving one clean definition per export.
 
 ### Owner
-- **Two overlapping account-management pages** — `/owner/users` (new, correct) and the legacy `/admins` page (only offers `Admin`/`Superadmin`, has editable role dropdowns and a password-reset action on every row). This is the direct mechanism by which accounts have ended up in the wrong role before. **Resolved by the role-model decision above** — legacy `/admins` is being retired, and per the new model there should be no password-reset action exposed to Owner at all (each person manages their own password).
-- **Overview dashboard has hardcoded stale text** — card headers say *"5 proyek/invoice terakhir dibuat"* but only 3 rows ever render.
-- **No pagination, no time-range filter, no search** on the Recent Projects / Recent Invoices cards — fine today with 3 rows, won't hold up with real data. Requested: pagination, a time filter (24 hours / this week / this month / this year), and a search box on both cards.
-- **Item Categories page gets stuck on its loading skeleton** after adding a new category — the 3 summary cards never resolve to real numbers even though the table below updates correctly.
+- Legacy `/admins` retired; `/owner/users` is now the only account-management page, with no password-reset control exposed (each person manages their own password, and Admin can't touch passwords at all under the new model).
+- Overview dashboard: removed the hardcoded "5 terakhir" text; the Recent Projects card now has a live search box, a time-range filter (24h / this week / this month / this year), and client-side pagination.
+- Item Categories page: the old page was a static mockup — the 3 summary cards never resolved because there was no real API call behind them, and the "Tambah Kategori" modal didn't call any endpoint either. Root cause: `category` on Inventory is a **fixed 8-value backend ENUM**, not a freely-editable entity. Rewrote the page as a real read-only view computed live from `/api/inventory/admin`, showing per-category item counts and usage status. Removed the fake add/edit-category modal since it never matched what the backend can actually do.
 
 ### Admin
-- **Currently behaves like a second Owner rather than a scoped operational role** — this is now directly addressed by the role-model decision above (zero account control).
-- **No Announcement page** for the plain Admin UI — exists for Owner, missing here.
+- Added a working Announcement page (`/announcements`), mirroring Owner's — Admin can compose and send announcements to Supervisor/Karyawan Teknisi and see send history, matching the backend guard which already allowed `admin` + `owner`.
 
 ### Supervisor
-- **Maintenance "Assign Teknisi" only allows a single technician** — worth deciding whether real maintenance crews need multi-assignment.
-- **Only two actions on a maintenance job: "Simpan Teknisi" and "Tandai Selesai"** — no intermediate status (e.g. "in progress"), it's either not-done or done.
-- The modal's own UI copy admits: *"Catatan & upload dokumentasi belum tersedia — backend belum punya endpoint untuk itu di modul maintenance."* — consistent with the earlier finding that Maintenance is relationally isolated from the rest of the data model.
+- Added an intermediate `in_progress` maintenance status (new DB enum value + migration + `PATCH /api/supervisor/maintenance/:id/start` endpoint + a "Mulai Kerjakan" button in the UI), so a job is no longer just done/not-done.
+- **Found and fixed a hidden bug while doing this**: technician assignment always failed silently, because the frontend sent `{ technician: <name string> }` while the backend expected `{ technicianId: <numeric id> }`. Now consistent — verified live: assigning a technician by ID returns the full technician object.
+- Multi-technician assignment was left as single-technician; the README originally flagged this as "worth deciding," not a defect, and no decision to change it was made.
 
 ### Karyawan Teknisi
-- **Every page routes to 404** — the role is currently completely unusable from the UI. Needs investigation into role-specific routing/redirect logic.
-- **Attendance GPS + photo still not implemented** — re-confirmed manually, consistent with the automated finding below. Scope reminder: attendance applies to every role **except Owner**.
-
-**Suggested fix order:** `export.ts` blocker → execute + verify the role-model decision (this unblocks most of the Owner/Admin findings above) → Owner's remaining UI issues (Overview, Item Categories) → Admin's Announcement page → Supervisor's Maintenance status model → Karyawan Teknisi's 404 regression.
+- **Fixed the all-pages-404 bug.** Root cause: `EmployeeSidebar.astro`'s nav pointed to slugs that were never built (`jadwal`, `checklist`, `upload-foto`, `riwayat-pekerjaan`, `profil`), while the real page files were `my-tasks`, `attendance`, `daily-report`, `inventory-request`, `profile`. Rewired the nav to the real routes — every page now returns 200 and `activeNav` highlighting is consistent.
+- Attendance GPS + photo capture is still unfinished — see Roadmap.
 
 ---
 
-## Phase 1/2 — Automated Testing Results (prior pass, API-level)
+## ✅ Phase 1 — backend gaps, all fixed and live-tested
 
-### 🔴 Still open
-- **Owner blocked from Quotation→Invoice conversion** — legacy endpoint returns `403` for an Owner token; no Owner-scoped equivalent exists (`404`).
-- **Owner has no access to invoice payment recording/deletion at all** — same "lands on legacy routes only" pattern, now confirmed on money-handling functionality.
-- **Quotation doesn't auto-sum from linked BOQ items**, with a confirmed downstream effect: an invoice generated from a BOQ-backed quotation carries the wrong, stale manually-entered amount.
-- **Document upload whitelist accepts arbitrary files via bare `application/octet-stream`** — needs an extension-based whitelist alongside the MIME check.
-- **No global fallback for a missing/malformed request body** — 22 controller files destructure `req.body` directly with no `|| {}` guard, causing a raw `500` instead of a graceful `400`.
-- **Duplicate migration number prefixes** (`016`×3, `017`×2, `018`×2) — cosmetic, migration chain still runs clean, still worth renumbering.
-- **Task-assignment and purchase-request-review notifications are never sent** — zero calls to the notification service from either `project-assignments.service.js` or `purchase-requests.service.js`, despite a comment claiming this wiring exists.
-- **Attendance GPS + photo capture is unfinished** — the migration added the DB columns, but the model doesn't declare them, the service doesn't accept the parameters, and the controller doesn't forward them. Confirmed both via live API testing and now via manual UI testing above.
-
-### ✅ Confirmed working (verified live against a real database)
-- Admin/Owner architecture split (before this pass's role-model change): admin-role callers correctly blocked from creating admin/owner accounts or deleting any account
-- `isActive` field, BOQ owner-role guard, `purchase_price` nullable fix — the three app-wide-impact bugs from earlier passes, still holding
-- BOQ & Document Management full CRUD (create/read/update/delete/download) — verified live
-- Reports/ROI formula matches spec exactly
-- `technicianId` role validation on assignment creation — now correctly rejects non-`karyawan` targets
-- Status-transition guards on Task status update and Purchase Request review — both correctly block invalid/backward transitions
-- `createFromQuotation`'s draft-rejection guard — correctly blocks converting a still-`draft` quotation, and blocks double-conversion
-- Announcement → Notification delivery, with correct role-targeting and no IDOR on the notification list
-- Invoice payment ledger overpayment guard and draft-invoice guard — both correctly enforced with clear messages
-- JWT auth (expiry, tampering, `alg:none`), SQL injection safety, stored XSS escaping, user-enumeration protection, rate limiting, error responses that don't leak stack traces outside development mode
+- **Owner blocked from Quotation→Invoice conversion / payment recording** — the backend endpoints (`owner-invoices.routes.js`) already existed and were correctly mounted; what was actually missing was the frontend UI. Rewrote `owner/invoices.astro`: fixed a serious status-enum mismatch (the page used fictional statuses like `pending`/`failed`/`expired` that don't exist in the backend, instead of the real `draft/issued/unpaid/partially_paid/paid/overdue/cancelled`), and added full payment recording + history UI. Added a "Buat Invoice" button on `owner/quotations.astro` for `accepted` quotations.
+  - **Bug found only via live testing**: `invoices.project_id` was `NOT NULL` in the database while every part of the app (manual invoice form, quotation conversion) treats project as optional — this caused a 500 on any invoice without a linked project. Fixed with migration `20260101000030` (column now nullable). Verified live: conversion and manual creation without a project both succeed now.
+- **Quotation auto-sum from linked BOQ items** — was already correctly wired (`syncAmountFromBoq` fires on BOQ item create/update/delete). Live-verified end-to-end: adding two BOQ items updates the quotation's amount immediately, and converting that quotation to an invoice carries the correct summed amount through, not the stale manually-entered figure.
+- **Document upload whitelist hardened** — the old filter let *any* file claiming `application/octet-stream` through as long as the extension matched, which is trivially spoofable. Now `octet-stream` is only tolerated for extensions that get verified against real file-content magic bytes after upload (`.pdf`, `.docx/.xlsx/.pptx/.zip`, and now also legacy `.doc/.xls/.ppt` via an added OLE-header signature).
+  - **Bug found only via live testing**: the `verifyUploadedDocument` magic-byte-check middleware existed in `uploadStorage.js` but was **never actually wired into `documents.routes.js`** — the whole content-verification layer was inert. Fixed by adding it to the upload route. Verified live: a plain-text file renamed to `.pdf`/`.doc`, and an EXE renamed to `.pdf`, are now rejected (400); real files of the same extensions still upload fine (201).
+- **Global fallback for missing/malformed request bodies** — a guard already existed but only checked `undefined`, not a literal JSON `null` body, which would still crash a destructure. Tightened to catch both.
+- **Duplicate migration number prefixes** (`016`×3, `017`×2, `018`×2) — renumbered into sequential unique prefixes (`016`–`024`), carefully preserving the exact original execution order (a first attempt at this broke a real cross-migration dependency — `inventory-stock-management` adding a column that `fix-purchase-price-nullable` needs — and was caught and corrected by actually running the full migration chain against a fresh database rather than assuming reordering was safe).
 
 ---
 
-## Roadmap
+## Testing performed
 
-### Immediate — role model & UI blocker
-- [ ] Fix `export.ts` duplicate exports (blocks pages app-wide)
-- [ ] Execute the `superadmin` removal (migrate accounts, retire `/admins`, strip `requireRole('superadmin')` guards, fix `seedAdmin.js`, remove role/password controls from Admin's reachable UI)
-- [ ] Verify the above didn't leave partial state — check every route that previously referenced `superadmin`
+This pass went beyond static code reading: a real MySQL instance was provisioned, the full migration chain was run against an empty database, an Owner account was seeded, and the backend was exercised with live HTTP requests for every fix above — role boundaries, quotation→invoice conversion, payment recording/removal, maintenance assignment and status transitions, and file-upload rejection/acceptance — with results checked directly against the database where relevant, not just against API response codes.
 
-### Phase 1 — remaining backend gaps
-- [ ] Give Owner working access to `from-quotation` invoice conversion and to payment recording/deletion
-- [ ] Quotation auto-sum from linked BOQ items (now has a confirmed downstream wrong-invoice-amount bug)
-- [ ] Harden `uploadStorage.js` document whitelist (drop bare `application/octet-stream`)
-- [ ] Global fallback for missing/malformed request bodies
-- [ ] Renumber duplicate migration prefixes
+**Still to do:** a full manual click-through across all four roles in the actual browser UI (this pass tested through direct API calls plus code-level frontend fixes, not a live browser session), and building this into a checked-in automated test suite (see Roadmap).
 
-### Phase 2 — feature completion
-- [ ] Wire task-assignment and purchase-request-review notifications
-- [ ] Finish attendance GPS + photo capture (model → service → controller → upload wiring, not just the migration)
-- [ ] Written RBAC reference
-- [ ] Automated test suite (checked-in, not ad-hoc)
+---
 
-### UI — from Manual QA Round 1
-- [ ] Owner Overview: fix hardcoded "5" text, add pagination + time-range filter + search to Recent Projects/Invoices
-- [ ] Owner Item Categories: fix stuck-loading summary cards after create
-- [ ] Admin: add Announcement page
-- [ ] Supervisor: decide single vs. multi-technician Maintenance assignment; add intermediate status states beyond just done/not-done
-- [ ] Karyawan Teknisi: fix all-pages-404 routing regression
+## Roadmap — remaining open items
+
+### Phase 2 — feature completion (not yet started)
+- [ ] Wire task-assignment and purchase-request-review notifications (`project-assignments.service.js` / `purchase-requests.service.js` currently make zero calls to the notification service despite a comment claiming otherwise)
+- [ ] Finish attendance GPS + photo capture — the migration added the DB columns, but the model doesn't declare them and the service/controller don't forward them
+- [ ] Written RBAC reference document
+- [ ] Automated test suite (checked in to the repo, not ad-hoc scripts)
 
 ### Still the real milestone
-- [ ] **Full manual end-to-end testing across all four roles** — this pass covered some of it (Owner, Admin, Supervisor, Karyawan Teknisi surface-level), but a thorough pass is still ahead, especially once the role-model change lands
+- [ ] Full manual end-to-end click-through testing across all four roles, in-browser
 
 ---
 
@@ -135,12 +110,12 @@ This is the first pass that actually used the UI in a browser rather than hittin
 
 Core/shared modules (`backend/src/modules/`): Admin Authentication, Clients, Projects, Quotations, Invoices, Maintenance, Inventory, Reports, BOQ, Documents, Attendance, Daily Reports, Project Assignments, Project Documentation, Purchase Requests, Notifications, Announcements.
 
-Role-scoped route groups: `modules-owner/` → `/api/owner/*`, `modules-supervisor/` → `/api/supervisor/*`, `modules-technical/` → `/api/technical/*`. Note: `modules-owner` is still missing invoice-from-quotation conversion and payment recording (see Phase 1 above).
+Role-scoped route groups: `modules-owner/` → `/api/owner/*`, `modules-supervisor/` → `/api/supervisor/*`, `modules-technical/` → `/api/technical/*`.
 
-Also implemented, verified across passes: JWT auth with correct expiry/tampering/`alg:none` rejection, route-level role guards with no cross-role leakage, SQL injection safety, stored XSS escaping, user-enumeration protection, rate limiting, Helmet + CORS, a migration chain that runs cleanly end to end, error responses gated correctly behind `NODE_ENV`.
+Verified across passes: JWT auth with correct expiry/tampering/`alg:none` rejection, route-level role guards with no cross-role leakage, SQL injection safety, stored XSS escaping, user-enumeration protection, rate limiting, Helmet + CORS, a migration chain that now runs cleanly end to end from an empty database (30 migrations, verified live), error responses gated correctly behind `NODE_ENV`.
 
 ### Frontend
-Legacy Admin UI, Owner, Supervisor, and Karyawan Teknisi pages are all present and were largely API-verified in earlier passes — but this pass's manual click-through found the `export.ts` blocker (breaks any page using it) and the Karyawan Teknisi all-404 regression, both of which likely mean some of the earlier "wired and working" claims need re-checking once those are fixed.
+Legacy Admin UI, Owner, Supervisor, and Karyawan Teknisi pages are all present and wired. The `export.ts` blocker and the Karyawan Teknisi all-404 regression are both fixed and verified.
 
 ---
 
@@ -153,13 +128,11 @@ cd backend
 npm install
 cp .env.example .env
 npm run db:migrate
-npm run seed:admin
+npm run seed:owner
 npm run dev
 ```
 
 Update `.env` with your database credentials and a secure `JWT_SECRET` (generate with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`).
-
-> ⚠️ `seed:admin` currently creates a `superadmin`-role account — this is expected to change once the role-model decision above is executed (see Roadmap). Until then, use it as-is; afterward this section needs updating to reflect whatever the new bootstrap process is (likely a `seed:owner`-first flow, since Admin can no longer self-bootstrap under the new zero-account-control model).
 
 **Reminder:** always run production deployments with `NODE_ENV=production` — the error handler only suppresses stack traces when this is set correctly.
 
@@ -181,32 +154,27 @@ Configure `PUBLIC_API_URL` to point to your backend server.
 ```
 backend/
 ├── modules/             # Core/shared modules, incl. boq/, documents/, notifications/, announcements/
-├── modules-owner/        # Owner-role routes; missing from-quotation + payment endpoints
-├── modules-supervisor/   # Supervisor-role routes
-├── modules-technical/    # Karyawan Teknisi-role routes; frontend currently 404s on every page
+├── modules-owner/        # Owner-role routes — invoices, payments, and BOQ (via core /api/boq) all working
+├── modules-supervisor/   # Supervisor-role routes — maintenance now has in_progress status
+├── modules-technical/    # Karyawan Teknisi-role routes
 ├── middleware/
 ├── config/
-├── migrations/           # runs cleanly end-to-end; duplicate number prefixes still need renumbering
-├── utils/                # uploadStorage.js document whitelist still too permissive
-└── scripts/              # seedAdmin.js needs revisiting once superadmin is removed
+├── migrations/           # runs cleanly end-to-end from empty DB, 30 migrations, no duplicate prefixes
+├── utils/                # uploadStorage.js — whitelist hardened, verifyUploadedDocument now wired in
+└── scripts/              # seedOwner.js is the only seed script
 
 dashboard/
 ├── src/
 │   ├── components/
 │   ├── layouts/
-│   ├── lib/               # export.ts currently fails to compile — see blocker above
+│   ├── lib/               # export.ts fixed
 │   └── pages/
-│       ├── *.astro         # legacy Admin UI — /admins slated for retirement
-│       ├── owner/           # user management, Projects/Invoices, BOQ, Documents; Overview + Item Categories have known UI bugs
-│       ├── supervisor/      # wired; Maintenance assignment model needs a decision
-│       └── employee-technical/  # currently 404s on every route
+│       ├── announcements.astro  # new — Admin's announcement page
+│       ├── item-categories.astro  # rewritten — real data, no fake CRUD
+│       ├── owner/           # user management, Projects, Invoices (rewritten), Quotations (convert button added), BOQ, Documents
+│       ├── supervisor/      # maintenance now supports in_progress + fixed technician-assign bug
+│       └── employee-technical/  # all routes fixed, no more 404s
 ```
-
----
-
-## Notes
-
-Two things are true at once right now: the backend logic has been through a genuinely thorough automated testing pass (live database, live requests, cross-role attacks), and this project has never had a real manual click-through pass until now — and that pass immediately found a compile-breaking bug plus a batch of role-boundary problems that no amount of API testing could have caught, because API tests don't render a page or know what UI a role *shouldn't* see. The role-model simplification (dropping `superadmin`, making Admin genuinely zero-control on accounts) is the right fix for the root confusion behind several of these findings, but it's a decision on paper right now, not verified code — the next priority is executing it cleanly and then re-running both kinds of testing against the result.
 
 ---
 
