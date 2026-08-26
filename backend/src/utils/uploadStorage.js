@@ -84,7 +84,10 @@ const DOCUMENT_SIGNATURES = [
   { ext: ['.doc', '.xls', '.ppt'], bytes: [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1] }, // OLE compound file
 ];
 
-
+// Ekstensi yang punya entri di DOCUMENT_SIGNATURES — hanya untuk ekstensi ini
+// mimetype 'application/octet-stream' (generik, mudah dipalsukan) ditoleransi,
+// karena isi filenya tetap diverifikasi via magic bytes setelah upload
+// (lihat verifyUploadedDocument). Ekstensi lain WAJIB mimetype yang jujur.
 const SIGNATURE_VERIFIED_EXTENSIONS = new Set(
   DOCUMENT_SIGNATURES.flatMap((s) => s.ext)
 );
