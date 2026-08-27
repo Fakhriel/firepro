@@ -10,7 +10,7 @@ This project manages clients, projects, quotations, invoices, maintenance schedu
 
 ## 🔑 Role model — executed & verified
 
-**Old model (5 roles):** `superadmin`, `admin`, `owner`, `supervisor`, `karyawan`.
+**Old model (5 roles):** `superadmin`, `admin`, `owner`, `supervisor`, `employee`.
 
 **Current model (4 roles):**
 | Role | Scope |
