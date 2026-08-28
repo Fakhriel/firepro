@@ -2,7 +2,7 @@ const service = require('./reports.service');
 
 async function listCostsHandler(req, res, next) {
   try {
-    const costs = await service.listCosts({ period: req.query.period });
+    const costs = await service.listCosts({ period: req.query.period, projectId: req.query.projectId });
     res.status(200).json({ data: costs });
   } catch (err) {
     next(err);
@@ -36,4 +36,29 @@ async function summaryHandler(req, res, next) {
   }
 }
 
-module.exports = { listCostsHandler, createCostHandler, createCostBreakdownHandler, summaryHandler };
+async function projectRoiHandler(req, res, next) {
+  try {
+    const roi = await service.getProjectRoi(req.params.projectId);
+    res.status(200).json({ data: roi });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function listProjectsRoiHandler(req, res, next) {
+  try {
+    const data = await service.listProjectsRoi();
+    res.status(200).json({ data });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  listCostsHandler,
+  createCostHandler,
+  createCostBreakdownHandler,
+  summaryHandler,
+  projectRoiHandler,
+  listProjectsRoiHandler,
+};
