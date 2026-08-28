@@ -34,6 +34,13 @@ async function login(username, password) {
     throw err;
   }
 
+  if (admin.isActive === false) {
+    const err = new Error('Akun ini telah dinonaktifkan. Hubungi Owner untuk info lebih lanjut.');
+    err.status = 403;
+    err.expose = true;
+    throw err;
+  }
+
   const token = jwt.sign(
     { sub: admin.id, username: admin.username, role: admin.role },
     env.jwt.secret,
@@ -80,7 +87,16 @@ function notFound(message = 'Akun admin tidak ditemukan.') {
 
 function serialize(admin) {
   const plain = admin.toJSON ? admin.toJSON() : admin;
-  return { id: plain.id, username: plain.username, name: plain.name, role: plain.role, phone: plain.phone ?? '', email: plain.email ?? '' };
+  return {
+    id: plain.id,
+    username: plain.username,
+    name: plain.name,
+    role: plain.role,
+    phone: plain.phone ?? '',
+    email: plain.email ?? '',
+    isActive: plain.isActive,
+    createdAt: plain.createdAt,
+  };
 }
 
 async function list({ search } = {}) {
@@ -174,18 +190,21 @@ async function remove(id, requesterId) {
   await admin.destroy();
 }
 
-
 async function setActive(id, isActive, requesterId) {
+  if (typeof isActive !== 'boolean') {
+    throw badRequest('isActive wajib diisi dan harus bernilai boolean.');
+  }
   if (String(id) === String(requesterId)) {
-    throw forbidden('Tidak bisa menonaktifkan akun sendiri.');
+    throw forbidden('Tidak bisa mengubah status akun sendiri.');
   }
   const admin = await Admin.findByPk(id);
   if (!admin) throw notFound();
   if (admin.role === 'owner') {
-    throw forbidden('Akun Owner tidak bisa dinonaktifkan lewat sini.');
+    throw forbidden('Status akun Owner tidak bisa diubah.');
   }
-  await admin.update({ isActive: Boolean(isActive) });
-  return getById(id);
+  admin.isActive = isActive;
+  await admin.save();
+  return serialize(admin);
 }
 
 async function changePassword(id, body, requester) {
@@ -197,14 +216,22 @@ async function changePassword(id, body, requester) {
   const admin = await Admin.findByPk(id);
   if (!admin) throw notFound();
 
-   const isSelf = String(admin.id) === String(requester.id);
-  if (!isSelf) {
-    throw forbidden('Tidak bisa mengganti password akun lain — setiap orang mengelola passwordnya sendiri.');
+  if (requester.role === 'admin') {
+    throw forbidden('Admin tidak diizinkan mengganti password akun manapun, termasuk milik sendiri.');
   }
 
-  if (!currentPassword) throw badRequest('Password saat ini wajib diisi.');
-  const isMatch = await bcrypt.compare(currentPassword, admin.passwordHash);
-  if (!isMatch) throw badRequest('Password saat ini salah.');
+  const isSelf = String(admin.id) === String(requester.id);
+  const isOwner = requester.role === 'owner';
+
+  if (!isSelf && !isOwner) {
+    throw forbidden('Tidak punya izin mengganti password admin lain.');
+  }
+
+  if (isSelf) {
+    if (!currentPassword) throw badRequest('Password saat ini wajib diisi.');
+    const isMatch = await bcrypt.compare(currentPassword, admin.passwordHash);
+    if (!isMatch) throw badRequest('Password saat ini salah.');
+  }
 
   admin.passwordHash = await bcrypt.hash(newPassword, 10);
   await admin.save();
