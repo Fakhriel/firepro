@@ -1,15 +1,23 @@
 const { Op } = require('sequelize');
 const { CostEntry } = require('./report.model');
 const { Invoice } = require('../invoices/invoices.model');
+const { Project } = require('../projects/projects.model');
+const { Client } = require('../clients/clients.model');
 
-const CATEGORIES = ['hpp', 'ads', 'shipping', 'ops', 'other'];
+const CATEGORIES = ['material', 'labor', 'service', 'equipment', 'other'];
 const CATEGORY_LABELS = {
-  hpp: 'HPP / Harga Pokok',
-  ads: 'Iklan',
-  shipping: 'Pengiriman',
-  ops: 'Operasional',
+  material: 'Material',
+  labor: 'Tenaga Kerja',
+  service: 'Jasa',
+  equipment: 'Peralatan',
   other: 'Lain-lain',
 };
+
+// Status invoice yang dihitung sebagai "sudah masuk / revenue tercapai"
+// untuk laporan. Draft belum resmi terbit, cancelled bukan pendapatan.
+const REVENUE_STATUSES = ['issued', 'unpaid', 'partially_paid', 'paid', 'overdue'];
+const PAID_STATUS = 'paid';
+const OUTSTANDING_STATUSES = ['issued', 'unpaid', 'partially_paid', 'overdue'];
 
 function badRequest(message) {
   const err = new Error(message);
@@ -17,7 +25,6 @@ function badRequest(message) {
   err.expose = true;
   return err;
 }
-
 
 function resolveRange(period) {
   const now = new Date();
@@ -43,7 +50,6 @@ function resolveRange(period) {
 }
 
 function toDateOnly(d) {
-
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
@@ -59,14 +65,18 @@ function serializeCost(entry) {
     categoryLabel: CATEGORY_LABELS[plain.category] ?? plain.category,
     amount: Number(plain.amount),
     note: plain.note ?? '',
+    projectId: plain.projectId ?? null,
   };
 }
 
-async function listCosts({ period } = {}) {
+async function listCosts({ period, projectId } = {}) {
   const { start, end } = resolveRange(period);
   const where = {};
   if (start && end) {
     where.date = { [Op.between]: [toDateOnly(start), toDateOnly(end)] };
+  }
+  if (projectId) {
+    where.projectId = projectId;
   }
 
   const entries = await CostEntry.findAll({ where, order: [['date', 'DESC'], ['id', 'DESC']] });
@@ -74,7 +84,7 @@ async function listCosts({ period } = {}) {
 }
 
 function validateCostInput(body) {
-  const { category, amount } = body;
+  const { category, amount, projectId } = body;
   if (!category || !CATEGORIES.includes(category)) {
     throw badRequest(`category harus salah satu dari: ${CATEGORIES.join(', ')}.`);
   }
@@ -86,6 +96,7 @@ function validateCostInput(body) {
     category,
     amount: Number(amount),
     note: body.note ? String(body.note).trim() : null,
+    projectId: projectId ?? null,
   };
 }
 
@@ -94,7 +105,6 @@ async function createCost(body) {
   const entry = await CostEntry.create(payload);
   return serializeCost(entry);
 }
-
 
 async function createCostBreakdown(body) {
   const entries = [];
@@ -106,6 +116,7 @@ async function createCostBreakdown(body) {
         category,
         amount,
         note: `Input rincian biaya (${CATEGORY_LABELS[category]})`,
+        projectId: body.projectId ?? null,
       });
     }
   }
@@ -116,31 +127,133 @@ async function createCostBreakdown(body) {
   return created.map(serializeCost);
 }
 
+
+function computeRoi(contractValue, cost) {
+  const profit = contractValue - cost;
+  const roi = cost > 0 ? (profit / cost) * 100 : 0;
+  return { profit, roi: Math.round(roi * 100) / 100 };
+}
+
 async function getSummary({ period } = {}) {
   const { start, end } = resolveRange(period);
 
-  const invoiceWhere = { status: 'paid' };
-  if (start && end) {
-    invoiceWhere.issuedDate = { [Op.between]: [toDateOnly(start), toDateOnly(end)] };
-  }
-  const revenue = Number((await Invoice.sum('amount', { where: invoiceWhere })) ?? 0);
+  const invoiceDateWhere = start && end ? { issuedDate: { [Op.between]: [toDateOnly(start), toDateOnly(end)] } } : {};
+  const costDateWhere = start && end ? { date: { [Op.between]: [toDateOnly(start), toDateOnly(end)] } } : {};
 
-  const costWhere = {};
-  if (start && end) {
-    costWhere.date = { [Op.between]: [toDateOnly(start), toDateOnly(end)] };
-  }
-  const totalCost = Number((await CostEntry.sum('amount', { where: costWhere })) ?? 0);
+  // Contract Value: total nilai invoice yang sudah resmi terbit (bukan draft/cancelled).
+  const contractValue = Number(
+    (await Invoice.sum('amount', { where: { ...invoiceDateWhere, status: { [Op.in]: REVENUE_STATUSES } } })) ?? 0,
+  );
+  const paidRevenue = Number(
+    (await Invoice.sum('amount', { where: { ...invoiceDateWhere, status: PAID_STATUS } })) ?? 0,
+  );
+  const outstandingRevenue = Number(
+    (await Invoice.sum('amount', { where: { ...invoiceDateWhere, status: { [Op.in]: OUTSTANDING_STATUSES } } })) ?? 0,
+  );
+  const totalInvoiceCount = await Invoice.count({ where: { ...invoiceDateWhere, status: { [Op.in]: REVENUE_STATUSES.concat(PAID_STATUS) } } });
+  const paidInvoiceCount = await Invoice.count({ where: { ...invoiceDateWhere, status: PAID_STATUS } });
 
-  const grossProfit = revenue - totalCost;
-  const roi = totalCost > 0 ? (grossProfit / totalCost) * 100 : 0;
+  const totalCost = Number((await CostEntry.sum('amount', { where: costDateWhere })) ?? 0);
+
+  const { profit, roi } = computeRoi(contractValue, totalCost);
+
+  const totalProjects = await Project.count();
+  const activeProjects = await Project.count({ where: { status: { [Op.in]: ['planning', 'in_progress'] } } });
+  const completedProjects = await Project.count({ where: { status: 'completed' } });
+
+  const costByCategoryRaw = await CostEntry.findAll({
+    where: costDateWhere,
+    attributes: ['category', [CostEntry.sequelize.fn('SUM', CostEntry.sequelize.col('amount')), 'total']],
+    group: ['category'],
+    raw: true,
+  });
+  const costByCategory = CATEGORIES.map((category) => {
+    const row = costByCategoryRaw.find((r) => r.category === category);
+    return { category, categoryLabel: CATEGORY_LABELS[category], amount: Number(row?.total ?? 0) };
+  });
 
   return {
     period: period || 'this_month',
-    revenue,
-    totalCost,
-    grossProfit,
-    roi: Math.round(roi * 100) / 100,
+    kpi: {
+      totalProjects,
+      activeProjects,
+      completedProjects,
+      contractValue,
+      totalInvoices: totalInvoiceCount,
+      paidInvoices: paidInvoiceCount,
+      outstandingInvoiceAmount: outstandingRevenue,
+      paidRevenue,
+      totalCost,
+      estimatedProfit: profit,
+      roi,
+    },
+    charts: {
+      costByCategory,
+      contractValueVsCost: [
+        { label: 'Contract Value', amount: contractValue },
+        { label: 'Total Cost', amount: totalCost },
+      ],
+      invoiceStatus: [
+        { label: 'Paid', amount: paidRevenue },
+        { label: 'Outstanding', amount: outstandingRevenue },
+      ],
+    },
   };
 }
 
-module.exports = { listCosts, createCost, createCostBreakdown, getSummary };
+
+async function getProjectRoi(projectId) {
+  const project = await Project.findByPk(projectId);
+  if (!project) {
+    const err = new Error('Proyek tidak ditemukan.');
+    err.status = 404;
+    err.expose = true;
+    throw err;
+  }
+
+  const contractValue = Number(
+    (await Invoice.sum('amount', { where: { projectId, status: { [Op.in]: REVENUE_STATUSES.concat(PAID_STATUS) } } })) ?? 0,
+  );
+  const totalCost = Number((await CostEntry.sum('amount', { where: { projectId } })) ?? 0);
+  const { profit, roi } = computeRoi(contractValue, totalCost);
+
+  return {
+    projectId: project.id,
+    projectName: project.name,
+    contractValue,
+    totalCost,
+    estimatedProfit: profit,
+    roi,
+  };
+}
+
+async function listProjectsRoi() {
+  const projects = await Project.findAll({
+    include: [{ model: Client, as: 'client', attributes: ['id', 'name'] }],
+    order: [['createdAt', 'DESC']],
+  });
+
+  const results = [];
+  for (const project of projects) {
+    const contractValue = Number(
+      (await Invoice.sum('amount', { where: { projectId: project.id, status: { [Op.in]: REVENUE_STATUSES.concat(PAID_STATUS) } } })) ?? 0,
+    );
+    const totalCost = Number((await CostEntry.sum('amount', { where: { projectId: project.id } })) ?? 0);
+    const { profit, roi } = computeRoi(contractValue, totalCost);
+    const margin = contractValue > 0 ? Math.round((profit / contractValue) * 10000) / 100 : 0;
+
+    results.push({
+      projectId: project.id,
+      projectName: project.name,
+      clientName: project.client?.name ?? '-',
+      contractValue,
+      totalCost,
+      estimatedProfit: profit,
+      margin,
+      roi,
+    });
+  }
+  return results;
+}
+
+module.exports = { listCosts, createCost, createCostBreakdown, getSummary, getProjectRoi, listProjectsRoi };
