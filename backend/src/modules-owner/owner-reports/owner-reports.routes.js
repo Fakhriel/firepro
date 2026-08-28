@@ -6,6 +6,7 @@ const {
   createCostHandler,
   createCostBreakdownHandler,
   summaryHandler,
+  listProjectsRoiHandler,
 } = require('../../modules/reports/reports.controller');
 
 const router = express.Router();
@@ -13,6 +14,9 @@ const router = express.Router();
 // GET /api/owner/reports/summary?period= — Revenue/Biaya/Laba/ROI di
 // pages/owner/reports.astro.
 router.get('/summary', summaryHandler);
+// GET /api/owner/reports/projects-roi — breakdown laba per proyek untuk
+// tabel "Profitabilitas per Proyek" di pages/owner/reports.astro.
+router.get('/projects-roi', listProjectsRoiHandler);
 // GET /api/owner/reports/costs?period=
 router.get('/costs', listCostsHandler);
 router.post('/costs', createCostHandler);
