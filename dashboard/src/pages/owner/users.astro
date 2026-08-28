@@ -42,21 +42,33 @@ import StatCard from "../../components/StatCard.astro";
   <!-- Table -->
   <div class="panel overflow-hidden">
     <div class="overflow-x-auto">
-      <table id="users-table" class="data-table">
+      <table id="users-table" class="data-table hidden">
         <thead>
           <tr>
             <th>Nama</th>
             <th class="hidden sm:table-cell">Email</th>
             <th>Role</th>
             <th class="hidden md:table-cell">Bergabung</th>
-            <th>Status</th>
+            <th>Status Akun</th>
             <th class="text-right">Aksi</th>
           </tr>
         </thead>
         <tbody id="users-body"></tbody>
       </table>
     </div>
-    <div id="users-empty" class="empty-state min-h-56">
+    <div id="users-skeleton">
+      {Array.from({ length: 5 }).map(() => (
+        <div class="skeleton-row">
+          <div class="skeleton w-9 h-9 shrink-0"></div>
+          <div class="flex-1 space-y-2">
+            <div class="skeleton h-3 w-1/3"></div>
+            <div class="skeleton h-2.5 w-1/5"></div>
+          </div>
+          <div class="skeleton h-5 w-16 shrink-0"></div>
+        </div>
+      ))}
+    </div>
+    <div id="users-empty" class="empty-state min-h-56 hidden">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
         <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
@@ -75,10 +87,10 @@ import StatCard from "../../components/StatCard.astro";
 
   <!-- Add / edit user modal -->
   <div id="user-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
-    <div class="panel w-full max-w-md bg-paper">
+    <div class="panel w-full max-w-md bg-surface">
       <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
         <h3 id="user-modal-title" class="font-display text-lg text-ink leading-none">Tambah User</h3>
-        <button id="user-modal-close" type="button" class="text-smoke hover:text-ink transition-colors" aria-label="Tutup">
+        <button id="user-modal-close" type="button" class="text-steel hover:text-ink transition-colors" aria-label="Tutup">
           <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
@@ -91,29 +103,36 @@ import StatCard from "../../components/StatCard.astro";
             <input id="user-name" type="text" class="field-input" placeholder="Nama lengkap" />
           </div>
           <div>
+            <label class="field-label" for="user-username">Username</label>
+            <input id="user-username" type="text" class="field-input" placeholder="username" autocomplete="off" />
+          </div>
+          <div>
             <label class="field-label" for="user-email">Email</label>
             <input id="user-email" type="email" class="field-input" placeholder="nama@firepro.id" />
           </div>
           <div>
+            <label class="field-label" for="user-phone">No. Telepon</label>
+            <input id="user-phone" type="tel" class="field-input" placeholder="08xxxxxxxxxx" />
+          </div>
+          <div id="user-password-wrap">
+            <label class="field-label" for="user-password">Password Awal</label>
+            <input id="user-password" type="password" class="field-input" placeholder="Min. 6 karakter" autocomplete="new-password" />
+          </div>
+          <div>
             <label class="field-label" for="user-role">Role</label>
             <select id="user-role" class="field-input">
-              <option value="owner">Owner</option>
               <option value="admin">Admin</option>
               <option value="supervisor">Supervisor</option>
               <option value="karyawan" selected>Teknisi Lapangan</option>
             </select>
           </div>
-          <div>
-            <label class="field-label" for="user-status">Status</label>
-            <select id="user-status" class="field-input">
-              <option value="active">Aktif</option>
-              <option value="inactive">Nonaktif</option>
-            </select>
+          <div id="user-modal-error" class="hidden border-2 border-signal bg-signal-dim px-3 py-2">
+            <p id="user-modal-error-msg" class="font-mono text-xs text-signal"></p>
           </div>
         </div>
         <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
           <button type="button" id="user-modal-cancel" class="btn-secondary text-xs">Batal</button>
-          <button type="submit" class="btn-primary text-xs">Simpan</button>
+          <button type="button" id="user-modal-save" class="btn-primary text-xs">Simpan</button>
         </div>
       </form>
     </div>
@@ -121,30 +140,290 @@ import StatCard from "../../components/StatCard.astro";
 </OwnerLayout>
 
 <script>
-  // Prototype UI only — belum terhubung ke endpoint users/roles.
-  const modal = document.getElementById("user-modal");
-  const modalTitle = document.getElementById("user-modal-title");
+  import { adminApiFetch, getAdminAuth } from "../../lib/auth";
+  import { escapeHtml } from "../../lib/escapeHtml";
 
-  function openModal(title: string): void {
-    if (modalTitle) modalTitle.textContent = title;
-    modal?.classList.remove("hidden");
-    modal?.classList.add("flex");
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface UserRow {
+    id: number;
+    username: string;
+    name: string;
+    role: "admin" | "owner" | "supervisor" | "karyawan";
+    phone: string;
+    email: string;
+    createdAt: string;
+    isActive: boolean;
   }
-  function closeModal(): void {
-    modal?.classList.add("hidden");
-    modal?.classList.remove("flex");
+
+  const ROLE_LABEL: Record<string, string> = {
+    owner: "Owner",
+    admin: "Admin",
+    supervisor: "Supervisor",
+    karyawan: "Teknisi Lapangan",
+  };
+
+  const { admin: currentAdmin } = getAdminAuth();
+  const currentAdminId = currentAdmin ? Number(currentAdmin.id) : null;
+
+  let allUsers: UserRow[] = [];
+
+  const tableBody = document.getElementById("users-body") as HTMLTableSectionElement;
+  const emptyState = document.getElementById("users-empty") as HTMLDivElement;
+  const table = document.getElementById("users-table") as HTMLTableElement;
+  const skeletonEl_users = document.getElementById("users-skeleton") as HTMLDivElement;
+  const countLabel = document.querySelector("[data-users-count]") as HTMLElement | null;
+  const searchInput = document.getElementById("search-users") as HTMLInputElement | null;
+  const roleFilter = document.getElementById("filter-role") as HTMLSelectElement | null;
+  const statusFilter = document.getElementById("filter-user-status") as HTMLSelectElement | null;
+
+  function openModal(id: string): void {
+    document.getElementById(id)?.classList.replace("hidden", "flex");
+  }
+  function closeModal(id: string): void {
+    document.getElementById(id)?.classList.replace("flex", "hidden");
   }
 
-  document.getElementById("btn-add-user")?.addEventListener("click", () => openModal("Tambah User"));
-  document.getElementById("user-modal-close")?.addEventListener("click", closeModal);
-  document.getElementById("user-modal-cancel")?.addEventListener("click", closeModal);
+  function setStatValue(cardId: string, value: string): void {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
+    if (!valueEl) {
+      const skeleton = card.querySelector(".skeleton")?.parentElement;
+      valueEl = document.createElement("p");
+      const isAccent = card.classList.contains("bg-ink");
+      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
+      if (skeleton) {
+        skeleton.replaceWith(valueEl);
+      } else {
+        card.appendChild(valueEl);
+      }
+    }
+    valueEl.textContent = value;
+  }
 
-  document.getElementById("user-form")?.addEventListener("submit", (e) => {
-    e.preventDefault();
-    closeModal();
-    (e.target as HTMLFormElement).reset();
-    window.showToast?.("User tersimpan (prototype)", "success");
+  function formatDate(iso: string): string {
+    try {
+      return new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+    } catch {
+      return "-";
+    }
+  }
+
+  function applyFilters(users: UserRow[]): UserRow[] {
+    return users.filter((u) => {
+      if (roleFilter?.value && u.role !== roleFilter.value) return false;
+      if (statusFilter?.value === "active" && !u.isActive) return false;
+      if (statusFilter?.value === "inactive" && u.isActive) return false;
+      return true;
+    });
+  }
+
+  function renderTable(users: UserRow[]): void {
+    const filtered = applyFilters(users);
+    tableBody.innerHTML = "";
+
+    const isEmpty = filtered.length === 0;
+    skeletonEl_users.classList.add("hidden");
+    table.classList.toggle("hidden", isEmpty);
+    emptyState.classList.toggle("hidden", !isEmpty);
+    if (countLabel) countLabel.textContent = `${filtered.length} user`;
+
+    filtered.forEach((u) => {
+      const isSelf = u.id === currentAdminId;
+      const isProtectedRole = u.role === "owner";
+      const tr = document.createElement("tr");
+      tr.className = u.isActive ? "" : "opacity-50";
+      tr.innerHTML = `
+        <td class="font-semibold text-ink">${escapeHtml(u.name)}${isSelf ? ' <span class="font-mono text-[9px] text-smoke">(Anda)</span>' : ""}</td>
+        <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${escapeHtml(u.email || "-")}</td>
+        <td><span class="font-mono text-[9px] uppercase tracking-widest border border-ink px-2 py-1">${escapeHtml(ROLE_LABEL[u.role] ?? u.role)}</span></td>
+        <td class="hidden md:table-cell font-mono text-xs text-charcoal">${formatDate(u.createdAt)}</td>
+        <td>
+          <span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${u.isActive ? "border-ink bg-ink/5" : "border-signal text-signal bg-signal/5"}">
+            ${u.isActive ? "Aktif" : "Nonaktif"}
+          </span>
+        </td>
+        <td class="text-right whitespace-nowrap">
+          <button type="button" data-id="${u.id}" class="btn-edit-user text-xs text-steel hover:text-ink font-mono underline-offset-2 hover:underline mr-3">Edit</button>
+          ${
+            isSelf || isProtectedRole
+              ? ""
+              : `<button type="button" data-id="${u.id}" data-name="${escapeHtml(u.name)}" data-active="${u.isActive}" class="btn-toggle-active text-xs text-steel hover:text-ink font-mono underline-offset-2 hover:underline mr-3">${u.isActive ? "Nonaktifkan" : "Aktifkan"}</button>`
+          }
+          <button type="button" data-id="${u.id}" data-name="${escapeHtml(u.name)}" class="btn-delete-user text-xs text-steel hover:text-signal font-mono underline-offset-2 hover:underline" ${isSelf ? 'disabled title="Tidak bisa hapus akun sendiri"' : ""}>Hapus</button>
+        </td>
+      `;
+      tableBody.appendChild(tr);
+    });
+
+    tableBody.querySelectorAll<HTMLButtonElement>(".btn-toggle-active").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id;
+        const name = btn.dataset.name ?? "";
+        const currentlyActive = btn.dataset.active === "true";
+        const action = currentlyActive ? "menonaktifkan" : "mengaktifkan";
+        if (!window.confirm(`Yakin ${action} akun "${name}"?`)) return;
+        try {
+          const res = await adminApiFetch(`${apiUrl}/api/owner/users/${id}/active`, {
+            method: "PATCH",
+            body: JSON.stringify({ isActive: !currentlyActive }),
+          });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            window.showToast?.(json.error ?? "Gagal mengubah status akun", "error");
+            return;
+          }
+          window.showToast?.(json.message ?? "Status akun berhasil diubah");
+          await loadUsers();
+        } catch (err) {
+          console.error("[btn-toggle-active] gagal fetch backend:", err);
+          window.showToast?.("Tidak bisa terhubung ke server", "error");
+        }
+      });
+    });
+
+    tableBody.querySelectorAll<HTMLButtonElement>(".btn-edit-user").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const user = allUsers.find((u) => String(u.id) === btn.dataset.id);
+        if (user) openEditModal(user);
+      });
+    });
+
+    tableBody.querySelectorAll<HTMLButtonElement>(".btn-delete-user").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id;
+        const name = btn.dataset.name ?? "";
+        if (!window.confirm(`Hapus akun "${name}"? Aksi ini tidak bisa dibatalkan.`)) return;
+        try {
+          const res = await adminApiFetch(`${apiUrl}/api/owner/users/${id}`, { method: "DELETE" });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            window.showToast?.(json.error ?? "Gagal menghapus user", "error");
+            return;
+          }
+          window.showToast?.("User berhasil dihapus");
+          await loadUsers();
+        } catch {
+          window.showToast?.("Tidak bisa terhubung ke server", "error");
+        }
+      });
+    });
+  }
+
+  function updateStats(users: UserRow[]): void {
+    setStatValue("stat-users-total", String(users.length));
+    setStatValue("stat-users-supervisor", String(users.filter((u) => u.role === "supervisor").length));
+    setStatValue("stat-users-teknisi", String(users.filter((u) => u.role === "karyawan").length));
+    setStatValue("stat-users-inactive", String(users.filter((u) => !u.isActive).length));
+  }
+
+  async function loadUsers(): Promise<void> {
+    try {
+      const params = new URLSearchParams();
+      if (searchInput?.value) params.set("search", searchInput.value);
+
+      const res = await adminApiFetch(`${apiUrl}/api/owner/users?${params.toString()}`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat data user", "error");
+        return;
+      }
+      allUsers = json.data ?? [];
+      renderTable(allUsers);
+      updateStats(allUsers);
+    } catch (err) {
+      console.error("[loadUsers] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  function resetForm(): void {
+    (document.getElementById("user-name") as HTMLInputElement).value = "";
+    (document.getElementById("user-username") as HTMLInputElement).value = "";
+    (document.getElementById("user-email") as HTMLInputElement).value = "";
+    (document.getElementById("user-phone") as HTMLInputElement).value = "";
+    (document.getElementById("user-password") as HTMLInputElement).value = "";
+    (document.getElementById("user-role") as HTMLSelectElement).value = "karyawan";
+    document.getElementById("user-modal-error")?.classList.add("hidden");
+    (document.getElementById("user-form") as HTMLFormElement).dataset.editId = "";
+  }
+
+  function setPasswordFieldVisible(visible: boolean): void {
+    document.getElementById("user-password-wrap")?.classList.toggle("hidden", !visible);
+    (document.getElementById("user-username") as HTMLInputElement).disabled = !visible;
+  }
+
+  function openEditModal(user: UserRow): void {
+    resetForm();
+    (document.getElementById("user-modal-title") as HTMLElement).textContent = "Edit User";
+    (document.getElementById("user-form") as HTMLFormElement).dataset.editId = String(user.id);
+    (document.getElementById("user-name") as HTMLInputElement).value = user.name;
+    (document.getElementById("user-username") as HTMLInputElement).value = user.username;
+    (document.getElementById("user-email") as HTMLInputElement).value = user.email ?? "";
+    (document.getElementById("user-phone") as HTMLInputElement).value = user.phone ?? "";
+    (document.getElementById("user-role") as HTMLSelectElement).value = user.role;
+    setPasswordFieldVisible(false);
+    openModal("user-modal");
+  }
+
+  document.getElementById("btn-add-user")?.addEventListener("click", () => {
+    resetForm();
+    (document.getElementById("user-modal-title") as HTMLElement).textContent = "Tambah User";
+    setPasswordFieldVisible(true);
+    openModal("user-modal");
+  });
+  document.getElementById("user-modal-close")?.addEventListener("click", () => closeModal("user-modal"));
+  document.getElementById("user-modal-cancel")?.addEventListener("click", () => closeModal("user-modal"));
+
+  document.getElementById("user-modal-save")?.addEventListener("click", async () => {
+    const form = document.getElementById("user-form") as HTMLFormElement;
+    const editId = form.dataset.editId;
+
+    const name = (document.getElementById("user-name") as HTMLInputElement).value.trim();
+    const username = (document.getElementById("user-username") as HTMLInputElement).value.trim();
+    const email = (document.getElementById("user-email") as HTMLInputElement).value.trim();
+    const phone = (document.getElementById("user-phone") as HTMLInputElement).value.trim();
+    const password = (document.getElementById("user-password") as HTMLInputElement).value;
+    const role = (document.getElementById("user-role") as HTMLSelectElement).value;
+
+    const errorBox = document.getElementById("user-modal-error");
+    const errorMsg = document.getElementById("user-modal-error-msg");
+
+    const body: Record<string, unknown> = { name, email: email || null, phone: phone || null, role };
+    if (!editId) {
+      body.username = username;
+      body.password = password;
+    }
+
+    try {
+      const res = await adminApiFetch(
+        editId ? `${apiUrl}/api/owner/users/${editId}` : `${apiUrl}/api/owner/users`,
+        { method: editId ? "PATCH" : "POST", body: JSON.stringify(body) }
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        if (errorMsg) errorMsg.textContent = json.error ?? "Gagal menyimpan user";
+        errorBox?.classList.remove("hidden");
+        return;
+      }
+      window.showToast?.(editId ? "User berhasil diperbarui" : "User berhasil ditambahkan");
+      closeModal("user-modal");
+      await loadUsers();
+    } catch {
+      if (errorMsg) errorMsg.textContent = "Tidak bisa terhubung ke server";
+      errorBox?.classList.remove("hidden");
+    }
   });
 
-  document.getElementById("users-body")?.addEventListener("click", () => openModal("Edit User"));
+  let searchDebounce: ReturnType<typeof setTimeout>;
+  searchInput?.addEventListener("input", () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(loadUsers, 300);
+  });
+  roleFilter?.addEventListener("change", () => renderTable(allUsers));
+  statusFilter?.addEventListener("change", () => renderTable(allUsers));
+
+  loadUsers();
 </script>
