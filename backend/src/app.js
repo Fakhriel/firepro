@@ -21,6 +21,7 @@ const reportsRoutes = require('./modules/reports/reports.routes');
 const ownerRoutes = require('./modules-owner/owner.routes');
 const supervisorRoutes = require('./modules-supervisor/supervisor.routes');
 const technicalRoutes = require('./modules-technical/technical.routes');
+const adminAttendanceRoutes = require('./modules/attendance/admin-attendance.routes');
 const { requireAdminAuth, requireRole } = require('./middleware/auth');
 const adminUsersRoutes = require('./modules-owner/owner-users/owner-users.routes');
 
@@ -58,7 +59,9 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/owner', ownerRoutes);
 app.use('/api/supervisor', supervisorRoutes);
 app.use('/api/technical', technicalRoutes);
+
 app.use('/api/admin/users', requireAdminAuth, requireRole('owner'), adminUsersRoutes);
+app.use('/api/admin/attendance', requireAdminAuth, requireRole('admin'), adminAttendanceRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
