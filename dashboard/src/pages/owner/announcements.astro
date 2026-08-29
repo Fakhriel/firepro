@@ -27,6 +27,10 @@ import PageHeader from "../../components/PageHeader.astro";
           <input id="ann-target-karyawan" type="checkbox" class="w-4 h-4" checked />
           Karyawan Teknisi
         </label>
+        <label class="flex items-center gap-2 font-mono text-xs text-charcoal cursor-pointer">
+          <input id="ann-target-admin" type="checkbox" class="w-4 h-4" checked />
+          Admin
+        </label>
       </div>
     </div>
     <div id="ann-error" class="hidden border-2 border-signal bg-signal/5 px-3 py-2">
@@ -72,7 +76,7 @@ import PageHeader from "../../components/PageHeader.astro";
   const apiUrl =
     document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
 
-  const ROLE_LABEL: Record<string, string> = { supervisor: "Supervisor", karyawan: "Karyawan Teknisi" };
+  const ROLE_LABEL: Record<string, string> = { supervisor: "Supervisor", karyawan: "Karyawan Teknisi", admin: "Admin" };
 
   interface AnnouncementRow {
     id: number;
@@ -141,6 +145,7 @@ import PageHeader from "../../components/PageHeader.astro";
     const targetRoles: string[] = [];
     if ((document.getElementById("ann-target-supervisor") as HTMLInputElement).checked) targetRoles.push("supervisor");
     if ((document.getElementById("ann-target-karyawan") as HTMLInputElement).checked) targetRoles.push("karyawan");
+    if ((document.getElementById("ann-target-admin") as HTMLInputElement).checked) targetRoles.push("admin");
 
     if (!title) return showError("Judul wajib diisi.");
     if (!message) return showError("Isi pengumuman wajib diisi.");
