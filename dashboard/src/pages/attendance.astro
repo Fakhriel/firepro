@@ -1,0 +1,300 @@
+---
+import DashboardLayout from "../layouts/DashboardLayout.astro";
+import PageHeader from "../components/PageHeader.astro";
+import StatCard from "../components/StatCard.astro";
+---
+
+<DashboardLayout title="Attendance" activeNav="attendance">
+  <PageHeader heading="Attendance" sub="Absensi harian Anda" crumbs={[{ label: "Utama" }, { label: "Absensi" }]} />
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
+    <!-- Own check in/out card -->
+    <div class="panel lg:col-span-1 flex flex-col items-center text-center px-6 py-8">
+      <p class="font-mono text-[10px] uppercase tracking-widest text-smoke mb-2">Waktu Saat Ini</p>
+      <p id="live-clock" class="font-display text-4xl text-ink leading-none mb-1">--:--:--</p>
+      <p id="live-date" class="font-mono text-xs text-smoke mb-6">—</p>
+
+      <div id="attendance-status-badge" class="badge badge-inactive mb-6">Belum Check In</div>
+
+      <button id="btn-check-in" type="button" class="btn-primary w-full justify-center">
+        Check In
+      </button>
+      <button id="btn-check-out" type="button" class="btn-danger w-full justify-center hidden">
+        Check Out
+      </button>
+    </div>
+
+    <!-- Info panel -->
+    <div class="panel lg:col-span-2">
+      <div class="px-5 py-4 border-b-2 border-ink">
+        <h3 class="font-display text-lg text-ink leading-none">Hari Ini</h3>
+        <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">
+          {new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+        </p>
+      </div>
+      <div class="grid grid-cols-2 divide-x divide-hairline">
+        <div class="px-5 py-6 text-center">
+          <p class="font-mono text-[9px] uppercase tracking-widest text-smoke mb-2">Jam Masuk</p>
+          <p id="today-check-in" class="font-display text-2xl text-ink">-</p>
+        </div>
+        <div class="px-5 py-6 text-center">
+          <p class="font-mono text-[9px] uppercase tracking-widest text-smoke mb-2">Jam Keluar</p>
+          <p id="today-check-out" class="font-display text-2xl text-ink">-</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stat cards for personal history -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <StatCard id="stat-attendance-month" label="Hadir Bulan Ini" accent />
+    <StatCard id="stat-attendance-avg-hours" label="Rata-rata Jam Kerja" />
+  </div>
+
+  <!-- Personal history -->
+  <div class="panel overflow-hidden">
+    <div class="px-5 py-4 border-b-2 border-ink">
+      <h3 class="font-display text-lg text-ink leading-none">Riwayat Kehadiran Saya</h3>
+      <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">30 hari terakhir</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table id="attendance-table" class="data-table hidden">
+        <thead>
+          <tr>
+            <th>Tanggal</th>
+            <th>Jam Masuk</th>
+            <th>Jam Keluar</th>
+            <th class="hidden sm:table-cell">Durasi</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="attendance-body"></tbody>
+      </table>
+    </div>
+    <div id="attendance-skeleton">
+      {Array.from({ length: 5 }).map(() => (
+        <div class="skeleton-row">
+          <div class="skeleton w-9 h-9 shrink-0"></div>
+          <div class="flex-1 space-y-2">
+            <div class="skeleton h-3 w-1/3"></div>
+            <div class="skeleton h-2.5 w-1/5"></div>
+          </div>
+          <div class="skeleton h-5 w-16 shrink-0"></div>
+        </div>
+      ))}
+    </div>
+    <div id="attendance-empty" class="empty-state min-h-52 hidden">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/>
+      </svg>
+      <p>Belum ada riwayat kehadiran</p>
+    </div>
+  </div>
+</DashboardLayout>
+
+<script>
+  import { adminApiFetch } from "../lib/auth";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface AttendanceRecord {
+    id: string;
+    workDate: string;
+    checkInAt: string | null;
+    checkOutAt: string | null;
+    status: string;
+  }
+
+  // ─── Live clock ─────────────────────────────────────────────────────
+  function tickClock(): void {
+    const now = new Date();
+    const clockEl = document.getElementById("live-clock");
+    const dateEl = document.getElementById("live-date");
+    if (clockEl) {
+      clockEl.textContent = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    }
+    if (dateEl) {
+      dateEl.textContent = now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    }
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  function setStatValue(cardId: string, value: string): void {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
+    if (!valueEl) {
+      const skeleton = card.querySelector(".skeleton")?.parentElement;
+      valueEl = document.createElement("p");
+      const isAccent = card.classList.contains("bg-ink");
+      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
+      if (skeleton) {
+        skeleton.replaceWith(valueEl);
+      } else {
+        card.appendChild(valueEl);
+      }
+    }
+    valueEl.textContent = value;
+  }
+
+  function formatTime(iso: string | null): string {
+    if (!iso) return "-";
+    try {
+      return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return "-";
+    }
+  }
+  function formatDate(iso: string): string {
+    try {
+      return new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+    } catch {
+      return iso;
+    }
+  }
+  function durationHours(checkIn: string | null, checkOut: string | null): number {
+    if (!checkIn || !checkOut) return 0;
+    const ms = new Date(checkOut).getTime() - new Date(checkIn).getTime();
+    return ms > 0 ? ms / 3600000 : 0;
+  }
+  function formatDuration(checkIn: string | null, checkOut: string | null): string {
+    const hrs = durationHours(checkIn, checkOut);
+    if (hrs === 0) return "-";
+    const h = Math.floor(hrs);
+    const m = Math.round((hrs - h) * 60);
+    return `${h}j ${m}m`;
+  }
+
+  // ─── Absensi milik sendiri ──────────────────────────────────────────
+  const btnIn = document.getElementById("btn-check-in");
+  const btnOut = document.getElementById("btn-check-out");
+  const badge = document.getElementById("attendance-status-badge");
+
+  function applySelfState(record: AttendanceRecord | null): void {
+    const inEl = document.getElementById("today-check-in");
+    const outEl = document.getElementById("today-check-out");
+    if (inEl) inEl.textContent = formatTime(record?.checkInAt ?? null);
+    if (outEl) outEl.textContent = formatTime(record?.checkOutAt ?? null);
+
+    if (record?.checkOutAt) {
+      if (badge) {
+        badge.textContent = "Selesai Check Out";
+        badge.className = "badge badge-inactive mb-6";
+      }
+      btnIn?.classList.add("hidden");
+      btnOut?.classList.add("hidden");
+    } else if (record?.checkInAt) {
+      if (badge) {
+        badge.textContent = "Sedang Bekerja";
+        badge.className = "badge badge-active mb-6";
+      }
+      btnIn?.classList.add("hidden");
+      btnOut?.classList.remove("hidden");
+    } else {
+      if (badge) {
+        badge.textContent = "Belum Check In";
+        badge.className = "badge badge-inactive mb-6";
+      }
+      btnIn?.classList.remove("hidden");
+      btnOut?.classList.add("hidden");
+    }
+  }
+
+  async function loadToday(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/admin/attendance/today`);
+      const json = await res.json();
+      if (!res.ok) return;
+      applySelfState(json.data ?? null);
+    } catch (err) {
+      console.error("[loadToday] gagal fetch backend:", err);
+    }
+  }
+
+  btnIn?.addEventListener("click", async () => {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/admin/attendance/check-in`, { method: "POST", body: JSON.stringify({}) });
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal check in", "error");
+        return;
+      }
+      window.showToast?.(json.message ?? "Check in berhasil");
+      applySelfState(json.data);
+      await loadHistory();
+    } catch (err) {
+      console.error("[btn-check-in] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  });
+
+  btnOut?.addEventListener("click", async () => {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/admin/attendance/check-out`, { method: "POST", body: JSON.stringify({}) });
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal check out", "error");
+        return;
+      }
+      window.showToast?.(json.message ?? "Check out berhasil");
+      applySelfState(json.data);
+      await loadHistory();
+    } catch (err) {
+      console.error("[btn-check-out] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  });
+
+  // ─── Riwayat kehadiran saya ─────────────────────────────────────────
+  async function loadHistory(): Promise<void> {
+    const tableBody = document.getElementById("attendance-body") as HTMLTableSectionElement;
+    const table = document.getElementById("attendance-table") as HTMLTableElement;
+    const emptyState = document.getElementById("attendance-empty") as HTMLDivElement;
+    const skeletonEl = document.getElementById("attendance-skeleton") as HTMLDivElement;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/admin/attendance/history`);
+      const json = await res.json();
+      skeletonEl.classList.add("hidden");
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat riwayat kehadiran", "error");
+        return;
+      }
+      const history: AttendanceRecord[] = json.data ?? [];
+      const isEmpty = history.length === 0;
+      table.classList.toggle("hidden", isEmpty);
+      emptyState.classList.toggle("hidden", !isEmpty);
+      tableBody.innerHTML = history
+        .map(
+          (r) => `
+        <tr>
+          <td class="font-mono text-xs text-charcoal">${formatDate(r.workDate)}</td>
+          <td class="font-mono text-xs text-charcoal">${formatTime(r.checkInAt)}</td>
+          <td class="font-mono text-xs text-charcoal">${formatTime(r.checkOutAt)}</td>
+          <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${formatDuration(r.checkInAt, r.checkOutAt)}</td>
+          <td><span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${r.checkOutAt ? "bg-hairline/20 text-smoke border-hairline" : "bg-ink/5 text-ink border-ink"}">${r.checkOutAt ? "Sudah Pulang" : "Sedang Bekerja"}</span></td>
+        </tr>
+      `
+        )
+        .join("");
+
+      const now = new Date();
+      const thisMonth = history.filter((r) => {
+        const d = new Date(r.workDate);
+        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      });
+      setStatValue("stat-attendance-month", String(thisMonth.length));
+      const durations = thisMonth.map((r) => durationHours(r.checkInAt, r.checkOutAt)).filter((h) => h > 0);
+      const avg = durations.length ? durations.reduce((a, b) => a + b, 0) / durations.length : 0;
+      setStatValue("stat-attendance-avg-hours", avg > 0 ? `${avg.toFixed(1)}j` : "-");
+    } catch (err) {
+      console.error("[loadHistory] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+      skeletonEl.classList.add("hidden");
+    }
+  }
+
+  loadToday();
+  loadHistory();
+</script>
