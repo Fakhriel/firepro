@@ -4,6 +4,7 @@ const { Op } = require('sequelize');
 const { Admin } = require('./admin.model');
 const env = require('../../config/env');
 const { escapeLike } = require('../../utils/escapeLike');
+const { rethrowFriendlyForeignKeyError } = require('../../utils/sequelizeErrors');
 
 
 const INVALID_CREDENTIALS_MESSAGE = 'Username atau password salah.';
@@ -187,7 +188,14 @@ async function remove(id, requesterId) {
   }
   const admin = await Admin.findByPk(id);
   if (!admin) throw notFound();
-  await admin.destroy();
+  try {
+    await admin.destroy();
+  } catch (err) {
+    rethrowFriendlyForeignKeyError(
+      err,
+      'Akun ini masih tercatat sebagai pengirim pengumuman/pemilik data lain sehingga tidak bisa dihapus. Coba lagi setelah migration terbaru dijalankan.'
+    );
+  }
 }
 
 async function setActive(id, isActive, requesterId) {
