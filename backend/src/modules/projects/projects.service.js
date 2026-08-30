@@ -48,13 +48,44 @@ function serialize(project) {
 
 const includeClient = [{ model: Client, as: 'client', attributes: ['id', 'name', 'email'] }];
 
-async function list({ search, status } = {}) {
+// Untuk searchable select (Quotation/BOQ/Document form) — ringan, tanpa
+// join Client penuh, dibatasi 20 hasil.
+async function options(search) {
   const where = {};
-  if (status && STATUSES.includes(status)) where.status = status;
   if (search) {
     where[Op.or] = [
       { code: { [Op.like]: `%${escapeLike(search)}%` } },
       { name: { [Op.like]: `%${escapeLike(search)}%` } },
+    ];
+  }
+  const projects = await Project.findAll({
+    where,
+    attributes: ['id', 'code', 'name', 'clientId'],
+    order: [['name', 'ASC']],
+    limit: 20,
+  });
+  return projects.map((p) => ({ id: p.id, label: `${p.code} — ${p.name}`, clientId: p.clientId }));
+}
+
+async function list({ search, status } = {}) {
+  const where = {};
+  if (status && STATUSES.includes(status)) where.status = status;
+  if (search) {
+    // Sebelumnya cuma cari ke code/name milik Project sendiri, padahal
+    // placeholder di UI ("Cari ID proyek / nama klien...") sudah janji
+    // bisa cari nama klien juga. Cari ID klien yang namanya cocok dulu,
+    // baru pakai itu di Op.or bareng code/name proyek.
+    const escaped = escapeLike(search);
+    const matchingClients = await Client.findAll({
+      where: { name: { [Op.like]: `%${escaped}%` } },
+      attributes: ['id'],
+    });
+    const clientIds = matchingClients.map((c) => c.id);
+
+    where[Op.or] = [
+      { code: { [Op.like]: `%${escaped}%` } },
+      { name: { [Op.like]: `%${escaped}%` } },
+      ...(clientIds.length ? [{ clientId: { [Op.in]: clientIds } }] : []),
     ];
   }
 
@@ -118,7 +149,6 @@ async function create(body) {
   if (!client) throw badRequest('clientId tidak valid — klien tidak ditemukan.');
 
   const project = await Project.create({
- 
     code: `TMP-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     status: 'planning',
     crewSize: 1,
@@ -159,4 +189,4 @@ async function remove(id) {
   }
 }
 
-module.exports = { list, getById, create, update, remove };
+module.exports = { options, list, getById, create, update, remove };
