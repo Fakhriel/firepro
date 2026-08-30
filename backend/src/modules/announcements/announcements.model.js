@@ -31,7 +31,8 @@ const Announcement = sequelize.define(
     },
     createdBy: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true, 
+                       
       field: 'created_by',
     },
   },
