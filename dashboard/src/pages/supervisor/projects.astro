@@ -1,520 +1,165 @@
----
-import SupervisorLayout from "../../layouts/SupervisorLayout.astro";
-import PageHeader from "../../components/PageHeader.astro";
-import StatCard from "../../components/StatCard.astro";
----
+const { Op } = require('sequelize');
+const { ProjectAssignment } = require('./project-assignments.model');
+const { Admin } = require('../admin-auth/admin.model');
+const { Project } = require('../projects/projects.model');
 
-<SupervisorLayout title="Projects" activeNav="projects">
-  <PageHeader heading="Projects" sub="Proyek lapangan yang perlu diawasi" crumbs={[{ label: "Fokus Lapangan" }, { label: "Projects" }]} />
+const STATUSES = ['assigned', 'in_progress', 'done'];
 
-  <!-- Stat cards -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
-    <StatCard id="stat-projects-total" label="Total Proyek" accent />
-    <StatCard id="stat-projects-running" label="Sedang Berjalan" />
-    <StatCard id="stat-projects-approval" label="Menunggu Approval" />
-    <StatCard id="stat-projects-done" label="Selesai Bulan Ini" />
-  </div>
+function badRequest(message) {
+  const err = new Error(message);
+  err.status = 400;
+  err.expose = true;
+  return err;
+}
 
-  <!-- Filter -->
-  <div class="flex flex-col sm:flex-row gap-3 mb-5">
-    <input id="search-projects" type="search" placeholder="Cari nama proyek / lokasi…" class="field-input sm:max-w-xs" />
-    <select id="filter-status" class="field-input sm:w-44">
-      <option value="">Semua Status</option>
-      <option value="planning">Perencanaan</option>
-      <option value="in_progress">Berjalan</option>
-      <option value="pending_approval">Menunggu Approval</option>
-      <option value="completed">Selesai</option>
-      <option value="on_hold">Ditunda</option>
-    </select>
-  </div>
+function notFound(message = 'Tugas/penugasan tidak ditemukan.') {
+  const err = new Error(message);
+  err.status = 404;
+  err.expose = true;
+  return err;
+}
 
-  <!-- Table -->
-  <div class="panel overflow-hidden">
-    <div class="overflow-x-auto">
-      <table id="projects-table" class="data-table">
-        <thead>
-          <tr>
-            <th>Nama Proyek</th>
-            <th class="hidden sm:table-cell">Lokasi</th>
-            <th class="hidden md:table-cell">Teknisi</th>
-            <th>Progres</th>
-            <th>Status</th>
-            <th class="text-right">Aksi</th>
-          </tr>
-        </thead>
-        <tbody id="projects-body"></tbody>
-      </table>
-    </div>
-    <div id="projects-empty" class="empty-state min-h-56">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M5.5 8H18.5L19.5 21H4.5L5.5 8Z"/>
-        <path d="M8.5 8V6C8.5 4.067 9.567 3 12 3C14.433 3 15.5 4.067 15.5 6V8"/>
-      </svg>
-      <p>Belum ada proyek yang ditugaskan ke tim Anda</p>
-    </div>
-    <div class="flex items-center justify-between px-4 py-3 border-t border-hairline">
-      <span data-projects-count class="font-mono text-[10px] text-smoke">0 proyek</span>
-      <div class="flex items-center gap-1">
-        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>←</button>
-        <span class="font-mono text-xs px-3 py-1.5 border border-hairline">1</span>
-        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>→</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Project Detail Drawer -->
-  <div id="project-drawer" class="fixed inset-y-0 right-0 z-50 w-full sm:w-[440px] bg-paper border-l-2 border-ink translate-x-full transition-transform duration-300 ease-out flex flex-col">
-    <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink shrink-0">
-      <h2 class="font-display text-xl text-ink">Detail Proyek</h2>
-      <button id="drawer-close" type="button" class="text-smoke hover:text-ink p-1">
-        <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-    </div>
-    <div class="flex-1 overflow-y-auto p-5">
-      <div class="empty-state min-h-40">
-        <p>Pilih proyek untuk melihat detail</p>
-      </div>
-
-      <!-- Static prototype sections (selalu ada, siap diisi data nanti) -->
-      <div class="space-y-6 mt-6">
-        <div>
-          <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-2">Teknisi Ditugaskan</p>
-          <div id="assigned-technicians" class="flex flex-wrap gap-2 mb-2">
-            <span class="font-mono text-[10px] text-smoke">Belum ada teknisi ditugaskan</span>
-          </div>
-          <button id="btn-assign-technician" type="button" class="btn-secondary text-xs gap-1.5">
-            <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Assign Teknisi
-          </button>
-        </div>
-
-        <hr class="border-hairline" />
-
-        <div>
-          <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-2">Update Status Proyek</p>
-          <select id="status-select" class="field-input mb-3">
-            <option value="planning">Perencanaan</option>
-            <option value="in_progress">Berjalan</option>
-            <option value="completed">Selesai</option>
-            <option value="on_hold">Ditunda</option>
-            <option value="cancelled">Dibatalkan</option>
-          </select>
-          <button id="btn-save-progress" type="button" class="btn-primary text-xs w-full justify-center">
-            Simpan Status
-          </button>
-        </div>
-
-        <hr class="border-hairline" />
-
-        <div>
-          <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-2">Dokumentasi Proyek</p>
-          <div id="drawer-documentation-list" class="space-y-1.5 mb-2">
-            <p class="font-mono text-[10px] text-smoke">Memuat…</p>
-          </div>
-          <p class="font-mono text-[9px] text-smoke">Upload foto dokumentasi belum tersedia untuk role Supervisor — backend belum punya endpoint upload-nya (baru GET list).</p>
-        </div>
-
-        <hr class="border-hairline" />
-
-        <div>
-          <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-2">Approval</p>
-          <button id="btn-approve-project" type="button" class="btn-primary w-full justify-center gap-1.5" style="background-color: var(--color-armed, #1f7a4d); border-color: var(--color-armed, #1f7a4d);">
-            <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="2">
-              <path d="M20 6L9 17l-5-5"/>
-            </svg>
-            Approve Pekerjaan Selesai
-          </button>
-          <p class="font-mono text-[9px] text-smoke mt-2">Menandai proyek sebagai status "Selesai".</p>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div id="drawer-overlay" class="fixed inset-0 bg-ink/40 z-40 hidden"></div>
-
-  <!-- Assign technician modal -->
-  <div id="assign-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
-    <div class="panel w-full max-w-sm bg-paper">
-      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
-        <h3 class="font-display text-lg text-ink leading-none">Assign Teknisi</h3>
-        <button id="assign-modal-close" type="button" class="text-smoke hover:text-ink transition-colors" aria-label="Tutup">
-          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-      <div class="p-5 space-y-4">
-        <div>
-          <label class="field-label" for="assign-technician-select">Pilih Teknisi</label>
-          <select id="assign-technician-select" class="field-input">
-            <option value="">Pilih teknisi…</option>
-          </select>
-        </div>
-        <div>
-          <label class="field-label" for="assign-note">Catatan Penugasan</label>
-          <textarea id="assign-note" rows="3" class="field-input resize-none" placeholder="Instruksi tambahan untuk teknisi (opsional)…"></textarea>
-        </div>
-        <div id="assign-modal-error" class="hidden border-2 border-signal bg-signal/5 px-3 py-2">
-          <p id="assign-modal-error-msg" class="font-mono text-xs text-signal"></p>
-        </div>
-      </div>
-      <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
-        <button id="assign-modal-cancel" type="button" class="btn-secondary text-xs">Batal</button>
-        <button id="assign-modal-save" type="button" class="btn-primary text-xs">Assign</button>
-      </div>
-    </div>
-  </div>
-</SupervisorLayout>
-
-<script>
-  import { adminApiFetch } from "../../lib/auth";
-  import { escapeHtml } from "../../lib/escapeHtml";
-  import { formatIDR } from "../../lib/export";
-
-  const apiUrl =
-    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
-
-  interface ProjectRow {
-    id: number;
-    projectCode: string;
-    projectName: string;
-    clientName: string;
-    location: string;
-    contractValue: number;
-    status: "planning" | "in_progress" | "completed" | "on_hold" | "cancelled";
-    startDate: string;
-  }
-
-  interface Technician {
-    id: number;
-    name: string;
-  }
-
-  interface Assignment {
-    id: number;
-    projectId: number;
-    technicianId: number;
-    notes?: string;
-    status: string;
-    technician?: { id: number; name: string };
-  }
-
-  const STATUS_LABEL: Record<string, string> = {
-    planning: "Perencanaan",
-    in_progress: "Berjalan",
-    completed: "Selesai",
-    on_hold: "Ditunda",
-    cancelled: "Dibatalkan",
+function serialize(a) {
+  const plain = a.toJSON ? a.toJSON() : a;
+  return {
+    id: String(plain.id),
+    projectId: plain.projectId,
+    technicianId: plain.technicianId,
+    assignedBy: plain.assignedBy,
+    status: plain.status,
+    notes: plain.notes ?? '',
+    project: plain.project ? { id: plain.project.id, name: plain.project.name, code: plain.project.code, location: plain.project.location } : undefined,
+    technician: plain.technician ? { id: plain.technician.id, name: plain.technician.name } : undefined,
   };
+}
 
-  let allProjects: ProjectRow[] = [];
-  let currentProjectId: number | null = null;
-  let allTechnicians: Technician[] = [];
+const includeAll = [
+  { model: Project, as: 'project', attributes: ['id', 'name', 'code', 'location'] },
+  { model: Admin, as: 'technician', attributes: ['id', 'name'] },
+];
 
-  const tableBody = document.getElementById("projects-body") as HTMLTableSectionElement;
-  const emptyState = document.getElementById("projects-empty") as HTMLDivElement;
-  const table = document.getElementById("projects-table") as HTMLTableElement;
-  const countLabel = document.querySelector("[data-projects-count]") as HTMLElement | null;
-  const searchInput = document.getElementById("search-projects") as HTMLInputElement | null;
-  const statusFilter = document.getElementById("filter-status") as HTMLSelectElement | null;
+async function list({ projectId, technicianId, status } = {}) {
+  const where = {};
+  if (projectId) where.projectId = projectId;
+  if (technicianId) where.technicianId = technicianId;
+  if (status) where.status = status;
 
-  const drawer = document.getElementById("project-drawer");
-  const overlay = document.getElementById("drawer-overlay");
-  const drawerContent = drawer?.querySelector(".flex-1.overflow-y-auto > div:first-child") as HTMLElement | null;
+  const rows = await ProjectAssignment.findAll({ where, include: includeAll, order: [['createdAt', 'DESC']] });
+  return rows.map(serialize);
+}
 
-  function setStatValue(cardId: string, value: string): void {
-    const card = document.getElementById(cardId);
-    if (!card) return;
-    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
-    if (!valueEl) {
-      const skeleton = card.querySelector(".animate-pulse")?.parentElement;
-      valueEl = document.createElement("p");
-      const isAccent = card.classList.contains("bg-ink");
-      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
-      if (skeleton) {
-        skeleton.replaceWith(valueEl);
-      } else {
-        card.appendChild(valueEl);
-      }
+async function listByTechnician(technicianId) {
+  return list({ technicianId });
+}
+
+async function getById(id) {
+  const a = await ProjectAssignment.findByPk(id, { include: includeAll });
+  if (!a) throw notFound();
+  return serialize(a);
+}
+
+async function create({ projectId, technicianId, assignedBy, notes }) {
+  if (!projectId) throw badRequest('Project wajib dipilih.');
+  if (!technicianId) throw badRequest('Teknisi wajib dipilih.');
+
+  // SEBELUMNYA technicianId tidak divalidasi sama sekali — bisa nunjuk ke
+  // akun role apa saja (termasuk Admin/Supervisor), atau ID yang tidak
+  // ada sekalipun (baru gagal belakangan lewat FK error mentah / 500).
+  const [project, technician] = await Promise.all([
+    Project.findByPk(projectId),
+    Admin.findByPk(technicianId),
+  ]);
+  if (!project) throw badRequest('Project tidak ditemukan.');
+  if (!technician) throw badRequest('Teknisi tidak ditemukan.');
+  if (technician.role !== 'karyawan') {
+    throw badRequest('Assignment hanya bisa ditugaskan ke akun dengan role Karyawan Teknisi.');
+  }
+
+  // Bug QA Round 3 (laporan Supervisor): sebelumnya teknisi yang sama
+  // bisa di-assign berkali-kali ke proyek yang sama tanpa penolakan apa
+  // pun, bikin baris duplikat di tabel. Cek dulu apakah kombinasi
+  // project+teknisi ini masih aktif (belum 'done') sebelum insert baru.
+  const existingActive = await ProjectAssignment.findOne({
+    where: { projectId, technicianId, status: { [Op.in]: ['assigned', 'in_progress'] } },
+  });
+  if (existingActive) {
+    throw badRequest('Teknisi ini sudah ditugaskan ke proyek ini dan masih aktif. Batalkan penugasan lama dulu kalau mau menugaskan ulang.');
+  }
+
+  const a = await ProjectAssignment.create({
+    projectId,
+    technicianId,
+    assignedBy,
+    notes: notes ? String(notes).trim() : null,
+    status: 'assigned',
+  });
+  return getById(a.id);
+}
+
+// Graf transisi status yang valid — mencegah lompat/mundur bebas (mis.
+// 'done' balik ke 'assigned' tanpa alasan). Transisi assigned->done
+// LANGSUNG tetap diizinkan karena UI teknisi ("Tandai Selesai") memang
+// selalu tampil terlepas dari status saat ini — jadi guard ini fokus
+// mengunci 'done' sebagai status akhir, bukan memaksakan urutan step.
+const VALID_STATUS_TRANSITIONS = {
+  assigned: ['in_progress', 'done'],
+  in_progress: ['done', 'assigned'], // boleh mundur ke assigned kalau pekerjaan dibatalkan sementara
+  done: [], // status akhir — tidak bisa diubah lagi lewat endpoint ini
+};
+
+async function updateStatus(id, status) {
+  if (!STATUSES.includes(status)) {
+    throw badRequest(`status harus salah satu dari: ${STATUSES.join(', ')}.`);
+  }
+  const a = await ProjectAssignment.findByPk(id);
+  if (!a) throw notFound();
+
+  if (a.status === status) {
+    return getById(id);
+  }
+  const allowedNext = VALID_STATUS_TRANSITIONS[a.status] ?? [];
+  if (!allowedNext.includes(status)) {
+    throw badRequest(`Tidak bisa mengubah status dari '${a.status}' ke '${status}'.`);
+  }
+
+  await a.update({ status });
+  return getById(id);
+}
+
+async function update(id, { notes, technicianId }) {
+  const a = await ProjectAssignment.findByPk(id);
+  if (!a) throw notFound();
+
+  if (technicianId !== undefined) {
+    const technician = await Admin.findByPk(technicianId);
+    if (!technician) throw badRequest('Teknisi tidak ditemukan.');
+    if (technician.role !== 'karyawan') {
+      throw badRequest('Assignment hanya bisa ditugaskan ke akun dengan role Karyawan Teknisi.');
     }
-    valueEl.textContent = value;
-  }
-
-  function openModal(id: string): void {
-    document.getElementById(id)?.classList.replace("hidden", "flex");
-  }
-  function closeModal(id: string): void {
-    document.getElementById(id)?.classList.replace("flex", "hidden");
-  }
-
-  function openDrawer(): void {
-    drawer?.classList.remove("translate-x-full");
-    overlay?.classList.remove("hidden");
-    document.body.style.overflow = "hidden";
-  }
-  function closeDrawer(): void {
-    drawer?.classList.add("translate-x-full");
-    overlay?.classList.add("hidden");
-    document.body.style.overflow = "";
-    currentProjectId = null;
-  }
-  document.getElementById("drawer-close")?.addEventListener("click", closeDrawer);
-  overlay?.addEventListener("click", closeDrawer);
-
-  function statusBadge(status: string): string {
-    const map: Record<string, string> = {
-      planning: "bg-hairline/30 text-smoke border-hairline",
-      in_progress: "bg-ink/5 text-ink border-ink",
-      completed: "bg-hairline/20 text-smoke border-hairline",
-      on_hold: "bg-signal/10 text-signal border-signal",
-      cancelled: "bg-signal/10 text-signal border-signal",
-    };
-    return map[status] ?? map.planning;
-  }
-
-  function renderTable(projects: ProjectRow[]): void {
-    tableBody.innerHTML = "";
-    const isEmpty = projects.length === 0;
-    table.classList.toggle("hidden", isEmpty);
-    emptyState.classList.toggle("hidden", !isEmpty);
-    if (countLabel) countLabel.textContent = `${projects.length} proyek`;
-
-    projects.forEach((p) => {
-      const tr = document.createElement("tr");
-      tr.className = "cursor-pointer hover:bg-hairline/10";
-      tr.innerHTML = `
-        <td class="font-semibold text-ink">${escapeHtml(p.projectName)}</td>
-        <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${escapeHtml(p.location ?? "-")}</td>
-        <td class="hidden md:table-cell font-mono text-xs text-charcoal">-</td>
-        <td class="font-mono text-xs text-charcoal">${p.status === "completed" ? "100%" : p.status === "planning" ? "0%" : "-"}</td>
-        <td><span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${statusBadge(p.status)}">${escapeHtml(STATUS_LABEL[p.status] ?? p.status)}</span></td>
-        <td class="text-right font-mono text-[10px] text-smoke">Lihat →</td>
-      `;
-      tr.addEventListener("click", () => openProjectDrawer(p));
-      tableBody.appendChild(tr);
+    const existingActive = await ProjectAssignment.findOne({
+      where: {
+        id: { [Op.ne]: id },
+        projectId: a.projectId,
+        technicianId,
+        status: { [Op.in]: ['assigned', 'in_progress'] },
+      },
     });
-  }
-
-  function updateStats(projects: ProjectRow[]): void {
-    const now = new Date();
-    setStatValue("stat-projects-total", String(projects.length));
-    setStatValue("stat-projects-running", String(projects.filter((p) => p.status === "in_progress").length));
-    setStatValue("stat-projects-approval", "0");
-    setStatValue(
-      "stat-projects-done",
-      String(
-        projects.filter((p) => {
-          if (p.status !== "completed") return false;
-          const d = new Date(p.startDate);
-          return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-        }).length
-      )
-    );
-  }
-
-  async function loadProjects(): Promise<void> {
-    try {
-      const params = new URLSearchParams();
-      if (searchInput?.value) params.set("search", searchInput.value);
-      if (statusFilter?.value) params.set("status", statusFilter.value);
-
-      const res = await adminApiFetch(`${apiUrl}/api/supervisor/projects?${params.toString()}`);
-      const json = await res.json();
-      if (!res.ok) {
-        window.showToast?.(json.error ?? "Gagal memuat data proyek", "error");
-        return;
-      }
-      allProjects = json.data ?? [];
-      renderTable(allProjects);
-      updateStats(allProjects);
-    } catch (err) {
-      console.error("[loadProjects] gagal fetch backend:", err);
-      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    if (existingActive) {
+      throw badRequest('Teknisi ini sudah ditugaskan ke proyek ini dan masih aktif.');
     }
   }
 
-  async function loadAssignedTechnicians(projectId: number): Promise<void> {
-    const wrap = document.getElementById("assigned-technicians");
-    if (!wrap) return;
-    wrap.innerHTML = `<span class="font-mono text-[10px] text-smoke">Memuat…</span>`;
-    try {
-      const res = await adminApiFetch(`${apiUrl}/api/supervisor/assignments?projectId=${projectId}`);
-      const json = await res.json();
-      if (!res.ok) return;
-      const assignments: Assignment[] = json.data ?? [];
-      if (assignments.length === 0) {
-        wrap.innerHTML = `<span class="font-mono text-[10px] text-smoke">Belum ada teknisi ditugaskan</span>`;
-        return;
-      }
-      wrap.innerHTML = assignments
-        .map(
-          (a) =>
-            `<span class="font-mono text-[10px] uppercase tracking-widest border border-ink px-2 py-1">${escapeHtml(a.technician?.name ?? "Teknisi")}</span>`
-        )
-        .join("");
-    } catch (err) {
-      console.error("[loadAssignedTechnicians] gagal fetch backend:", err);
-    }
-  }
-
-  async function loadDocumentation(projectId: number): Promise<void> {
-    const wrap = document.getElementById("drawer-documentation-list");
-    if (!wrap) return;
-    wrap.innerHTML = `<p class="font-mono text-[10px] text-smoke">Memuat…</p>`;
-    try {
-      const res = await adminApiFetch(`${apiUrl}/api/supervisor/documentation/project/${projectId}`);
-      const json = await res.json();
-      if (!res.ok) {
-        wrap.innerHTML = `<p class="font-mono text-[10px] text-smoke">Gagal memuat dokumentasi</p>`;
-        return;
-      }
-      const docs: { id: string; photoUrl?: string; note?: string }[] = json.data ?? [];
-      wrap.innerHTML = docs.length
-        ? docs
-            .map(
-              (d) =>
-                `<p class="font-mono text-[10px] text-charcoal truncate">• ${escapeHtml(d.note || d.photoUrl || `Dokumentasi #${d.id}`)}</p>`
-            )
-            .join("")
-        : `<p class="font-mono text-[10px] text-smoke">Belum ada dokumentasi untuk proyek ini</p>`;
-    } catch (err) {
-      console.error("[loadDocumentation] gagal fetch backend:", err);
-    }
-  }
-
-  function openProjectDrawer(p: ProjectRow): void {
-    currentProjectId = p.id;
-    if (drawerContent) {
-      drawerContent.innerHTML = `
-        <div class="space-y-2">
-          <p class="font-mono text-[9px] text-smoke uppercase tracking-widest">${escapeHtml(p.projectCode)}</p>
-          <h3 class="font-display text-xl text-ink">${escapeHtml(p.projectName)}</h3>
-          <span class="inline-block font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${statusBadge(p.status)}">${escapeHtml(STATUS_LABEL[p.status] ?? p.status)}</span>
-          <div class="border-t border-hairline pt-3 mt-3 space-y-1.5 font-mono text-xs">
-            <div class="flex justify-between"><span class="text-smoke">Klien</span><span class="text-ink">${escapeHtml(p.clientName)}</span></div>
-            <div class="flex justify-between"><span class="text-smoke">Lokasi</span><span class="text-ink">${escapeHtml(p.location ?? "-")}</span></div>
-            <div class="flex justify-between"><span class="text-smoke">Nilai Kontrak</span><span class="text-ink">${formatIDR(p.contractValue)}</span></div>
-          </div>
-        </div>
-      `;
-    }
-    (document.getElementById("status-select") as HTMLSelectElement).value = p.status;
-    loadAssignedTechnicians(p.id);
-    loadDocumentation(p.id);
-    openDrawer();
-  }
-
-  document.getElementById("btn-save-progress")?.addEventListener("click", async () => {
-    if (!currentProjectId) return;
-    const status = (document.getElementById("status-select") as HTMLSelectElement).value;
-    try {
-      const res = await adminApiFetch(`${apiUrl}/api/supervisor/projects/${currentProjectId}/progress`, {
-        method: "PATCH",
-        body: JSON.stringify({ status }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        window.showToast?.(json.error ?? "Gagal menyimpan status", "error");
-        return;
-      }
-      window.showToast?.("Status proyek berhasil diperbarui");
-      await loadProjects();
-    } catch (err) {
-      console.error("[btn-save-progress] gagal fetch backend:", err);
-      window.showToast?.("Tidak bisa terhubung ke server", "error");
-    }
+  await a.update({
+    ...(notes !== undefined && { notes: notes ? String(notes).trim() : null }),
+    ...(technicianId !== undefined && { technicianId }),
   });
+  return getById(id);
+}
 
-  document.getElementById("btn-approve-project")?.addEventListener("click", async () => {
-    if (!currentProjectId) return;
-    try {
-      const res = await adminApiFetch(`${apiUrl}/api/supervisor/projects/${currentProjectId}/progress`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: "completed" }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        window.showToast?.(json.error ?? "Gagal menyetujui proyek", "error");
-        return;
-      }
-      window.showToast?.("Proyek ditandai selesai");
-      closeDrawer();
-      await loadProjects();
-    } catch (err) {
-      console.error("[btn-approve-project] gagal fetch backend:", err);
-      window.showToast?.("Tidak bisa terhubung ke server", "error");
-    }
-  });
+async function remove(id) {
+  const a = await ProjectAssignment.findByPk(id);
+  if (!a) throw notFound();
+  await a.destroy();
+}
 
-  // ─── Assign technician modal ───────────────────────────────────────
-  async function loadTechnicianOptions(): Promise<void> {
-    const select = document.getElementById("assign-technician-select") as HTMLSelectElement;
-    try {
-      const res = await adminApiFetch(`${apiUrl}/api/supervisor/technicians`);
-      const json = await res.json();
-      if (!res.ok) return;
-      allTechnicians = json.data ?? [];
-      select.innerHTML =
-        `<option value="">Pilih teknisi…</option>` +
-        allTechnicians.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
-    } catch (err) {
-      console.error("[loadTechnicianOptions] gagal fetch backend:", err);
-    }
-  }
-
-  document.getElementById("btn-assign-technician")?.addEventListener("click", () => {
-    document.getElementById("assign-modal-error")?.classList.add("hidden");
-    (document.getElementById("assign-technician-select") as HTMLSelectElement).value = "";
-    (document.getElementById("assign-note") as HTMLTextAreaElement).value = "";
-    openModal("assign-modal");
-  });
-  document.getElementById("assign-modal-close")?.addEventListener("click", () => closeModal("assign-modal"));
-  document.getElementById("assign-modal-cancel")?.addEventListener("click", () => closeModal("assign-modal"));
-
-  document.getElementById("assign-modal-save")?.addEventListener("click", async () => {
-    if (!currentProjectId) return;
-    const technicianId = (document.getElementById("assign-technician-select") as HTMLSelectElement).value;
-    const notes = (document.getElementById("assign-note") as HTMLTextAreaElement).value.trim();
-    const errorBox = document.getElementById("assign-modal-error");
-    const errorMsg = document.getElementById("assign-modal-error-msg");
-
-    if (!technicianId) {
-      if (errorMsg) errorMsg.textContent = "Pilih teknisi terlebih dahulu.";
-      errorBox?.classList.remove("hidden");
-      return;
-    }
-
-    try {
-      const res = await adminApiFetch(`${apiUrl}/api/supervisor/assignments`, {
-        method: "POST",
-        body: JSON.stringify({ projectId: currentProjectId, technicianId: Number(technicianId), notes: notes || undefined }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        if (errorMsg) errorMsg.textContent = json.error ?? "Gagal menugaskan teknisi";
-        errorBox?.classList.remove("hidden");
-        return;
-      }
-      window.showToast?.(json.message ?? "Teknisi berhasil ditugaskan");
-      closeModal("assign-modal");
-      await loadAssignedTechnicians(currentProjectId);
-    } catch (err) {
-      console.error("[assign-modal-save] gagal fetch backend:", err);
-      if (errorMsg) errorMsg.textContent = "Tidak bisa terhubung ke server";
-      errorBox?.classList.remove("hidden");
-    }
-  });
-
-  let searchDebounce: ReturnType<typeof setTimeout>;
-  searchInput?.addEventListener("input", () => {
-    clearTimeout(searchDebounce);
-    searchDebounce = setTimeout(loadProjects, 300);
-  });
-  statusFilter?.addEventListener("change", loadProjects);
-
-  loadProjects();
-  loadTechnicianOptions();
-</script>
+module.exports = { list, listByTechnician, getById, create, updateStatus, update, remove };
