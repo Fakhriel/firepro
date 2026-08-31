@@ -94,8 +94,20 @@ import StatCard from "../../components/StatCard.astro";
       <div class="p-5 space-y-4">
         <input type="hidden" id="quotation-id" />
         <div>
-          <label class="field-label" for="quotation-client">Nama Klien</label>
+          <label class="field-label" for="quotation-client-select">Klien Terdaftar</label>
+          <select id="quotation-client-select" class="field-input">
+            <option value="">— Belum pilih, ketik manual di bawah —</option>
+          </select>
+          <p class="font-mono text-[10px] text-smoke mt-1">
+            Pilih dari daftar supaya penawaran ini bisa langsung dijadikan Invoice nanti.
+          </p>
+        </div>
+        <div>
+          <label class="field-label" for="quotation-client">Nama Klien (manual)</label>
           <input id="quotation-client" type="text" class="field-input" placeholder="Nama klien / calon klien" />
+          <p id="quotation-client-manual-warning" class="font-mono text-[10px] text-signal mt-1 hidden">
+            Klien manual tidak terhubung ke data klien asli — penawaran ini tidak akan bisa dibuatkan Invoice sampai dihubungkan ke klien terdaftar (edit lagi nanti dan pilih dari daftar di atas).
+          </p>
         </div>
         <div>
           <label class="field-label" for="quotation-project">Nama Proyek</label>
@@ -146,6 +158,7 @@ import StatCard from "../../components/StatCard.astro";
   interface QuotationRow {
     id: string;
     number: string;
+    clientId: string | null;
     client: string;
     project: string;
     description: string;
@@ -153,6 +166,13 @@ import StatCard from "../../components/StatCard.astro";
     validUntil: string;
     status: "draft" | "sent" | "accepted" | "rejected" | "expired";
   }
+
+  interface ClientOption {
+    id: string;
+    label: string;
+  }
+
+  let clientOptions: ClientOption[] = [];
 
   const STATUS_LABEL: Record<string, string> = {
     draft: "Draft",
@@ -178,6 +198,47 @@ import StatCard from "../../components/StatCard.astro";
   function closeModal(id: string): void {
     document.getElementById(id)?.classList.replace("flex", "hidden");
   }
+
+  async function loadClientOptions(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/clients/options`);
+      const json = await res.json();
+      if (!res.ok) return;
+      clientOptions = json.data ?? [];
+    } catch (err) {
+      console.error("[loadClientOptions] gagal fetch backend:", err);
+    }
+  }
+
+  function renderClientSelect(currentClientId?: string | null, currentClientName?: string): void {
+    const select = document.getElementById("quotation-client-select") as HTMLSelectElement;
+    const options = [...clientOptions];
+    if (currentClientId && !options.some((o) => o.id === currentClientId)) {
+      options.unshift({ id: currentClientId, label: currentClientName ?? "(klien saat ini)" });
+    }
+    select.innerHTML =
+      `<option value="">— Belum pilih, ketik manual di bawah —</option>` +
+      options.map((o) => `<option value="${o.id}">${escapeHtml(o.label)}</option>`).join("");
+    select.value = currentClientId ?? "";
+  }
+
+  function syncClientFields(): void {
+    const select = document.getElementById("quotation-client-select") as HTMLSelectElement;
+    const manualInput = document.getElementById("quotation-client") as HTMLInputElement;
+    const warning = document.getElementById("quotation-client-manual-warning") as HTMLElement;
+    const hasSelectValue = Boolean(select.value);
+    manualInput.disabled = hasSelectValue;
+    if (hasSelectValue) {
+      const opt = select.options[select.selectedIndex];
+      manualInput.value = opt?.textContent ?? "";
+      warning.classList.add("hidden");
+    } else {
+      warning.classList.toggle("hidden", !manualInput.value.trim());
+    }
+  }
+
+  document.getElementById("quotation-client-select")?.addEventListener("change", syncClientFields);
+  document.getElementById("quotation-client")?.addEventListener("input", syncClientFields);
 
   function statusBadge(status: string): string {
     const map: Record<string, string> = {
@@ -227,7 +288,7 @@ import StatCard from "../../components/StatCard.astro";
         <td class="hidden md:table-cell font-mono text-xs text-charcoal">${q.validUntil ? new Date(q.validUntil).toLocaleDateString("id-ID") : "-"}</td>
         <td><span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${statusBadge(q.status)}">${escapeHtml(STATUS_LABEL[q.status] ?? q.status)}</span></td>
         <td class="text-right whitespace-nowrap">
-          ${q.status === "accepted" ? `<button type="button" data-id="${q.id}" class="btn-convert-quotation text-xs text-armed hover:underline font-mono underline-offset-2 mr-3">Buat Invoice</button>` : ""}
+          ${q.status === "accepted" ? `<button type="button" data-id="${q.id}" data-has-client="${q.clientId ? "1" : "0"}" class="btn-convert-quotation text-xs text-armed hover:underline font-mono underline-offset-2 mr-3 ${!q.clientId ? "opacity-50 cursor-not-allowed" : ""}" ${!q.clientId ? `title="Penawaran ini belum terhubung ke klien terdaftar — edit dan pilih klien dari daftar dulu sebelum bisa dibuatkan invoice."` : `title="Buat Invoice"`}>Buat Invoice</button>` : ""}
           <button type="button" data-id="${q.id}" class="btn-edit-quotation text-xs text-steel hover:text-ink font-mono underline-offset-2 hover:underline mr-3">Edit</button>
           <button type="button" data-id="${q.id}" data-number="${escapeHtml(q.number)}" class="btn-delete-quotation text-xs text-steel hover:text-signal font-mono underline-offset-2 hover:underline">Hapus</button>
         </td>
@@ -237,6 +298,10 @@ import StatCard from "../../components/StatCard.astro";
 
     tableBody.querySelectorAll<HTMLButtonElement>(".btn-convert-quotation").forEach((btn) => {
       btn.addEventListener("click", async () => {
+        if (btn.dataset.hasClient !== "1") {
+          window.showToast?.("Penawaran ini belum terhubung ke klien terdaftar. Edit dulu dan pilih klien dari daftar.", "error");
+          return;
+        }
         const id = btn.dataset.id;
         if (!window.confirm("Buat invoice dari penawaran ini?")) return;
         btn.disabled = true;
@@ -321,6 +386,9 @@ import StatCard from "../../components/StatCard.astro";
   function resetForm(): void {
     (document.getElementById("quotation-id") as HTMLInputElement).value = "";
     (document.getElementById("quotation-client") as HTMLInputElement).value = "";
+    (document.getElementById("quotation-client") as HTMLInputElement).disabled = false;
+    document.getElementById("quotation-client-manual-warning")?.classList.add("hidden");
+    renderClientSelect(null);
     (document.getElementById("quotation-project") as HTMLInputElement).value = "";
     (document.getElementById("quotation-description") as HTMLTextAreaElement).value = "";
     (document.getElementById("quotation-amount") as HTMLInputElement).value = "";
@@ -333,7 +401,9 @@ import StatCard from "../../components/StatCard.astro";
     resetForm();
     (document.getElementById("quotation-modal-title") as HTMLElement).textContent = "Edit Penawaran";
     (document.getElementById("quotation-id") as HTMLInputElement).value = q.id;
+    renderClientSelect(q.clientId, q.client);
     (document.getElementById("quotation-client") as HTMLInputElement).value = q.client;
+    syncClientFields();
     (document.getElementById("quotation-project") as HTMLInputElement).value = q.project;
     (document.getElementById("quotation-description") as HTMLTextAreaElement).value = q.description ?? "";
     (document.getElementById("quotation-amount") as HTMLInputElement).value = String(q.amount);
@@ -352,6 +422,7 @@ import StatCard from "../../components/StatCard.astro";
 
   document.getElementById("quotation-modal-save")?.addEventListener("click", async () => {
     const id = (document.getElementById("quotation-id") as HTMLInputElement).value;
+    const clientSelectValue = (document.getElementById("quotation-client-select") as HTMLSelectElement).value;
     const client = (document.getElementById("quotation-client") as HTMLInputElement).value.trim();
     const project = (document.getElementById("quotation-project") as HTMLInputElement).value.trim();
     const description = (document.getElementById("quotation-description") as HTMLTextAreaElement).value.trim();
@@ -362,7 +433,15 @@ import StatCard from "../../components/StatCard.astro";
     const errorBox = document.getElementById("quotation-modal-error");
     const errorMsg = document.getElementById("quotation-modal-error-msg");
 
-    const body = { client, project, description: description || null, amount: Number(amount), validUntil, status };
+    const body = {
+      clientId: clientSelectValue || null,
+      client,
+      project,
+      description: description || null,
+      amount: Number(amount),
+      validUntil,
+      status,
+    };
 
     try {
       const res = await adminApiFetch(
@@ -391,5 +470,6 @@ import StatCard from "../../components/StatCard.astro";
   });
   statusFilter?.addEventListener("change", loadQuotations);
 
+  loadClientOptions();
   loadQuotations();
 </script>
