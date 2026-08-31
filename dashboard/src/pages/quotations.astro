@@ -46,7 +46,7 @@ import StatCard from "../components/StatCard.astro";
   <!-- Table -->
   <div class="panel overflow-hidden">
     <div class="overflow-x-auto">
-      <table id="quotations-table" class="data-table">
+      <table id="quotations-table" class="data-table hidden">
         <thead>
           <tr>
             <th>No. Penawaran</th>
@@ -60,6 +60,18 @@ import StatCard from "../components/StatCard.astro";
         </thead>
         <tbody id="quotations-body"></tbody>
       </table>
+    </div>
+    <div id="quotations-skeleton">
+      {Array.from({ length: 5 }).map(() => (
+        <div class="skeleton-row">
+          <div class="skeleton w-9 h-9 shrink-0"></div>
+          <div class="flex-1 space-y-2">
+            <div class="skeleton h-3 w-1/3"></div>
+            <div class="skeleton h-2.5 w-1/5"></div>
+          </div>
+          <div class="skeleton h-5 w-16 shrink-0"></div>
+        </div>
+      ))}
     </div>
 
     <div id="quotations-empty" class="empty-state min-h-56 hidden">
@@ -83,10 +95,10 @@ import StatCard from "../components/StatCard.astro";
 
   <!-- Modal: Buat / Edit Penawaran -->
   <div id="quotation-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-ink/50">
-    <div class="bg-paper border-2 border-ink w-full max-w-lg max-h-[90vh] overflow-y-auto brutal-shadow">
-      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink sticky top-0 bg-paper">
+    <div class="bg-surface border-2 border-ink w-full max-w-lg max-h-[90vh] overflow-y-auto brutal-shadow">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink sticky top-0 bg-surface">
         <h2 id="quotation-modal-title" class="font-display text-xl text-ink">Buat Penawaran</h2>
-        <button id="quotation-modal-close" type="button" class="text-smoke hover:text-ink transition-colors p-1">
+        <button id="quotation-modal-close" type="button" class="text-steel hover:text-ink transition-colors p-1">
           <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
@@ -96,14 +108,26 @@ import StatCard from "../components/StatCard.astro";
       <div class="p-5 space-y-4">
         <input type="hidden" id="quotation-id" />
 
-        <div id="quotation-form-error" class="hidden border-2 border-signal bg-signal/5 px-3 py-2.5">
+        <div id="quotation-form-error" class="hidden border-2 border-signal bg-signal-dim px-3 py-2.5">
           <p class="font-mono text-xs text-signal" id="quotation-form-error-msg"></p>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label class="field-label" for="quotation-client">Nama Klien</label>
+          <div class="sm:col-span-2">
+            <label class="field-label" for="quotation-client-select">Klien Terdaftar</label>
+            <select id="quotation-client-select" class="field-input">
+              <option value="">— Belum pilih, ketik manual di bawah —</option>
+            </select>
+            <p class="font-mono text-[10px] text-smoke mt-1">
+              Pilih dari daftar supaya penawaran ini bisa langsung dijadikan Invoice nanti.
+            </p>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="field-label" for="quotation-client">Nama Klien (manual)</label>
             <input id="quotation-client" type="text" placeholder="PT Sinar Abadi" class="field-input" />
+            <p id="quotation-client-manual-warning" class="font-mono text-[10px] text-signal mt-1 hidden">
+              Klien manual tidak terhubung ke data klien asli — penawaran ini tidak akan bisa dibuatkan Invoice sampai dihubungkan ke klien terdaftar (edit lagi nanti dan pilih dari daftar di atas).
+            </p>
           </div>
           <div>
             <label class="field-label" for="quotation-project">Nama Proyek</label>
@@ -134,7 +158,7 @@ import StatCard from "../components/StatCard.astro";
         </div>
       </div>
 
-      <div class="flex gap-3 px-5 py-4 border-t border-hairline sticky bottom-0 bg-paper">
+      <div class="flex gap-3 px-5 py-4 border-t border-hairline sticky bottom-0 bg-surface">
         <button id="quotation-modal-cancel" type="button" class="btn-secondary text-sm flex-1">Batal</button>
         <button id="quotation-modal-save" type="button" class="btn-primary text-sm flex-1">Simpan</button>
       </div>
@@ -143,7 +167,7 @@ import StatCard from "../components/StatCard.astro";
 
   <!-- Modal: Konfirmasi Hapus -->
   <div id="quotation-delete-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-ink/50">
-    <div class="bg-paper border-2 border-ink w-full max-w-sm brutal-shadow">
+    <div class="bg-surface border-2 border-ink w-full max-w-sm brutal-shadow">
       <div class="p-5 space-y-2">
         <h2 class="font-display text-xl text-ink">Hapus Penawaran?</h2>
         <p class="font-mono text-xs text-smoke">Tindakan ini tidak bisa dibatalkan.</p>
@@ -167,6 +191,7 @@ import StatCard from "../components/StatCard.astro";
   interface Quotation {
     id: string;
     number: string;
+    clientId: string | null;
     client: string;
     project: string;
     description: string;
@@ -174,6 +199,13 @@ import StatCard from "../components/StatCard.astro";
     validUntil: string;
     status: "draft" | "sent" | "accepted" | "rejected" | "expired";
   }
+
+  interface ClientOption {
+    id: string;
+    label: string;
+  }
+
+  let clientOptions: ClientOption[] = [];
 
   let quotations: Quotation[] = [];
 
@@ -191,6 +223,7 @@ import StatCard from "../components/StatCard.astro";
   const tbody = document.getElementById("quotations-body") as HTMLTableSectionElement;
   const emptyState = document.getElementById("quotations-empty") as HTMLDivElement;
   const table = document.getElementById("quotations-table") as HTMLTableElement;
+  const skeletonEl_quotations = document.getElementById("quotations-skeleton") as HTMLDivElement;
   const countLabel = document.querySelector<HTMLSpanElement>("[data-quotations-count]");
 
   let quotationBeingDeleted: Quotation | null = null;
@@ -202,6 +235,7 @@ import StatCard from "../components/StatCard.astro";
   function renderTable(list: Quotation[]): void {
     tbody.innerHTML = "";
     const isEmpty = list.length === 0;
+    skeletonEl_quotations.classList.add("hidden");
     table.classList.toggle("hidden", isEmpty);
     emptyState.classList.toggle("hidden", !isEmpty);
     if (countLabel) countLabel.textContent = `${list.length} penawaran`;
@@ -222,13 +256,14 @@ import StatCard from "../components/StatCard.astro";
           </span>
         </td>
         <td class="text-right">
-          <button type="button" data-edit="${q.id}" class="text-smoke hover:text-ink p-1" title="Edit">
+          ${q.status === "accepted" ? `<button type="button" data-convert="${q.id}" data-has-client="${q.clientId ? "1" : "0"}" class="text-armed hover:underline p-1 font-mono text-[10px] uppercase tracking-wide mr-1 ${!q.clientId ? "opacity-50 cursor-not-allowed" : ""}" ${!q.clientId ? `title="Penawaran ini belum terhubung ke klien terdaftar — edit dan pilih klien dari daftar dulu sebelum bisa dibuatkan invoice."` : `title="Buat Invoice"`}>Buat Invoice</button>` : ""}
+          <button type="button" data-edit="${q.id}" class="text-steel hover:text-ink p-1" title="Edit">
             <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
           </button>
-          <button type="button" data-delete="${q.id}" class="text-smoke hover:text-signal p-1" title="Hapus">
+          <button type="button" data-delete="${q.id}" class="text-steel hover:text-signal p-1" title="Hapus">
             <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
               <polyline points="3 6 5 6 21 6"/>
               <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
@@ -240,6 +275,32 @@ import StatCard from "../components/StatCard.astro";
       tbody.appendChild(tr);
     });
 
+    tbody.querySelectorAll<HTMLButtonElement>("[data-convert]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (btn.dataset.hasClient !== "1") {
+          window.showToast?.("Penawaran ini belum terhubung ke klien terdaftar. Edit dulu dan pilih klien dari daftar.", "error");
+          return;
+        }
+        const id = btn.dataset.convert;
+        if (!window.confirm("Buat invoice dari penawaran ini?")) return;
+        btn.setAttribute("disabled", "true");
+        try {
+          const res = await adminApiFetch(`${apiUrl}/api/invoices/from-quotation/${id}`, { method: "POST" });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            window.showToast?.(json.error ?? "Gagal membuat invoice dari penawaran", "error");
+            return;
+          }
+          window.showToast?.(json.message ?? "Invoice berhasil dibuat dari penawaran");
+          window.location.href = "/invoices";
+        } catch (err) {
+          console.error("[btn-convert] gagal fetch backend:", err);
+          window.showToast?.("Tidak bisa terhubung ke server", "error");
+        } finally {
+          btn.removeAttribute("disabled");
+        }
+      });
+    });
     tbody.querySelectorAll<HTMLButtonElement>("[data-edit]").forEach((btn) => {
       btn.addEventListener("click", () => openEditModal(btn.dataset.edit!));
     });
@@ -266,7 +327,7 @@ import StatCard from "../components/StatCard.astro";
     if (!card) return;
     let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
     if (!valueEl) {
-      const skeleton = card.querySelector(".animate-pulse")?.parentElement;
+      const skeleton = card.querySelector(".skeleton")?.parentElement;
       valueEl = document.createElement("p");
       const isAccent = card.classList.contains("bg-ink");
       valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
@@ -326,6 +387,50 @@ import StatCard from "../components/StatCard.astro";
     }
   }
 
+  async function loadClientOptions(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/clients/options`);
+      const json = await res.json();
+      if (!res.ok) return;
+      clientOptions = json.data ?? [];
+    } catch (err) {
+      console.error("[loadClientOptions] gagal fetch backend:", err);
+    }
+  }
+
+  function renderClientSelect(currentClientId?: string | null, currentClientName?: string): void {
+    const select = document.getElementById("quotation-client-select") as HTMLSelectElement;
+    const options = [...clientOptions];
+    // Kalau quotation yang sedang diedit klien-nya tidak ada di 20 hasil
+    // teratas (limit di /api/clients/options), sisipkan manual supaya
+    // pilihan yang sudah tersambung tidak hilang dari tampilan.
+    if (currentClientId && !options.some((o) => o.id === currentClientId)) {
+      options.unshift({ id: currentClientId, label: currentClientName ?? "(klien saat ini)" });
+    }
+    select.innerHTML =
+      `<option value="">— Belum pilih, ketik manual di bawah —</option>` +
+      options.map((o) => `<option value="${o.id}">${escapeHtml(o.label)}</option>`).join("");
+    select.value = currentClientId ?? "";
+  }
+
+  function syncClientFields(): void {
+    const select = document.getElementById("quotation-client-select") as HTMLSelectElement;
+    const manualInput = document.getElementById("quotation-client") as HTMLInputElement;
+    const warning = document.getElementById("quotation-client-manual-warning") as HTMLElement;
+    const hasSelectValue = Boolean(select.value);
+    manualInput.disabled = hasSelectValue;
+    if (hasSelectValue) {
+      const opt = select.options[select.selectedIndex];
+      manualInput.value = opt?.textContent ?? "";
+      warning.classList.add("hidden");
+    } else {
+      warning.classList.toggle("hidden", !manualInput.value.trim());
+    }
+  }
+
+  document.getElementById("quotation-client-select")?.addEventListener("change", syncClientFields);
+  document.getElementById("quotation-client")?.addEventListener("input", syncClientFields);
+
   function openModal(id: string) { document.getElementById(id)?.classList.replace("hidden", "flex"); }
   function closeModal(id: string) { document.getElementById(id)?.classList.replace("flex", "hidden"); }
 
@@ -333,6 +438,9 @@ import StatCard from "../components/StatCard.astro";
     hideFormError();
     (document.getElementById("quotation-id") as HTMLInputElement).value = "";
     (document.getElementById("quotation-client") as HTMLInputElement).value = "";
+    (document.getElementById("quotation-client") as HTMLInputElement).disabled = false;
+    document.getElementById("quotation-client-manual-warning")?.classList.add("hidden");
+    renderClientSelect(null);
     (document.getElementById("quotation-project") as HTMLInputElement).value = "";
     (document.getElementById("quotation-desc") as HTMLTextAreaElement).value = "";
     (document.getElementById("quotation-amount") as HTMLInputElement).value = "";
@@ -351,7 +459,9 @@ import StatCard from "../components/StatCard.astro";
     if (!q) return;
     (document.getElementById("quotation-modal-title") as HTMLElement).textContent = "Edit Penawaran";
     (document.getElementById("quotation-id") as HTMLInputElement).value = q.id;
+    renderClientSelect(q.clientId, q.client);
     (document.getElementById("quotation-client") as HTMLInputElement).value = q.client;
+    syncClientFields();
     (document.getElementById("quotation-project") as HTMLInputElement).value = q.project;
     (document.getElementById("quotation-desc") as HTMLTextAreaElement).value = q.description;
     (document.getElementById("quotation-amount") as HTMLInputElement).value = String(q.amount);
@@ -368,6 +478,7 @@ import StatCard from "../components/StatCard.astro";
   async function saveQuotation(): Promise<void> {
     hideFormError();
     const id = (document.getElementById("quotation-id") as HTMLInputElement).value;
+    const clientSelectValue = (document.getElementById("quotation-client-select") as HTMLSelectElement).value;
     const client = (document.getElementById("quotation-client") as HTMLInputElement).value.trim();
     const project = (document.getElementById("quotation-project") as HTMLInputElement).value.trim();
     const description = (document.getElementById("quotation-desc") as HTMLTextAreaElement).value.trim();
@@ -380,7 +491,15 @@ import StatCard from "../components/StatCard.astro";
       return;
     }
 
-    const payload = { client, project, description, amount, validUntil, status };
+    const payload = {
+      clientId: clientSelectValue || null,
+      client,
+      project,
+      description,
+      amount,
+      validUntil,
+      status,
+    };
 
     const saveBtn = document.getElementById("quotation-modal-save") as HTMLButtonElement;
     const originalLabel = saveBtn.textContent;
@@ -461,5 +580,6 @@ import StatCard from "../components/StatCard.astro";
     exportTableToPDF("quotations-table", { title: "Rekap Penawaran", subtitle: "Data quotations FIREPRO" });
   });
 
+  loadClientOptions();
   loadQuotations();
 </script>
