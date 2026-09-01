@@ -4,27 +4,22 @@ import PageHeader from "../../components/PageHeader.astro";
 ---
 
 <OwnerLayout title="Settings" activeNav="settings">
-  <PageHeader heading="Settings" sub="Konfigurasi akun, perusahaan, dan sistem" crumbs={[{ label: "Sistem" }, { label: "Settings" }]} />
+  <PageHeader heading="Settings" sub="Profil akun dan kebijakan penggunaan" crumbs={[{ label: "Sistem" }, { label: "Settings" }]} />
 
   <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6">
-    <!-- Nav tabs -->
     <div class="lg:col-span-1">
       <nav class="panel p-2 space-y-1">
-        <button type="button" data-settings-tab="account" class="settings-tab active w-full text-left px-3 py-2 font-body text-sm font-semibold rounded-sm">Akun Saya</button>
-        <button type="button" data-settings-tab="company" class="settings-tab w-full text-left px-3 py-2 font-body text-sm text-charcoal rounded-sm">Profil Perusahaan</button>
-        <button type="button" data-settings-tab="roles" class="settings-tab w-full text-left px-3 py-2 font-body text-sm text-charcoal rounded-sm">Role & Izin Akses</button>
-        <button type="button" data-settings-tab="notif" class="settings-tab w-full text-left px-3 py-2 font-body text-sm text-charcoal rounded-sm">Notifikasi</button>
+        <button type="button" data-settings-tab="account" class="settings-tab active w-full text-left px-3 py-2 font-body text-sm font-semibold rounded-sm">Profil</button>
+        <button type="button" data-settings-tab="terms" class="settings-tab w-full text-left px-3 py-2 font-body text-sm text-charcoal rounded-sm">Terms & Policy</button>
       </nav>
     </div>
 
-    <!-- Panels -->
     <div class="lg:col-span-4 space-y-4 sm:space-y-6">
 
-      <!-- Akun Saya -->
       <form id="panel-account" class="settings-panel panel">
         <div class="px-5 py-4 border-b-2 border-ink">
-          <h3 class="font-display text-lg text-ink leading-none">Akun Saya</h3>
-          <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Informasi profil pemilik</p>
+          <h3 class="font-display text-lg text-ink leading-none">Profil</h3>
+          <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Informasi akun Owner</p>
         </div>
         <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -40,9 +35,16 @@ import PageHeader from "../../components/PageHeader.astro";
             <input id="acc-phone" type="tel" class="field-input" placeholder="08xx-xxxx-xxxx" />
           </div>
           <div>
+            <label class="field-label" for="acc-current-password">Password Saat Ini <span class="text-smoke normal-case">— isi hanya jika ganti password</span></label>
+            <input id="acc-current-password" type="password" class="field-input" placeholder="••••••••" autocomplete="current-password" />
+          </div>
+          <div>
             <label class="field-label" for="acc-password">Password Baru</label>
-            <input id="acc-password" type="password" class="field-input" placeholder="••••••••" />
+            <input id="acc-password" type="password" class="field-input" placeholder="Min. 6 karakter" autocomplete="new-password" />
           </div>
+        </div>
+        <div id="panel-account-error" class="hidden mx-5 mb-4 border-2 border-signal bg-signal-dim px-3 py-2">
+          <p id="panel-account-error-msg" class="font-mono text-xs text-signal"></p>
         </div>
         <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
           <button type="reset" class="btn-secondary text-xs">Batal</button>
@@ -50,130 +52,24 @@ import PageHeader from "../../components/PageHeader.astro";
         </div>
       </form>
 
-      <!-- Profil Perusahaan -->
-      <form id="panel-company" class="settings-panel panel hidden">
+      <div id="panel-terms" class="settings-panel panel hidden">
         <div class="px-5 py-4 border-b-2 border-ink">
-          <h3 class="font-display text-lg text-ink leading-none">Profil Perusahaan</h3>
-          <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Identitas bisnis FIREPRO</p>
+          <h3 class="font-display text-lg text-ink leading-none">Terms & Policy</h3>
+          <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Ketentuan penggunaan sistem FIREPRO</p>
         </div>
-        <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div class="sm:col-span-2">
-            <label class="field-label" for="co-name">Nama Perusahaan</label>
-            <input id="co-name" type="text" class="field-input" placeholder="PT Fire Protection Indonesia" />
-          </div>
-          <div class="sm:col-span-2">
-            <label class="field-label" for="co-address">Alamat</label>
-            <input id="co-address" type="text" class="field-input" placeholder="Alamat kantor" />
+        <div class="p-5 space-y-4 text-sm text-charcoal leading-relaxed">
+          <div>
+            <h4 class="font-semibold text-ink mb-1">Penggunaan Sistem</h4>
+            <p>FIREPRO digunakan untuk mengelola operasional layanan proteksi kebakaran secara internal. Setiap akun hanya boleh digunakan oleh pemiliknya sendiri dan tidak boleh dibagikan ke pihak lain.</p>
           </div>
           <div>
-            <label class="field-label" for="co-npwp">NPWP</label>
-            <input id="co-npwp" type="text" class="field-input" placeholder="00.000.000.0-000.000" />
+            <h4 class="font-semibold text-ink mb-1">Kerahasiaan Data</h4>
+            <p>Data klien, proyek, dan keuangan yang tersimpan di sistem ini bersifat rahasia dan hanya boleh diakses sesuai kewenangan role masing-masing pengguna.</p>
           </div>
           <div>
-            <label class="field-label" for="co-phone">Telepon Kantor</label>
-            <input id="co-phone" type="tel" class="field-input" placeholder="021-xxxxxxx" />
+            <h4 class="font-semibold text-ink mb-1">Keamanan Akun</h4>
+            <p>Pengguna bertanggung jawab menjaga kerahasiaan password akunnya. Segera ganti password dan laporkan ke Owner apabila mencurigai ada akses tidak sah ke akun Anda.</p>
           </div>
-        </div>
-        <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
-          <button type="reset" class="btn-secondary text-xs">Batal</button>
-          <button type="submit" class="btn-primary text-xs">Simpan Perubahan</button>
-        </div>
-      </form>
-
-      <!-- Role & Izin Akses -->
-      <div id="panel-roles" class="settings-panel panel hidden">
-        <div class="px-5 py-4 border-b-2 border-ink">
-          <h3 class="font-display text-lg text-ink leading-none">Role & Izin Akses</h3>
-          <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Atur hak akses tiap role dalam sistem</p>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Modul</th>
-                <th class="text-center">Owner</th>
-                <th class="text-center">Admin</th>
-                <th class="text-center">Supervisor</th>
-                <th class="text-center">Teknisi Lapangan</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Users & Roles</td>
-                <td class="text-center"><span class="badge badge-active">Penuh</span></td>
-                <td class="text-center"><span class="badge badge-inactive">—</span></td>
-                <td class="text-center"><span class="badge badge-inactive">—</span></td>
-                <td class="text-center"><span class="badge badge-inactive">—</span></td>
-              </tr>
-              <tr>
-                <td>Invoices & Quotations</td>
-                <td class="text-center"><span class="badge badge-active">Penuh</span></td>
-                <td class="text-center"><span class="badge badge-active">Penuh</span></td>
-                <td class="text-center"><span class="badge badge-inactive">—</span></td>
-                <td class="text-center"><span class="badge badge-inactive">—</span></td>
-              </tr>
-              <tr>
-                <td>Projects & Maintenance</td>
-                <td class="text-center"><span class="badge badge-active">Penuh</span></td>
-                <td class="text-center"><span class="badge badge-active">Penuh</span></td>
-                <td class="text-center"><span class="badge badge-new">Lapangan</span></td>
-                <td class="text-center"><span class="badge badge-inactive">—</span></td>
-              </tr>
-              <tr>
-                <td>Inventory</td>
-                <td class="text-center"><span class="badge badge-active">Penuh + Approve</span></td>
-                <td class="text-center"><span class="badge badge-active">Penuh</span></td>
-                <td class="text-center"><span class="badge badge-new">Request</span></td>
-                <td class="text-center"><span class="badge badge-new">Request</span></td>
-              </tr>
-              <tr>
-                <td>My Tasks & Daily Report</td>
-                <td class="text-center"><span class="badge badge-inactive">—</span></td>
-                <td class="text-center"><span class="badge badge-inactive">—</span></td>
-                <td class="text-center"><span class="badge badge-new">Review</span></td>
-                <td class="text-center"><span class="badge badge-active">Penuh</span></td>
-              </tr>
-              <tr>
-                <td>Reports (Omzet & Laba)</td>
-                <td class="text-center"><span class="badge badge-active">Penuh</span></td>
-                <td class="text-center"><span class="badge badge-inactive">—</span></td>
-                <td class="text-center"><span class="badge badge-inactive">—</span></td>
-                <td class="text-center"><span class="badge badge-inactive">—</span></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p class="font-mono text-[9px] text-smoke px-5 py-4 border-t border-hairline">
-          Matriks izin ini bersifat referensi visual di tahap prototipe — belum tersambung ke sistem RBAC backend.
-        </p>
-      </div>
-
-      <!-- Notifikasi -->
-      <div id="panel-notif" class="settings-panel panel hidden">
-        <div class="px-5 py-4 border-b-2 border-ink">
-          <h3 class="font-display text-lg text-ink leading-none">Preferensi Notifikasi</h3>
-          <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Pilih notifikasi yang ingin diterima</p>
-        </div>
-        <div class="p-5 space-y-4">
-          <label class="flex items-center justify-between gap-3 cursor-pointer">
-            <span class="text-sm text-ink">Permintaan pembelian barang baru</span>
-            <input type="checkbox" checked class="w-4 h-4 accent-signal" />
-          </label>
-          <label class="flex items-center justify-between gap-3 cursor-pointer">
-            <span class="text-sm text-ink">Invoice jatuh tempo</span>
-            <input type="checkbox" checked class="w-4 h-4 accent-signal" />
-          </label>
-          <label class="flex items-center justify-between gap-3 cursor-pointer">
-            <span class="text-sm text-ink">Proyek selesai menunggu approval</span>
-            <input type="checkbox" checked class="w-4 h-4 accent-signal" />
-          </label>
-          <label class="flex items-center justify-between gap-3 cursor-pointer">
-            <span class="text-sm text-ink">Laporan mingguan otomatis via email</span>
-            <input type="checkbox" class="w-4 h-4 accent-signal" />
-          </label>
-        </div>
-        <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
-          <button id="btn-save-notif" type="button" class="btn-primary text-xs">Simpan Preferensi</button>
         </div>
       </div>
 
@@ -189,13 +85,15 @@ import PageHeader from "../../components/PageHeader.astro";
 </style>
 
 <script>
-  // Prototype UI only — belum terhubung ke endpoint settings.
+  import { adminApiFetch, getAdminAuth, setAdminAuth } from "../../lib/auth";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
   const tabs = document.querySelectorAll<HTMLButtonElement>("[data-settings-tab]");
   const panels: Record<string, HTMLElement | null> = {
     account: document.getElementById("panel-account"),
-    company: document.getElementById("panel-company"),
-    roles: document.getElementById("panel-roles"),
-    notif: document.getElementById("panel-notif"),
+    terms: document.getElementById("panel-terms"),
   };
 
   tabs.forEach((tab) => {
@@ -209,15 +107,86 @@ import PageHeader from "../../components/PageHeader.astro";
     });
   });
 
-  document.getElementById("panel-account")?.addEventListener("submit", (e) => {
+  const { admin: currentAdmin, token: currentToken } = getAdminAuth();
+  const nameInput = document.getElementById("acc-name") as HTMLInputElement;
+  const emailInput = document.getElementById("acc-email") as HTMLInputElement;
+  const phoneInput = document.getElementById("acc-phone") as HTMLInputElement;
+  const currentPasswordInput = document.getElementById("acc-current-password") as HTMLInputElement;
+  const newPasswordInput = document.getElementById("acc-password") as HTMLInputElement;
+  const errorBox = document.getElementById("panel-account-error");
+  const errorMsg = document.getElementById("panel-account-error-msg");
+
+  if (currentAdmin) {
+    nameInput.value = currentAdmin.name ?? "";
+    emailInput.value = currentAdmin.email ?? "";
+    phoneInput.value = currentAdmin.phone ?? "";
+  }
+
+  function showAccountError(msg: string): void {
+    if (errorMsg) errorMsg.textContent = msg;
+    errorBox?.classList.remove("hidden");
+  }
+  function hideAccountError(): void {
+    errorBox?.classList.add("hidden");
+  }
+
+  document.getElementById("panel-account")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    window.showToast?.("Akun tersimpan (prototype)", "success");
-  });
-  document.getElementById("panel-company")?.addEventListener("submit", (e) => {
-    e.preventDefault();
-    window.showToast?.("Profil perusahaan tersimpan (prototype)", "success");
-  });
-  document.getElementById("btn-save-notif")?.addEventListener("click", () => {
-    window.showToast?.("Preferensi notifikasi tersimpan (prototype)", "success");
+    hideAccountError();
+    if (!currentAdmin) return;
+
+    const name = nameInput.value.trim();
+    const email = emailInput.value.trim();
+    const phone = phoneInput.value.trim();
+    const newPassword = newPasswordInput.value;
+    const currentPassword = currentPasswordInput.value;
+
+    if (!name) {
+      showAccountError("Nama tidak boleh kosong.");
+      return;
+    }
+    if (newPassword && newPassword.length < 6) {
+      showAccountError("Password baru minimal 6 karakter.");
+      return;
+    }
+    if (newPassword && !currentPassword) {
+      showAccountError("Password saat ini wajib diisi untuk mengganti password.");
+      return;
+    }
+
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/owner/users/${currentAdmin.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name, email: email || null, phone: phone || null }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        showAccountError(json.error ?? "Gagal menyimpan profil.");
+        return;
+      }
+
+      if (currentToken) {
+        setAdminAuth(currentToken, { ...currentAdmin, name, email, phone });
+      }
+
+      if (newPassword) {
+        const pwRes = await adminApiFetch(`${apiUrl}/api/owner/users/${currentAdmin.id}/password`, {
+          method: "PATCH",
+          body: JSON.stringify({ currentPassword, newPassword }),
+        });
+        const pwJson = await pwRes.json();
+        if (!pwRes.ok) {
+          showAccountError(pwJson.error ?? "Profil tersimpan, tapi gagal ganti password.");
+          return;
+        }
+        currentPasswordInput.value = "";
+        newPasswordInput.value = "";
+      }
+
+      window.showToast?.("Akun berhasil diperbarui");
+    } catch (err) {
+      console.error("[panel-account submit] gagal fetch backend:", err);
+      showAccountError("Tidak bisa terhubung ke server.");
+    }
   });
 </script>
