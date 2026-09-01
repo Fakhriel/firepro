@@ -7,11 +7,30 @@ const {
   deleteHandler,
 } = require('../../modules/inventory/inventory.controller');
 const purchaseRequestsService = require('../../modules/purchase-requests/purchase-requests.service');
+const { makeUploader, verifyUploadedImage, toPublicUrl } = require('../../utils/uploadStorage');
 
+const upload = makeUploader('inventory');
 const router = express.Router();
 
 // GET /api/owner/inventory/admin
 router.get('/admin', listHandler);
+
+// POST /api/owner/inventory/upload-image — multipart/form-data, field: image
+// Dipakai drag & drop di form Inventory. Mengembalikan URL publik untuk
+// langsung dimasukkan ke array `images` saat create/update item.
+router.post('/upload-image', upload.single('image'), verifyUploadedImage, (req, res, next) => {
+  try {
+    if (!req.file) {
+      const err = new Error('File gambar wajib diupload.');
+      err.status = 400;
+      err.expose = true;
+      throw err;
+    }
+    res.status(201).json({ data: { url: toPublicUrl('inventory', req.file.filename) } });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // --- Purchase requests (ditaruh sebelum /:id supaya "requests" tidak
 // ketangkep sebagai :id) ---
