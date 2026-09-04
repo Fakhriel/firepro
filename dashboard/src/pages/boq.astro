@@ -72,8 +72,8 @@ import StatCard from "../components/StatCard.astro";
 
   <!-- Create / Edit modal -->
   <div id="boq-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
-    <div class="panel w-full max-w-lg bg-surface max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+    <div class="panel w-full max-w-2xl bg-surface max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink shrink-0">
         <h3 id="boq-modal-title" class="font-display text-lg text-ink leading-none">Tambah Item BOQ</h3>
         <button id="boq-modal-close" type="button" class="text-steel hover:text-ink transition-colors" aria-label="Tutup">
           <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
@@ -81,68 +81,81 @@ import StatCard from "../components/StatCard.astro";
           </svg>
         </button>
       </div>
-      <div class="p-5 space-y-4">
-        <div>
-          <label class="field-label" for="bf-project">Proyek</label>
-          <select id="bf-project" class="field-input">
-            <option value="">Pilih proyek…</option>
-          </select>
-        </div>
-        <div>
-          <label class="field-label" for="bf-quotation">Penawaran (Quotation) <span class="text-smoke normal-case">(opsional)</span></label>
-          <select id="bf-quotation" class="field-input">
-            <option value="">Tanpa penawaran terkait</option>
-          </select>
-        </div>
-        <div>
-          <label class="field-label" for="bf-item-name">Nama Item</label>
-          <input id="bf-item-name" type="text" class="field-input" placeholder="Contoh: Pipa sprinkler 1 inch" />
-        </div>
-        <div>
-          <label class="field-label" for="bf-description">Deskripsi <span class="text-smoke normal-case">(opsional)</span></label>
-          <textarea id="bf-description" rows="2" class="field-input resize-none"></textarea>
-        </div>
+      <div class="p-5 space-y-4 overflow-y-auto">
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="field-label" for="bf-category">Kategori</label>
-            <select id="bf-category" class="field-input">
-              <option value="material">Material</option>
-              <option value="labor">Tenaga Kerja</option>
-              <option value="service">Jasa</option>
-              <option value="equipment">Peralatan</option>
-              <option value="other">Lainnya</option>
+            <label class="field-label" for="bf-project">Proyek</label>
+            <select id="bf-project" class="field-input">
+              <option value="">Pilih proyek…</option>
             </select>
           </div>
           <div>
-            <label class="field-label" for="bf-specification">Spesifikasi <span class="text-smoke normal-case">(opsional)</span></label>
-            <input id="bf-specification" type="text" class="field-input" />
+            <label class="field-label" for="bf-quotation">Penawaran <span class="text-smoke normal-case">(opsional)</span></label>
+            <select id="bf-quotation" class="field-input">
+              <option value="">Tanpa penawaran terkait</option>
+            </select>
           </div>
         </div>
-        <div class="grid grid-cols-3 gap-4">
-          <div>
-            <label class="field-label" for="bf-qty">Qty</label>
-            <input id="bf-qty" type="number" min="0" step="0.01" value="1" class="field-input" />
-          </div>
-          <div>
-            <label class="field-label" for="bf-unit">Satuan</label>
-            <input id="bf-unit" type="text" class="field-input" placeholder="pcs, m, m2, ls…" />
-          </div>
-          <div>
-            <label class="field-label" for="bf-unit-price">Harga Satuan (Rp)</label>
-            <input id="bf-unit-price" type="number" min="0" step="1" value="0" class="field-input" />
-          </div>
-        </div>
-        <p class="font-mono text-[10px] text-smoke">Total dihitung otomatis oleh server (qty × harga satuan) — tidak perlu diisi manual.</p>
+
+        <div id="boq-rows" class="space-y-3"></div>
+
+        <button id="btn-add-boq-row" type="button" class="text-xs font-mono uppercase tracking-wide text-signal hover:underline">
+          + Tambah Baris Item
+        </button>
+
+        <p class="font-mono text-[10px] text-smoke">Total per baris dihitung otomatis oleh server (qty × harga satuan).</p>
         <div id="boq-modal-error" class="hidden border-2 border-signal bg-signal/5 px-3 py-2">
           <p id="boq-modal-error-msg" class="font-mono text-xs text-signal"></p>
         </div>
       </div>
-      <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
+      <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline shrink-0">
         <button id="boq-modal-cancel" type="button" class="btn-secondary text-xs">Batal</button>
         <button id="boq-modal-save" type="button" class="btn-primary text-xs">Simpan</button>
       </div>
     </div>
   </div>
+
+  <template id="boq-row-template">
+    <div class="boq-row border-2 border-hairline p-3 space-y-3 relative">
+      <button type="button" class="btn-remove-row absolute top-2 right-2 text-steel hover:text-signal" aria-label="Hapus baris">
+        <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <div class="grid grid-cols-2 gap-3 pr-6">
+        <div>
+          <label class="field-label">Nama Item</label>
+          <input type="text" class="field-input row-item-name" placeholder="Contoh: Pipa sprinkler 1 inch" />
+        </div>
+        <div>
+          <label class="field-label">Kategori</label>
+          <select class="field-input row-category">
+            <option value="material">Material</option>
+            <option value="labor">Tenaga Kerja</option>
+            <option value="service">Jasa</option>
+            <option value="equipment">Peralatan</option>
+            <option value="other">Lainnya</option>
+          </select>
+        </div>
+      </div>
+      <div class="row-field-spec">
+        <label class="field-label">Spesifikasi <span class="text-smoke normal-case">(opsional)</span></label>
+        <input type="text" class="field-input row-specification" />
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        <div class="row-field-qty">
+          <label class="field-label">Qty</label>
+          <input type="number" min="0" step="0.01" value="1" class="field-input row-qty" />
+        </div>
+        <div class="row-field-unit">
+          <label class="field-label">Satuan</label>
+          <input type="text" class="field-input row-unit" placeholder="pcs, m, m2, ls…" />
+        </div>
+        <div>
+          <label class="field-label">Harga Satuan (Rp)</label>
+          <input type="number" min="0" step="1" value="0" class="field-input row-unit-price" />
+        </div>
+      </div>
+    </div>
+  </template>
 
   <!-- Delete confirm modal -->
   <div id="boq-delete-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
@@ -375,16 +388,73 @@ import StatCard from "../components/StatCard.astro";
     refreshQuotationSelectForProject((e.target as HTMLSelectElement).value);
   });
 
+  const CATEGORY_HIDDEN_FIELDS: Record<string, string[]> = {
+    // Jasa: satuan ukur/qty/spesifikasi biasanya tidak relevan untuk
+    // baris jasa borongan — harga satuan tetap tampil karena itu yang
+    // menentukan nilai baris ini. Kategori lain menampilkan semua field.
+    service: ["qty", "unit", "spec"],
+  };
+
+  function applyRowCategoryVisibility(rowEl: HTMLElement): void {
+    const category = (rowEl.querySelector(".row-category") as HTMLSelectElement).value;
+    const hidden = CATEGORY_HIDDEN_FIELDS[category] ?? [];
+    const qtyField = rowEl.querySelector(".row-field-qty") as HTMLElement;
+    const unitField = rowEl.querySelector(".row-field-unit") as HTMLElement;
+    const specField = rowEl.querySelector(".row-field-spec") as HTMLElement;
+    const qtyInput = rowEl.querySelector(".row-qty") as HTMLInputElement;
+    const unitInput = rowEl.querySelector(".row-unit") as HTMLInputElement;
+
+    qtyField.classList.toggle("hidden", hidden.includes("qty"));
+    unitField.classList.toggle("hidden", hidden.includes("unit"));
+    specField.classList.toggle("hidden", hidden.includes("spec"));
+
+    if (hidden.includes("qty") && !qtyInput.value) qtyInput.value = "1";
+    if (hidden.includes("unit") && !unitInput.value) unitInput.value = "paket";
+  }
+
+  function createBoqRow(data?: Partial<BoqRow>): HTMLElement {
+    const template = document.getElementById("boq-row-template") as HTMLTemplateElement;
+    const row = (template.content.firstElementChild as HTMLElement).cloneNode(true) as HTMLElement;
+
+    if (data) {
+      (row.querySelector(".row-item-name") as HTMLInputElement).value = data.itemName ?? "";
+      (row.querySelector(".row-category") as HTMLSelectElement).value = data.category ?? "material";
+      (row.querySelector(".row-specification") as HTMLInputElement).value = data.specification ?? "";
+      (row.querySelector(".row-qty") as HTMLInputElement).value = String(data.qty ?? 1);
+      (row.querySelector(".row-unit") as HTMLInputElement).value = data.unit ?? "";
+      (row.querySelector(".row-unit-price") as HTMLInputElement).value = String(data.unitPrice ?? 0);
+    }
+
+    row.querySelector(".row-category")?.addEventListener("change", () => applyRowCategoryVisibility(row));
+    row.querySelector(".btn-remove-row")?.addEventListener("click", () => {
+      if (document.querySelectorAll("#boq-rows .boq-row").length > 1) row.remove();
+    });
+
+    applyRowCategoryVisibility(row);
+    return row;
+  }
+
+  const rowsContainer = document.getElementById("boq-rows") as HTMLDivElement;
+  document.getElementById("btn-add-boq-row")?.addEventListener("click", () => {
+    rowsContainer.appendChild(createBoqRow());
+  });
+
+  function readBoqRow(rowEl: HTMLElement) {
+    return {
+      itemName: (rowEl.querySelector(".row-item-name") as HTMLInputElement).value.trim(),
+      category: (rowEl.querySelector(".row-category") as HTMLSelectElement).value,
+      specification: (rowEl.querySelector(".row-specification") as HTMLInputElement).value.trim(),
+      qty: Number((rowEl.querySelector(".row-qty") as HTMLInputElement).value || 0),
+      unit: (rowEl.querySelector(".row-unit") as HTMLInputElement).value.trim(),
+      unitPrice: Number((rowEl.querySelector(".row-unit-price") as HTMLInputElement).value || 0),
+    };
+  }
+
   function resetBoqForm(): void {
     (document.getElementById("bf-project") as HTMLSelectElement).value = "";
     refreshQuotationSelectForProject("");
-    (document.getElementById("bf-item-name") as HTMLInputElement).value = "";
-    (document.getElementById("bf-description") as HTMLTextAreaElement).value = "";
-    (document.getElementById("bf-category") as HTMLSelectElement).value = "material";
-    (document.getElementById("bf-specification") as HTMLInputElement).value = "";
-    (document.getElementById("bf-qty") as HTMLInputElement).value = "1";
-    (document.getElementById("bf-unit") as HTMLInputElement).value = "";
-    (document.getElementById("bf-unit-price") as HTMLInputElement).value = "0";
+    rowsContainer.innerHTML = "";
+    rowsContainer.appendChild(createBoqRow());
     document.getElementById("boq-modal-error")?.classList.add("hidden");
   }
 
@@ -392,21 +462,19 @@ import StatCard from "../components/StatCard.astro";
     editingId = item?.id ?? null;
     resetBoqForm();
     const title = document.getElementById("boq-modal-title") as HTMLElement;
+    const addRowBtn = document.getElementById("btn-add-boq-row") as HTMLElement;
 
     if (item) {
       title.textContent = "Edit Item BOQ";
+      addRowBtn.classList.add("hidden");
       (document.getElementById("bf-project") as HTMLSelectElement).value = String(item.projectId);
       refreshQuotationSelectForProject(String(item.projectId));
       (document.getElementById("bf-quotation") as HTMLSelectElement).value = item.quotationId ? String(item.quotationId) : "";
-      (document.getElementById("bf-item-name") as HTMLInputElement).value = item.itemName;
-      (document.getElementById("bf-description") as HTMLTextAreaElement).value = item.description;
-      (document.getElementById("bf-category") as HTMLSelectElement).value = item.category;
-      (document.getElementById("bf-specification") as HTMLInputElement).value = item.specification;
-      (document.getElementById("bf-qty") as HTMLInputElement).value = String(item.qty);
-      (document.getElementById("bf-unit") as HTMLInputElement).value = item.unit;
-      (document.getElementById("bf-unit-price") as HTMLInputElement).value = String(item.unitPrice);
+      rowsContainer.innerHTML = "";
+      rowsContainer.appendChild(createBoqRow(item));
     } else {
       title.textContent = "Tambah Item BOQ";
+      addRowBtn.classList.remove("hidden");
     }
     openModal("boq-modal");
   }
@@ -425,44 +493,54 @@ import StatCard from "../components/StatCard.astro";
   document.getElementById("boq-modal-save")?.addEventListener("click", async () => {
     const projectId = (document.getElementById("bf-project") as HTMLSelectElement).value;
     const quotationId = (document.getElementById("bf-quotation") as HTMLSelectElement).value;
-    const itemName = (document.getElementById("bf-item-name") as HTMLInputElement).value.trim();
-    const description = (document.getElementById("bf-description") as HTMLTextAreaElement).value.trim();
-    const category = (document.getElementById("bf-category") as HTMLSelectElement).value;
-    const specification = (document.getElementById("bf-specification") as HTMLInputElement).value.trim();
-    const qty = Number((document.getElementById("bf-qty") as HTMLInputElement).value || 0);
-    const unit = (document.getElementById("bf-unit") as HTMLInputElement).value.trim();
-    const unitPrice = Number((document.getElementById("bf-unit-price") as HTMLInputElement).value || 0);
 
     if (!projectId) return showBoqFormError("Proyek wajib dipilih.");
-    if (!itemName) return showBoqFormError("Nama item wajib diisi.");
-    if (!unit) return showBoqFormError("Satuan wajib diisi.");
-    if (Number.isNaN(qty) || qty < 0) return showBoqFormError("Qty harus angka >= 0.");
-    if (Number.isNaN(unitPrice) || unitPrice < 0) return showBoqFormError("Harga satuan harus angka >= 0.");
 
-    const payload = {
+    const rowEls = Array.from(document.querySelectorAll<HTMLElement>("#boq-rows .boq-row"));
+    const rows = rowEls.map(readBoqRow);
+
+    for (const row of rows) {
+      if (!row.itemName) return showBoqFormError("Nama item wajib diisi di semua baris.");
+      if (!row.unit) return showBoqFormError(`Satuan wajib diisi untuk "${row.itemName}".`);
+      if (Number.isNaN(row.qty) || row.qty < 0) return showBoqFormError(`Qty tidak valid untuk "${row.itemName}".`);
+      if (Number.isNaN(row.unitPrice) || row.unitPrice < 0) return showBoqFormError(`Harga satuan tidak valid untuk "${row.itemName}".`);
+    }
+
+    const basePayload = {
       projectId: Number(projectId),
       quotationId: quotationId ? Number(quotationId) : null,
-      itemName,
-      description: description || null,
-      category,
-      specification: specification || null,
-      qty,
-      unit,
-      unitPrice,
     };
 
     try {
-      const url = editingId ? `${apiUrl}/api/boq/${editingId}` : `${apiUrl}/api/boq`;
-      const res = await adminApiFetch(url, {
-        method: editingId ? "PATCH" : "POST",
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        showBoqFormError(json.error ?? "Gagal menyimpan item BOQ");
-        return;
+      if (editingId) {
+        const res = await adminApiFetch(`${apiUrl}/api/boq/${editingId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ ...basePayload, ...rows[0] }),
+        });
+        const json = await res.json();
+        if (!res.ok) return showBoqFormError(json.error ?? "Gagal menyimpan item BOQ");
+        window.showToast?.("Item BOQ berhasil diperbarui");
+      } else {
+        let successCount = 0;
+        const failedNames: string[] = [];
+        for (const row of rows) {
+          const res = await adminApiFetch(`${apiUrl}/api/boq`, {
+            method: "POST",
+            body: JSON.stringify({ ...basePayload, ...row }),
+          });
+          if (res.ok) {
+            successCount += 1;
+          } else {
+            failedNames.push(row.itemName);
+          }
+        }
+        if (failedNames.length) {
+          showBoqFormError(`${successCount} item tersimpan, gagal: ${failedNames.join(", ")}`);
+          await loadBoq();
+          return;
+        }
+        window.showToast?.(`${successCount} item BOQ berhasil ditambahkan`);
       }
-      window.showToast?.(editingId ? "Item BOQ berhasil diperbarui" : "Item BOQ berhasil ditambahkan");
       closeModal("boq-modal");
       await loadBoq();
     } catch (err) {
