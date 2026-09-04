@@ -31,6 +31,7 @@ import StatCard from "../../components/StatCard.astro";
       <option value="">Semua Role</option>
       <option value="supervisor">Supervisor</option>
       <option value="karyawan">Teknisi Lapangan</option>
+      <option value="admin">Admin</option>
     </select>
     <select id="filter-attendance-status" class="field-input sm:w-44">
       <option value="">Semua Status</option>
@@ -45,7 +46,7 @@ import StatCard from "../../components/StatCard.astro";
   <!-- Table -->
   <div class="panel overflow-hidden">
     <div class="overflow-x-auto">
-      <table id="attendance-table" class="data-table">
+      <table id="attendance-table" class="data-table hidden">
         <thead>
           <tr>
             <th>Nama</th>
@@ -60,7 +61,19 @@ import StatCard from "../../components/StatCard.astro";
         <tbody id="attendance-body"></tbody>
       </table>
     </div>
-    <div id="attendance-empty" class="empty-state min-h-56">
+    <div id="attendance-skeleton">
+      {Array.from({ length: 5 }).map(() => (
+        <div class="skeleton-row">
+          <div class="skeleton w-9 h-9 shrink-0"></div>
+          <div class="flex-1 space-y-2">
+            <div class="skeleton h-3 w-1/3"></div>
+            <div class="skeleton h-2.5 w-1/5"></div>
+          </div>
+          <div class="skeleton h-5 w-16 shrink-0"></div>
+        </div>
+      ))}
+    </div>
+    <div id="attendance-empty" class="empty-state min-h-56 hidden">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/>
       </svg>
@@ -117,6 +130,7 @@ import StatCard from "../../components/StatCard.astro";
   const tableBody = document.getElementById("attendance-body") as HTMLTableSectionElement;
   const emptyState = document.getElementById("attendance-empty") as HTMLDivElement;
   const table = document.getElementById("attendance-table") as HTMLTableElement;
+  const skeletonEl_attendance = document.getElementById("attendance-skeleton") as HTMLDivElement;
   const countLabel = document.querySelector("[data-attendance-count]") as HTMLElement | null;
 
   if (dateInput) {
@@ -130,7 +144,7 @@ import StatCard from "../../components/StatCard.astro";
     if (!card) return;
     let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
     if (!valueEl) {
-      const skeleton = card.querySelector(".animate-pulse")?.parentElement;
+      const skeleton = card.querySelector(".skeleton")?.parentElement;
       valueEl = document.createElement("p");
       const isAccent = card.classList.contains("bg-ink");
       valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
@@ -174,6 +188,7 @@ import StatCard from "../../components/StatCard.astro";
   const ROLE_LABEL: Record<string, string> = {
     supervisor: "Supervisor",
     karyawan: "Teknisi Lapangan",
+    admin: "Admin",
   };
 
   function applyFiltersAndRender(): void {
@@ -191,6 +206,7 @@ import StatCard from "../../components/StatCard.astro";
 
     tableBody.innerHTML = "";
     const isEmpty = filtered.length === 0;
+    skeletonEl_attendance.classList.add("hidden");
     table.classList.toggle("hidden", isEmpty);
     emptyState.classList.toggle("hidden", !isEmpty);
     if (countLabel) countLabel.textContent = `${filtered.length} karyawan`;
@@ -233,7 +249,7 @@ import StatCard from "../../components/StatCard.astro";
       }
 
       const teamUsers: TeamUser[] = (teamJson.data ?? []).filter(
-        (u: { role: string }) => u.role === "supervisor" || u.role === "karyawan"
+        (u: { role: string }) => u.role === "supervisor" || u.role === "karyawan" || u.role === "admin"
       );
       const records: AttendanceRecord[] = attJson.data ?? [];
       const recordByAdminId = new Map(records.map((r) => [r.adminId, r]));
