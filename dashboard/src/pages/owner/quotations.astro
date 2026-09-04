@@ -82,8 +82,8 @@ import StatCard from "../../components/StatCard.astro";
   </div>
   <!-- Add / edit quotation modal -->
   <div id="quotation-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
-    <div class="panel w-full max-w-md bg-surface">
-      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+    <div class="panel w-full max-w-md bg-surface max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink shrink-0">
         <h3 id="quotation-modal-title" class="font-display text-lg text-ink leading-none">Buat Penawaran</h3>
         <button id="quotation-modal-close" type="button" class="text-steel hover:text-ink transition-colors" aria-label="Tutup">
           <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
@@ -91,13 +91,16 @@ import StatCard from "../../components/StatCard.astro";
           </svg>
         </button>
       </div>
-      <div class="p-5 space-y-4">
+      <div class="p-5 space-y-4 overflow-y-auto">
         <input type="hidden" id="quotation-id" />
         <div>
-          <label class="field-label" for="quotation-client-select">Klien Terdaftar</label>
-          <select id="quotation-client-select" class="field-input">
-            <option value="">— Belum pilih, ketik manual di bawah —</option>
-          </select>
+          <label class="field-label" for="quotation-client-search">Klien Terdaftar</label>
+          <div class="relative flex gap-2">
+            <input id="quotation-client-search" type="text" class="field-input flex-1" placeholder="Ketik untuk cari klien terdaftar…" autocomplete="off" />
+            <button type="button" id="quotation-client-clear" class="hidden btn-secondary px-2.5 text-xs shrink-0">✕</button>
+            <input type="hidden" id="quotation-client-select" />
+            <div id="quotation-client-results" class="hidden absolute z-10 left-0 right-0 top-full mt-1 max-h-48 overflow-y-auto bg-surface border-2 border-ink"></div>
+          </div>
           <p class="font-mono text-[10px] text-smoke mt-1">
             Pilih dari daftar supaya penawaran ini bisa langsung dijadikan Invoice nanti.
           </p>
@@ -139,7 +142,7 @@ import StatCard from "../../components/StatCard.astro";
           <p id="quotation-modal-error-msg" class="font-mono text-xs text-signal"></p>
         </div>
       </div>
-      <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline">
+      <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline shrink-0">
         <button type="button" id="quotation-modal-cancel" class="btn-secondary text-xs">Batal</button>
         <button type="button" id="quotation-modal-save" class="btn-primary text-xs">Simpan</button>
       </div>
@@ -172,8 +175,6 @@ import StatCard from "../../components/StatCard.astro";
     label: string;
   }
 
-  let clientOptions: ClientOption[] = [];
-
   const STATUS_LABEL: Record<string, string> = {
     draft: "Draft",
     sent: "Terkirim",
@@ -199,45 +200,89 @@ import StatCard from "../../components/StatCard.astro";
     document.getElementById(id)?.classList.replace("flex", "hidden");
   }
 
-  async function loadClientOptions(): Promise<void> {
+  let clientSearchDebounce: ReturnType<typeof setTimeout>;
+
+  async function searchClients(query: string): Promise<ClientOption[]> {
     try {
-      const res = await adminApiFetch(`${apiUrl}/api/clients/options`);
+      const res = await adminApiFetch(`${apiUrl}/api/clients/options?search=${encodeURIComponent(query)}`);
       const json = await res.json();
-      if (!res.ok) return;
-      clientOptions = json.data ?? [];
+      return res.ok ? json.data ?? [] : [];
     } catch (err) {
-      console.error("[loadClientOptions] gagal fetch backend:", err);
+      console.error("[searchClients] gagal fetch backend:", err);
+      return [];
     }
+  }
+
+  function selectClient(id: string, name: string): void {
+    (document.getElementById("quotation-client-select") as HTMLInputElement).value = id;
+    const searchInput = document.getElementById("quotation-client-search") as HTMLInputElement;
+    searchInput.value = name;
+    searchInput.readOnly = true;
+    document.getElementById("quotation-client-clear")?.classList.remove("hidden");
+    document.getElementById("quotation-client-results")?.classList.add("hidden");
+    syncClientFields();
+  }
+
+  function clearSelectedClient(): void {
+    (document.getElementById("quotation-client-select") as HTMLInputElement).value = "";
+    const searchInput = document.getElementById("quotation-client-search") as HTMLInputElement;
+    searchInput.value = "";
+    searchInput.readOnly = false;
+    searchInput.focus();
+    document.getElementById("quotation-client-clear")?.classList.add("hidden");
+    syncClientFields();
   }
 
   function renderClientSelect(currentClientId?: string | null, currentClientName?: string): void {
-    const select = document.getElementById("quotation-client-select") as HTMLSelectElement;
-    const options = [...clientOptions];
-    if (currentClientId && !options.some((o) => o.id === currentClientId)) {
-      options.unshift({ id: currentClientId, label: currentClientName ?? "(klien saat ini)" });
+    if (currentClientId) {
+      selectClient(currentClientId, currentClientName ?? "(klien saat ini)");
+    } else {
+      clearSelectedClient();
     }
-    select.innerHTML =
-      `<option value="">— Belum pilih, ketik manual di bawah —</option>` +
-      options.map((o) => `<option value="${o.id}">${escapeHtml(o.label)}</option>`).join("");
-    select.value = currentClientId ?? "";
   }
 
+  const clientSearchInput = document.getElementById("quotation-client-search") as HTMLInputElement;
+  const clientResultsBox = document.getElementById("quotation-client-results") as HTMLDivElement;
+
+  clientSearchInput?.addEventListener("input", () => {
+    clearTimeout(clientSearchDebounce);
+    const query = clientSearchInput.value.trim();
+    clientSearchDebounce = setTimeout(async () => {
+      const results = await searchClients(query);
+      if (!results.length) {
+        clientResultsBox.innerHTML = `<p class="font-mono text-[10px] text-smoke px-3 py-2">Tidak ada klien ditemukan</p>`;
+      } else {
+        clientResultsBox.innerHTML = results
+          .map((c) => `<button type="button" data-client-id="${c.id}" data-client-name="${escapeHtml(c.label)}" class="w-full text-left px-3 py-2 text-sm hover:bg-hairline/30">${escapeHtml(c.label)}</button>`)
+          .join("");
+        clientResultsBox.querySelectorAll<HTMLButtonElement>("[data-client-id]").forEach((btn) => {
+          btn.addEventListener("click", () => selectClient(btn.dataset.clientId!, btn.dataset.clientName!));
+        });
+      }
+      clientResultsBox.classList.remove("hidden");
+    }, 250);
+  });
+  document.getElementById("quotation-client-clear")?.addEventListener("click", clearSelectedClient);
+  document.addEventListener("click", (e) => {
+    if (!(e.target as HTMLElement).closest("#quotation-client-search, #quotation-client-results")) {
+      clientResultsBox.classList.add("hidden");
+    }
+  });
+
   function syncClientFields(): void {
-    const select = document.getElementById("quotation-client-select") as HTMLSelectElement;
+    const clientId = (document.getElementById("quotation-client-select") as HTMLInputElement).value;
     const manualInput = document.getElementById("quotation-client") as HTMLInputElement;
     const warning = document.getElementById("quotation-client-manual-warning") as HTMLElement;
-    const hasSelectValue = Boolean(select.value);
-    manualInput.disabled = hasSelectValue;
-    if (hasSelectValue) {
-      const opt = select.options[select.selectedIndex];
-      manualInput.value = opt?.textContent ?? "";
+    const hasSelection = Boolean(clientId);
+    manualInput.disabled = hasSelection;
+    if (hasSelection) {
+      manualInput.value = (document.getElementById("quotation-client-search") as HTMLInputElement).value;
       warning.classList.add("hidden");
     } else {
       warning.classList.toggle("hidden", !manualInput.value.trim());
     }
   }
 
-  document.getElementById("quotation-client-select")?.addEventListener("change", syncClientFields);
   document.getElementById("quotation-client")?.addEventListener("input", syncClientFields);
 
   function statusBadge(status: string): string {
@@ -422,7 +467,7 @@ import StatCard from "../../components/StatCard.astro";
 
   document.getElementById("quotation-modal-save")?.addEventListener("click", async () => {
     const id = (document.getElementById("quotation-id") as HTMLInputElement).value;
-    const clientSelectValue = (document.getElementById("quotation-client-select") as HTMLSelectElement).value;
+    const clientSelectValue = (document.getElementById("quotation-client-select") as HTMLInputElement).value;
     const client = (document.getElementById("quotation-client") as HTMLInputElement).value.trim();
     const project = (document.getElementById("quotation-project") as HTMLInputElement).value.trim();
     const description = (document.getElementById("quotation-description") as HTMLTextAreaElement).value.trim();
@@ -470,6 +515,5 @@ import StatCard from "../../components/StatCard.astro";
   });
   statusFilter?.addEventListener("change", loadQuotations);
 
-  loadClientOptions();
   loadQuotations();
 </script>
