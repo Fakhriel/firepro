@@ -1,8 +1,4 @@
-// Service khusus modules-owner. TIDAK duplikat logic omzet/laba —
-// angka finansial dihitung ulang dari reports.service.getSummary() yang
-// sudah ada (reads dari Invoice + CostEntry). Di sini cuma menambahkan
-// agregasi yang memang belum ada endpoint-nya: jumlah proyek aktif dan
-// jumlah user per role, khusus untuk Dashboard Owner.
+
 const { Project } = require('../../modules/projects/projects.model');
 const { Admin } = require('../../modules/admin-auth/admin.model');
 const reportsService = require('../../modules/reports/reports.service');
@@ -27,10 +23,10 @@ async function getSummary({ period } = {}) {
 
   return {
     period: financial.period,
-    omzet: financial.revenue,
-    totalCost: financial.totalCost,
-    laba: financial.grossProfit,
-    roi: financial.roi,
+    omzet: financial.kpi.paidRevenue,
+    totalCost: financial.kpi.totalCost,
+    laba: financial.kpi.estimatedProfit,
+    roi: financial.kpi.roi,
     projectsActive,
     projectsTotal,
     usersActive,
