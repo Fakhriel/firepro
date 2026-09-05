@@ -7,6 +7,7 @@ const {
   createCostBreakdownHandler,
   summaryHandler,
   listProjectsRoiHandler,
+  monthlyTrendHandler,
 } = require('../../modules/reports/reports.controller');
 
 const router = express.Router();
@@ -14,6 +15,9 @@ const router = express.Router();
 // GET /api/owner/reports/summary?period= — Revenue/Biaya/Laba/ROI di
 // pages/owner/reports.astro.
 router.get('/summary', summaryHandler);
+// GET /api/owner/reports/monthly-trend?months= — tren omzet/biaya per
+// bulan, dipakai chart di Reports (12 bulan) & Dashboard (6 bulan).
+router.get('/monthly-trend', monthlyTrendHandler);
 // GET /api/owner/reports/projects-roi — breakdown laba per proyek untuk
 // tabel "Profitabilitas per Proyek" di pages/owner/reports.astro.
 router.get('/projects-roi', listProjectsRoiHandler);
