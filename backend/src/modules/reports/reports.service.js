@@ -26,10 +26,15 @@ function badRequest(message) {
   return err;
 }
 
+function startOfMonth(y, m) {
+  return new Date(y, m, 1);
+}
+function endOfMonth(y, m) {
+  return new Date(y, m + 1, 0);
+}
+
 function resolveRange(period) {
   const now = new Date();
-  const startOfMonth = (y, m) => new Date(y, m, 1);
-  const endOfMonth = (y, m) => new Date(y, m + 1, 0);
 
   switch (period) {
     case 'last_month': {
@@ -256,4 +261,33 @@ async function listProjectsRoi() {
   return results;
 }
 
-module.exports = { listCosts, createCost, createCostBreakdown, getSummary, getProjectRoi, listProjectsRoi };
+async function getMonthlyTrend({ months = 6 } = {}) {
+  const now = new Date();
+  const monthList = Array.from({ length: months }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (months - 1 - i), 1);
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+
+  const results = [];
+  for (const { year, month } of monthList) {
+    const start = startOfMonth(year, month);
+    const end = endOfMonth(year, month);
+    const dateWhere = { [Op.between]: [toDateOnly(start), toDateOnly(end)] };
+
+    const revenue = Number(
+      (await Invoice.sum('amount', { where: { issuedDate: dateWhere, status: PAID_STATUS } })) ?? 0,
+    );
+    const cost = Number((await CostEntry.sum('amount', { where: { date: dateWhere } })) ?? 0);
+
+    results.push({
+      month: `${year}-${String(month + 1).padStart(2, '0')}`,
+      label: start.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' }),
+      revenue,
+      cost,
+      profit: revenue - cost,
+    });
+  }
+  return results;
+}
+
+module.exports = { listCosts, createCost, createCostBreakdown, getSummary, getProjectRoi, listProjectsRoi, getMonthlyTrend };
