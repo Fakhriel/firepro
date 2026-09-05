@@ -36,12 +36,7 @@ import StatCard from "../../components/StatCard.astro";
       <h3 class="font-display text-lg text-ink leading-none">Omzet vs Biaya vs Laba</h3>
       <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Tren 12 bulan terakhir</p>
     </div>
-    <div id="report-chart-empty" class="empty-state min-h-64">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
-      </svg>
-      <p>Grafik akan tampil setelah data terhubung</p>
-    </div>
+    <div id="report-chart-container"></div>
   </div>
 
   <!-- Breakdown per project -->
@@ -118,6 +113,7 @@ import StatCard from "../../components/StatCard.astro";
   import { adminApiFetch } from "../../lib/auth";
   import { escapeHtml } from "../../lib/escapeHtml";
   import { exportTableToPDF, formatIDR } from "../../lib/export";
+  import { renderLineChart } from "../../lib/charts";
 
   const apiUrl =
     document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
@@ -263,10 +259,37 @@ import StatCard from "../../components/StatCard.astro";
     }
   }
 
+  async function loadTrendChart(): Promise<void> {
+    const container = document.getElementById("report-chart-container");
+    if (!container) return;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/owner/reports/monthly-trend?months=12`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat grafik tren", "error");
+        return;
+      }
+      const rows: { label: string; revenue: number; cost: number; profit: number }[] = json.data ?? [];
+      renderLineChart(
+        container,
+        [
+          { name: "Omzet", color: "#c22a1f", points: rows.map((r) => ({ label: r.label, value: r.revenue })) },
+          { name: "Biaya", color: "#14181c", points: rows.map((r) => ({ label: r.label, value: r.cost })) },
+          { name: "Laba", color: "#7a746a", points: rows.map((r) => ({ label: r.label, value: r.profit })) },
+        ],
+        formatIDR
+      );
+    } catch (err) {
+      console.error("[loadTrendChart] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
   function loadReports(): void {
     loadSummary();
     loadCosts();
     loadProjectProfitability();
+    loadTrendChart();
   }
 
   periodSelect?.addEventListener("change", loadReports);
