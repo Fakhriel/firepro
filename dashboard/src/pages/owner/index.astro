@@ -62,12 +62,7 @@ import StatCard from "../../components/StatCard.astro";
         <h3 class="font-display text-lg text-ink leading-none">Omzet vs Biaya</h3>
         <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">6 bulan terakhir</p>
       </div>
-      <div id="dashboard-chart-empty" class="empty-state min-h-56">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
-        </svg>
-        <p>Grafik akan tampil setelah data terhubung</p>
-      </div>
+      <div id="dashboard-chart-container"></div>
     </div>
 
     <div class="panel">
@@ -81,17 +76,33 @@ import StatCard from "../../components/StatCard.astro";
         </svg>
         <p>Tidak ada persetujuan yang menunggu</p>
       </div>
+      <ul id="dashboard-approval-list" class="hidden divide-y divide-hairline"></ul>
     </div>
   </div>
 
   <!-- Proyek berjalan -->
   <div class="panel">
-    <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+    <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink gap-3 flex-wrap">
       <div>
         <h3 class="font-display text-lg text-ink leading-none">Semua Proyek Berjalan</h3>
         <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-1">Lintas tim & supervisor</p>
       </div>
       <a href="/owner/projects" class="font-mono text-[10px] text-smoke border border-hairline px-2 py-1 hover:text-ink hover:border-ink transition-colors">Lihat Semua</a>
+    </div>
+    <div class="flex items-center gap-2 px-5 py-3 border-b border-hairline flex-wrap">
+      <input
+        id="projects-search"
+        type="text"
+        placeholder="Cari client atau project ID..."
+        class="field-input flex-1 min-w-[180px] text-sm"
+      />
+      <select id="projects-time-filter" class="field-input w-auto text-sm">
+        <option value="all">Semua Waktu</option>
+        <option value="24h">24 Jam Terakhir</option>
+        <option value="week">Minggu Ini</option>
+        <option value="month">Bulan Ini</option>
+        <option value="year">Tahun Ini</option>
+      </select>
     </div>
     <div id="dashboard-projects-empty" class="empty-state min-h-52">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -100,5 +111,260 @@ import StatCard from "../../components/StatCard.astro";
       </svg>
       <p>Belum ada proyek berjalan</p>
     </div>
+    <div id="dashboard-projects-list" class="hidden overflow-x-auto">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Project ID</th>
+            <th>Klien</th>
+            <th class="hidden md:table-cell">Lokasi</th>
+            <th>Nilai Kontrak</th>
+          </tr>
+        </thead>
+        <tbody id="dashboard-projects-body"></tbody>
+      </table>
+    </div>
+    <div id="dashboard-projects-pagination" class="hidden items-center justify-between px-5 py-3 border-t border-hairline">
+      <p id="projects-pagination-info" class="font-mono text-[10px] text-smoke uppercase tracking-widest"></p>
+      <div class="flex items-center gap-2">
+        <button type="button" id="projects-prev-page" class="btn-secondary text-xs px-2.5 py-1">←</button>
+        <button type="button" id="projects-next-page" class="btn-secondary text-xs px-2.5 py-1">→</button>
+      </div>
+    </div>
   </div>
 </OwnerLayout>
+
+<script>
+  import { adminApiFetch } from "../../lib/auth";
+  import { escapeHtml } from "../../lib/escapeHtml";
+  import { formatIDR } from "../../lib/export";
+  import { renderLineChart } from "../../lib/charts";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  function setStatValue(cardId: string, value: string): void {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
+    if (!valueEl) {
+      const skeleton = card.querySelector(".skeleton")?.parentElement;
+      valueEl = document.createElement("p");
+      const isAccent = card.classList.contains("bg-ink");
+      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
+      if (skeleton) {
+        skeleton.replaceWith(valueEl);
+      } else {
+        card.appendChild(valueEl);
+      }
+    }
+    valueEl.textContent = value;
+  }
+
+  interface PurchaseRequest {
+    id: number;
+    itemName?: string;
+    name?: string;
+    quantity?: number;
+    projectId?: number;
+    status: string;
+  }
+
+  interface ProjectRow {
+    id: number;
+    projectCode: string;
+    clientName: string;
+    location: string;
+    contractValue: number;
+    status: string;
+    startDate: string;
+  }
+
+  async function loadSummary(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/owner/dashboard/summary`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat ringkasan dashboard", "error");
+        return;
+      }
+      const d = json.data ?? {};
+      setStatValue("stat-omzet", formatIDR(d.omzet ?? 0));
+      setStatValue("stat-laba", formatIDR(d.laba ?? 0));
+      setStatValue("stat-projects-active", String(d.projectsActive ?? 0));
+      setStatValue("stat-users-active", String(d.usersActive ?? 0));
+    } catch (err) {
+      console.error("[loadSummary] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  async function loadTrendChart(): Promise<void> {
+    const container = document.getElementById("dashboard-chart-container");
+    if (!container) return;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/owner/reports/monthly-trend?months=6`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat grafik omzet vs biaya", "error");
+        return;
+      }
+      const rows: { label: string; revenue: number; cost: number }[] = json.data ?? [];
+      renderLineChart(
+        container,
+        [
+          { name: "Omzet", color: "#c22a1f", points: rows.map((r) => ({ label: r.label, value: r.revenue })) },
+          { name: "Biaya", color: "#14181c", points: rows.map((r) => ({ label: r.label, value: r.cost })) },
+        ],
+        formatIDR
+      );
+    } catch (err) {
+      console.error("[loadTrendChart] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  async function loadPendingApprovals(): Promise<void> {
+    const emptyEl = document.getElementById("dashboard-approval-empty");
+    const listEl = document.getElementById("dashboard-approval-list") as HTMLUListElement | null;
+    if (!listEl) return;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/owner/inventory/requests?status=pending`);
+      const json = await res.json();
+      if (!res.ok) return;
+      const requests: PurchaseRequest[] = json.data ?? [];
+      const isEmpty = requests.length === 0;
+      emptyEl?.classList.toggle("hidden", !isEmpty);
+      listEl.classList.toggle("hidden", isEmpty);
+      listEl.innerHTML = requests
+        .slice(0, 6)
+        .map(
+          (r) => `
+        <li class="px-5 py-3 flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <p class="font-body text-sm text-ink truncate">${escapeHtml(r.itemName ?? r.name ?? "Permintaan alat")}</p>
+            <p class="font-mono text-[9px] text-smoke uppercase tracking-widest mt-0.5">Qty: ${r.quantity ?? "-"}</p>
+          </div>
+          <span class="font-mono text-[9px] uppercase tracking-widest border border-signal text-signal px-2 py-1 shrink-0">Menunggu</span>
+        </li>
+      `
+        )
+        .join("");
+    } catch (err) {
+      console.error("[loadPendingApprovals] gagal fetch backend:", err);
+    }
+  }
+
+  const PAGE_SIZE = 8;
+  let allProjects: ProjectRow[] = [];
+  let currentPage = 1;
+
+  function withinTimeRange(dateStr: string, range: string): boolean {
+    if (range === "all" || !dateStr) return true;
+    const date = new Date(dateStr);
+    const now = new Date();
+    if (range === "24h") return now.getTime() - date.getTime() <= 24 * 60 * 60 * 1000;
+    if (range === "week") {
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
+      return date >= startOfWeek;
+    }
+    if (range === "month") {
+      return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+    }
+    if (range === "year") {
+      return date.getFullYear() === now.getFullYear();
+    }
+    return true;
+  }
+
+  function getFilteredProjects(): ProjectRow[] {
+    const search = (document.getElementById("projects-search") as HTMLInputElement)?.value.trim().toLowerCase() ?? "";
+    const range = (document.getElementById("projects-time-filter") as HTMLSelectElement)?.value ?? "all";
+    return allProjects.filter((p) => {
+      const matchesSearch =
+        !search ||
+        p.projectCode.toLowerCase().includes(search) ||
+        p.clientName.toLowerCase().includes(search);
+      return matchesSearch && withinTimeRange(p.startDate, range);
+    });
+  }
+
+  function renderProjectsTable(): void {
+    const emptyEl = document.getElementById("dashboard-projects-empty");
+    const wrapEl = document.getElementById("dashboard-projects-list");
+    const bodyEl = document.getElementById("dashboard-projects-body");
+    const paginationEl = document.getElementById("dashboard-projects-pagination");
+    const infoEl = document.getElementById("projects-pagination-info");
+    if (!wrapEl || !bodyEl || !paginationEl || !infoEl) return;
+
+    const filtered = getFilteredProjects();
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    currentPage = Math.min(currentPage, totalPages);
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const pageItems = filtered.slice(start, start + PAGE_SIZE);
+
+    const isEmpty = allProjects.length === 0;
+    emptyEl?.classList.toggle("hidden", !isEmpty);
+    wrapEl.classList.toggle("hidden", isEmpty);
+    paginationEl.classList.toggle("hidden", isEmpty);
+    paginationEl.classList.toggle("flex", !isEmpty);
+
+    bodyEl.innerHTML = pageItems
+      .map(
+        (p) => `
+        <tr>
+          <td class="font-mono text-xs text-ink">${escapeHtml(p.projectCode)}</td>
+          <td class="font-semibold text-ink">${escapeHtml(p.clientName)}</td>
+          <td class="hidden md:table-cell font-mono text-xs text-charcoal">${escapeHtml(p.location ?? "-")}</td>
+          <td class="font-mono text-xs text-charcoal">${formatIDR(p.contractValue)}</td>
+        </tr>
+      `
+      )
+      .join("");
+
+    infoEl.textContent = filtered.length
+      ? `Halaman ${currentPage} dari ${totalPages} · ${filtered.length} proyek`
+      : "Tidak ada proyek yang cocok";
+
+    const prevBtn = document.getElementById("projects-prev-page") as HTMLButtonElement | null;
+    const nextBtn = document.getElementById("projects-next-page") as HTMLButtonElement | null;
+    if (prevBtn) prevBtn.disabled = currentPage <= 1;
+    if (nextBtn) nextBtn.disabled = currentPage >= totalPages;
+  }
+
+  async function loadRunningProjects(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/owner/projects/admin?status=in_progress`);
+      const json = await res.json();
+      if (!res.ok) return;
+      allProjects = json.data ?? [];
+      renderProjectsTable();
+    } catch (err) {
+      console.error("[loadRunningProjects] gagal fetch backend:", err);
+    }
+  }
+
+  document.getElementById("projects-search")?.addEventListener("input", () => {
+    currentPage = 1;
+    renderProjectsTable();
+  });
+  document.getElementById("projects-time-filter")?.addEventListener("change", () => {
+    currentPage = 1;
+    renderProjectsTable();
+  });
+  document.getElementById("projects-prev-page")?.addEventListener("click", () => {
+    currentPage -= 1;
+    renderProjectsTable();
+  });
+  document.getElementById("projects-next-page")?.addEventListener("click", () => {
+    currentPage += 1;
+    renderProjectsTable();
+  });
+
+  loadSummary();
+  loadTrendChart();
+  loadPendingApprovals();
+  loadRunningProjects();
+</script>
