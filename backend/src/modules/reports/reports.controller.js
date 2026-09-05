@@ -54,6 +54,16 @@ async function listProjectsRoiHandler(req, res, next) {
   }
 }
 
+async function monthlyTrendHandler(req, res, next) {
+  try {
+    const months = Number(req.query.months) || 6;
+    const data = await service.getMonthlyTrend({ months });
+    res.status(200).json({ data });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   listCostsHandler,
   createCostHandler,
@@ -61,4 +71,5 @@ module.exports = {
   summaryHandler,
   projectRoiHandler,
   listProjectsRoiHandler,
+  monthlyTrendHandler,
 };
