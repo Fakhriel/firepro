@@ -41,9 +41,6 @@ import StatCard from "../../components/StatCard.astro";
       <option value="on_hold">Ditunda</option>
       <option value="cancelled">Dibatalkan</option>
     </select>
-    <select id="filter-supervisor" class="field-input sm:w-48">
-      <option value="">Semua Supervisor</option>
-    </select>
   </div>
 
   <!-- Table -->
@@ -156,11 +153,11 @@ import StatCard from "../../components/StatCard.astro";
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="field-label" for="pf-base-cost">Biaya Dasar (Rp)</label>
-            <input id="pf-base-cost" type="number" min="0" step="1" value="0" class="field-input" />
+            <input id="pf-base-cost" type="text" inputmode="numeric" class="field-input" placeholder="Rp 0" />
           </div>
           <div>
             <label class="field-label" for="pf-additional-cost">Biaya Tambahan (Rp)</label>
-            <input id="pf-additional-cost" type="number" min="0" step="1" value="0" class="field-input" />
+            <input id="pf-additional-cost" type="text" inputmode="numeric" class="field-input" placeholder="Rp 0" />
           </div>
         </div>
         <div>
@@ -209,6 +206,7 @@ import StatCard from "../../components/StatCard.astro";
   import { adminApiFetch } from "../../lib/auth";
   import { escapeHtml } from "../../lib/escapeHtml";
   import { exportTableToPDF, formatIDR } from "../../lib/export";
+  import { attachRupiahFormatting, setRupiahValue, getRupiahValue } from "../../lib/rupiahInput";
 
   const apiUrl =
     document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
@@ -440,8 +438,8 @@ import StatCard from "../../components/StatCard.astro";
     (document.getElementById("pf-category") as HTMLInputElement).value = "";
     (document.getElementById("pf-start-date") as HTMLInputElement).value = new Date().toISOString().split("T")[0];
     (document.getElementById("pf-crew-size") as HTMLInputElement).value = "1";
-    (document.getElementById("pf-base-cost") as HTMLInputElement).value = "0";
-    (document.getElementById("pf-additional-cost") as HTMLInputElement).value = "0";
+    setRupiahValue(document.getElementById("pf-base-cost") as HTMLInputElement, 0);
+    setRupiahValue(document.getElementById("pf-additional-cost") as HTMLInputElement, 0);
     (document.getElementById("pf-payment-ref") as HTMLInputElement).value = "";
     (document.getElementById("pf-status") as HTMLSelectElement).value = "planning";
     document.getElementById("project-modal-error")?.classList.add("hidden");
@@ -460,8 +458,8 @@ import StatCard from "../../components/StatCard.astro";
       (document.getElementById("pf-category") as HTMLInputElement).value = project.category ?? "";
       (document.getElementById("pf-start-date") as HTMLInputElement).value = project.startDate ? project.startDate.split("T")[0] : "";
       (document.getElementById("pf-crew-size") as HTMLInputElement).value = String(project.crewSize ?? 1);
-      (document.getElementById("pf-base-cost") as HTMLInputElement).value = String(project.baseCost ?? 0);
-      (document.getElementById("pf-additional-cost") as HTMLInputElement).value = String(project.additionalCost ?? 0);
+      setRupiahValue(document.getElementById("pf-base-cost") as HTMLInputElement, project.baseCost ?? 0);
+      setRupiahValue(document.getElementById("pf-additional-cost") as HTMLInputElement, project.additionalCost ?? 0);
       (document.getElementById("pf-payment-ref") as HTMLInputElement).value = project.paymentRef ?? "";
       (document.getElementById("pf-status") as HTMLSelectElement).value = project.status;
     } else {
@@ -489,8 +487,8 @@ import StatCard from "../../components/StatCard.astro";
     const category = (document.getElementById("pf-category") as HTMLInputElement).value.trim();
     const startDate = (document.getElementById("pf-start-date") as HTMLInputElement).value;
     const crewSize = Number((document.getElementById("pf-crew-size") as HTMLInputElement).value || 1);
-    const baseCost = Number((document.getElementById("pf-base-cost") as HTMLInputElement).value || 0);
-    const additionalCost = Number((document.getElementById("pf-additional-cost") as HTMLInputElement).value || 0);
+    const baseCost = getRupiahValue(document.getElementById("pf-base-cost") as HTMLInputElement);
+    const additionalCost = getRupiahValue(document.getElementById("pf-additional-cost") as HTMLInputElement);
     const paymentRef = (document.getElementById("pf-payment-ref") as HTMLInputElement).value.trim();
     const status = (document.getElementById("pf-status") as HTMLSelectElement).value;
 
@@ -560,5 +558,7 @@ import StatCard from "../../components/StatCard.astro";
   });
 
   loadClientOptions();
+  attachRupiahFormatting(document.getElementById("pf-base-cost") as HTMLInputElement);
+  attachRupiahFormatting(document.getElementById("pf-additional-cost") as HTMLInputElement);
   loadProjects();
 </script>
