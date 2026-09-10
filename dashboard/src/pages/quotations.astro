@@ -142,7 +142,7 @@ import StatCard from "../components/StatCard.astro";
           </div>
           <div>
             <label class="field-label" for="quotation-amount">Nilai Penawaran (Rp)</label>
-            <input id="quotation-amount" type="number" placeholder="45000000" class="field-input" />
+            <input id="quotation-amount" type="text" inputmode="numeric" placeholder="Rp 0" class="field-input" />
           </div>
           <div>
             <label class="field-label" for="quotation-valid">Berlaku Sampai</label>
@@ -187,6 +187,7 @@ import StatCard from "../components/StatCard.astro";
   import { exportTableToPDF, formatIDR } from "../lib/export";
   import { adminApiFetch } from "../lib/auth";
   import { escapeHtml } from "../lib/escapeHtml";
+  import { attachRupiahFormatting, setRupiahValue, getRupiahValue } from "../lib/rupiahInput";
 
   const apiUrl =
     document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
@@ -417,6 +418,7 @@ import StatCard from "../components/StatCard.astro";
     searchInput.readOnly = false;
     searchInput.focus();
     document.getElementById("quotation-client-clear")?.classList.add("hidden");
+    document.getElementById("quotation-client-results")?.classList.add("hidden");
     syncClientFields();
   }
 
@@ -434,6 +436,10 @@ import StatCard from "../components/StatCard.astro";
   clientSearchInput?.addEventListener("input", () => {
     clearTimeout(clientSearchDebounce);
     const query = clientSearchInput.value.trim();
+    if (!query) {
+      clientResultsBox.classList.add("hidden");
+      return;
+    }
     clientSearchDebounce = setTimeout(async () => {
       const results = await searchClients(query);
       if (!results.length) {
@@ -484,7 +490,7 @@ import StatCard from "../components/StatCard.astro";
     renderClientSelect(null);
     (document.getElementById("quotation-project") as HTMLInputElement).value = "";
     (document.getElementById("quotation-desc") as HTMLTextAreaElement).value = "";
-    (document.getElementById("quotation-amount") as HTMLInputElement).value = "";
+    setRupiahValue(document.getElementById("quotation-amount") as HTMLInputElement, null);
     (document.getElementById("quotation-valid") as HTMLInputElement).value = "";
     (document.getElementById("quotation-status") as HTMLSelectElement).value = "draft";
   }
@@ -505,7 +511,7 @@ import StatCard from "../components/StatCard.astro";
     syncClientFields();
     (document.getElementById("quotation-project") as HTMLInputElement).value = q.project;
     (document.getElementById("quotation-desc") as HTMLTextAreaElement).value = q.description;
-    (document.getElementById("quotation-amount") as HTMLInputElement).value = String(q.amount);
+    setRupiahValue(document.getElementById("quotation-amount") as HTMLInputElement, q.amount);
     (document.getElementById("quotation-valid") as HTMLInputElement).value = q.validUntil;
     (document.getElementById("quotation-status") as HTMLSelectElement).value = q.status;
     openModal("quotation-modal");
@@ -523,7 +529,7 @@ import StatCard from "../components/StatCard.astro";
     const client = (document.getElementById("quotation-client") as HTMLInputElement).value.trim();
     const project = (document.getElementById("quotation-project") as HTMLInputElement).value.trim();
     const description = (document.getElementById("quotation-desc") as HTMLTextAreaElement).value.trim();
-    const amount = Number((document.getElementById("quotation-amount") as HTMLInputElement).value);
+    const amount = getRupiahValue(document.getElementById("quotation-amount") as HTMLInputElement);
     const validUntil = (document.getElementById("quotation-valid") as HTMLInputElement).value;
     const status = (document.getElementById("quotation-status") as HTMLSelectElement).value as Quotation["status"];
 
@@ -621,5 +627,6 @@ import StatCard from "../components/StatCard.astro";
     exportTableToPDF("quotations-table", { title: "Rekap Penawaran", subtitle: "Data quotations FIREPRO" });
   });
 
+  attachRupiahFormatting(document.getElementById("quotation-amount") as HTMLInputElement);
   loadQuotations();
 </script>
