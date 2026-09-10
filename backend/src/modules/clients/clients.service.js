@@ -1,4 +1,5 @@
 const { Op } = require('sequelize');
+const { sequelize } = require('../../config/db');
 const { Client } = require('./clients.model');
 const { Project } = require('../projects/projects.model');
 const { escapeLike } = require('../../utils/escapeLike');
@@ -27,6 +28,26 @@ async function countProjectsByClientIds(clientIds) {
     raw: true,
   });
   return new Map(rows.map((r) => [r.clientId, Number(r.total)]));
+}
+
+// Untuk searchable select (Quotation/BOQ/Document form) — ringan,
+// tanpa pagination, dibatasi 20 hasil.
+async function options(search) {
+  const where = { status: 'active' };
+  if (search) {
+    const needle = `%${escapeLike(search).toLowerCase()}%`;
+    where[Op.or] = [
+      sequelize.where(sequelize.fn('LOWER', sequelize.col('name')), { [Op.like]: needle }),
+      sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), { [Op.like]: needle }),
+    ];
+  }
+  const clients = await Client.findAll({
+    where,
+    attributes: ['id', 'name', 'email'],
+    order: [['name', 'ASC']],
+    limit: 20,
+  });
+  return clients.map((c) => ({ id: c.id, label: c.name, email: c.email }));
 }
 
 async function list({ search, status, page = 1, limit = 20 } = {}) {
