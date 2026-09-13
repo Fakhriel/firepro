@@ -108,10 +108,17 @@ import StatCard from "../../components/StatCard.astro";
             <option value="">Pilih klien dulu…</option>
           </select>
         </div>
+        <div>
+          <label class="field-label" for="if-quotation">Dari Penawaran <span class="text-smoke normal-case">(opsional)</span></label>
+          <select id="if-quotation" class="field-input">
+            <option value="">Tanpa penawaran terkait</option>
+          </select>
+          <p class="font-mono text-[10px] text-smoke mt-1">Pilih penawaran yang sudah disetujui untuk otomatis isi nominal dari situ.</p>
+        </div>
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="field-label" for="if-amount">Jumlah (Rp)</label>
-            <input id="if-amount" type="number" min="0" step="1" value="0" class="field-input" />
+            <input id="if-amount" type="text" inputmode="numeric" placeholder="Rp 0" class="field-input" />
           </div>
           <div>
             <label class="field-label" for="if-issued-date">Tanggal Terbit</label>
@@ -172,7 +179,7 @@ import StatCard from "../../components/StatCard.astro";
         <div class="pt-3 border-t border-hairline space-y-2.5">
           <p class="field-label">Catat Pembayaran</p>
           <div class="grid grid-cols-2 gap-2.5">
-            <input id="payment-amount" type="number" min="1" placeholder="Jumlah (Rp)" class="field-input" />
+            <input id="payment-amount" type="text" inputmode="numeric" placeholder="Rp 0" class="field-input" />
             <input id="payment-date" type="date" class="field-input" />
           </div>
           <select id="payment-method" class="field-input">
@@ -201,6 +208,7 @@ import StatCard from "../../components/StatCard.astro";
   import { exportTableToPDF, exportInvoiceDocument, formatIDR } from "../../lib/export";
   import { adminApiFetch } from "../../lib/auth";
   import { escapeHtml } from "../../lib/escapeHtml";
+  import { attachRupiahFormatting, setRupiahValue, getRupiahValue } from "../../lib/rupiahInput";
 
   const apiUrl =
     document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
@@ -430,7 +438,7 @@ import StatCard from "../../components/StatCard.astro";
     (document.getElementById("detail-paid") as HTMLElement).textContent = formatIDR(inv.paidAmount);
     (document.getElementById("detail-outstanding") as HTMLElement).textContent = formatIDR(inv.outstandingAmount);
 
-    (document.getElementById("payment-amount") as HTMLInputElement).value = "";
+    setRupiahValue(document.getElementById("payment-amount") as HTMLInputElement, null);
     (document.getElementById("payment-date") as HTMLInputElement).value = new Date().toISOString().split("T")[0];
     (document.getElementById("payment-note") as HTMLInputElement).value = "";
     document.getElementById("payment-error")?.classList.add("hidden");
@@ -460,7 +468,7 @@ import StatCard from "../../components/StatCard.astro";
     const errorMsg = document.getElementById("payment-error-msg") as HTMLElement;
     errorBox.classList.add("hidden");
 
-    const amount = (document.getElementById("payment-amount") as HTMLInputElement).value;
+    const amount = getRupiahValue(document.getElementById("payment-amount") as HTMLInputElement);
     const paidDate = (document.getElementById("payment-date") as HTMLInputElement).value;
     const method = (document.getElementById("payment-method") as HTMLSelectElement).value;
     const note = (document.getElementById("payment-note") as HTMLInputElement).value.trim();
@@ -514,8 +522,16 @@ import StatCard from "../../components/StatCard.astro";
     projectName: string;
     clientId: number;
   }
+  interface QuotationOption {
+    id: number;
+    number: string;
+    amount: number;
+    projectId: number | null;
+    status: string;
+  }
   let clientOptions: ClientOption[] = [];
   let allProjectOptions: ProjectOption[] = [];
+  let allQuotationOptions: QuotationOption[] = [];
 
   async function loadClientOptions(): Promise<void> {
     const select = document.getElementById("if-client") as HTMLSelectElement;
@@ -543,25 +559,59 @@ import StatCard from "../../components/StatCard.astro";
     }
   }
 
+  async function loadQuotationOptions(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/owner/quotations`);
+      const json = await res.json();
+      if (!res.ok) return;
+      allQuotationOptions = (json.data ?? []).filter((q: QuotationOption) => q.status === "accepted");
+    } catch (err) {
+      console.error("[loadQuotationOptions] gagal fetch backend:", err);
+    }
+  }
+
+  function updateQuotationOptionsForProject(projectId: string): void {
+    const quotationSelect = document.getElementById("if-quotation") as HTMLSelectElement;
+    const filtered = projectId
+      ? allQuotationOptions.filter((q) => String(q.projectId) === projectId)
+      : allQuotationOptions;
+    quotationSelect.innerHTML =
+      `<option value="">Tanpa penawaran terkait</option>` +
+      filtered.map((q) => `<option value="${q.id}">${escapeHtml(q.number)} — ${formatIDR(q.amount)}</option>`).join("");
+  }
+
+  document.getElementById("if-quotation")?.addEventListener("change", (e) => {
+    const quotationId = (e.target as HTMLSelectElement).value;
+    const quotation = allQuotationOptions.find((q) => String(q.id) === quotationId);
+    if (quotation) {
+      setRupiahValue(document.getElementById("if-amount") as HTMLInputElement, quotation.amount);
+    }
+  });
+
   function updateProjectOptionsForClient(clientId: string): void {
     const projectSelect = document.getElementById("if-project") as HTMLSelectElement;
     if (!clientId) {
       projectSelect.innerHTML = `<option value="">Pilih klien dulu…</option>`;
+      updateQuotationOptionsForProject("");
       return;
     }
     const filtered = allProjectOptions.filter((p) => String(p.clientId) === clientId);
     projectSelect.innerHTML =
       `<option value="">Tanpa proyek terkait</option>` +
       filtered.map((p) => `<option value="${p.id}">${escapeHtml(p.projectName)}</option>`).join("");
+    updateQuotationOptionsForProject("");
   }
   document.getElementById("if-client")?.addEventListener("change", (e) => {
     updateProjectOptionsForClient((e.target as HTMLSelectElement).value);
+  });
+  document.getElementById("if-project")?.addEventListener("change", (e) => {
+    updateQuotationOptionsForProject((e.target as HTMLSelectElement).value);
   });
 
   function resetInvoiceForm(): void {
     (document.getElementById("if-client") as HTMLSelectElement).value = "";
     updateProjectOptionsForClient("");
-    (document.getElementById("if-amount") as HTMLInputElement).value = "0";
+    setRupiahValue(document.getElementById("if-amount") as HTMLInputElement, 0);
     (document.getElementById("if-issued-date") as HTMLInputElement).value = new Date().toISOString().split("T")[0];
     (document.getElementById("if-due-date") as HTMLInputElement).value = "";
     document.getElementById("invoice-modal-error")?.classList.add("hidden");
@@ -584,7 +634,8 @@ import StatCard from "../../components/StatCard.astro";
   document.getElementById("invoice-modal-save")?.addEventListener("click", async () => {
     const clientId = (document.getElementById("if-client") as HTMLSelectElement).value;
     const projectId = (document.getElementById("if-project") as HTMLSelectElement).value;
-    const amount = Number((document.getElementById("if-amount") as HTMLInputElement).value || 0);
+    const quotationId = (document.getElementById("if-quotation") as HTMLSelectElement).value;
+    const amount = getRupiahValue(document.getElementById("if-amount") as HTMLInputElement);
     const issuedDate = (document.getElementById("if-issued-date") as HTMLInputElement).value;
     const dueDate = (document.getElementById("if-due-date") as HTMLInputElement).value;
 
@@ -598,6 +649,7 @@ import StatCard from "../../components/StatCard.astro";
         body: JSON.stringify({
           clientId: Number(clientId),
           projectId: projectId ? Number(projectId) : null,
+          quotationId: quotationId ? Number(quotationId) : null,
           amount,
           issuedDate,
           dueDate: dueDate || null,
@@ -619,5 +671,8 @@ import StatCard from "../../components/StatCard.astro";
 
   loadClientOptions();
   loadProjectOptions();
+  loadQuotationOptions();
+  attachRupiahFormatting(document.getElementById("if-amount") as HTMLInputElement);
+  attachRupiahFormatting(document.getElementById("payment-amount") as HTMLInputElement);
   loadInvoices();
 </script>
