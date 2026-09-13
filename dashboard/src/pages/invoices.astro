@@ -11,7 +11,7 @@ import PageHeader from "../components/PageHeader.astro";
         <polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/>
         <line x1="9" y1="15" x2="15" y2="15"/>
       </svg>
-      Export PDF
+      Export Semua (PDF)
     </button>
     <button id="btn-add-invoice" type="button" class="btn-primary text-xs gap-1.5">
       <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="2">
@@ -24,12 +24,14 @@ import PageHeader from "../components/PageHeader.astro";
   <!-- Filter -->
   <div class="flex flex-col sm:flex-row gap-3 mb-5">
     <input id="search-invoices" type="search" placeholder="Cari no. invoice / ID proyek…" class="field-input sm:max-w-xs" />
-    <select id="filter-invoice-status" class="field-input sm:w-36">
+    <select id="filter-invoice-status" class="field-input sm:w-40">
       <option value="">Semua Status</option>
+      <option value="draft">Draft</option>
+      <option value="issued">Terbit</option>
+      <option value="unpaid">Belum Dibayar</option>
+      <option value="partially_paid">Dibayar Sebagian</option>
       <option value="paid">Lunas</option>
-      <option value="pending">Pending</option>
-      <option value="expired">Jatuh Tempo</option>
-      <option value="failed">Ditolak</option>
+      <option value="overdue">Jatuh Tempo</option>
       <option value="cancelled">Dibatalkan</option>
     </select>
   </div>
@@ -41,11 +43,12 @@ import PageHeader from "../components/PageHeader.astro";
         <thead>
           <tr>
             <th>No. Invoice</th>
-            <th class="hidden sm:table-cell">Project ID</th>
-            <th>Metode</th>
+            <th class="hidden sm:table-cell">Klien</th>
             <th>Jumlah</th>
-            <th class="hidden md:table-cell">Tanggal</th>
+            <th class="hidden md:table-cell">Sisa</th>
+            <th class="hidden md:table-cell">Jatuh Tempo</th>
             <th>Status</th>
+            <th class="text-right">Aksi</th>
           </tr>
         </thead>
         <tbody id="invoices-body"></tbody>
@@ -72,11 +75,6 @@ import PageHeader from "../components/PageHeader.astro";
     </div>
     <div class="flex items-center justify-between px-4 py-3 border-t border-hairline">
       <span data-invoices-count class="font-mono text-[10px] text-smoke">0 invoice</span>
-      <div class="flex items-center gap-1">
-        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>←</button>
-        <span class="font-mono text-xs px-3 py-1.5 border border-hairline">1</span>
-        <button type="button" class="btn-secondary text-xs px-2.5 py-1.5" disabled>→</button>
-      </div>
     </div>
   </div>
 
@@ -104,15 +102,26 @@ import PageHeader from "../components/PageHeader.astro";
             <option value="">Pilih klien dulu…</option>
           </select>
         </div>
+        <div>
+          <label class="field-label" for="if-quotation">Dari Penawaran <span class="text-smoke normal-case">(opsional)</span></label>
+          <select id="if-quotation" class="field-input">
+            <option value="">Tanpa penawaran terkait</option>
+          </select>
+          <p class="font-mono text-[10px] text-smoke mt-1">Pilih penawaran yang sudah disetujui untuk otomatis isi nominal dari situ.</p>
+        </div>
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="field-label" for="if-amount">Jumlah (Rp)</label>
-            <input id="if-amount" type="number" min="0" step="1" value="0" class="field-input" />
+            <input id="if-amount" type="text" inputmode="numeric" placeholder="Rp 0" class="field-input" />
           </div>
           <div>
             <label class="field-label" for="if-issued-date">Tanggal Terbit</label>
             <input id="if-issued-date" type="date" class="field-input" />
           </div>
+        </div>
+        <div>
+          <label class="field-label" for="if-due-date">Jatuh Tempo <span class="text-smoke normal-case">(opsional)</span></label>
+          <input id="if-due-date" type="date" class="field-input" />
         </div>
         <div id="invoice-modal-error" class="hidden border-2 border-signal bg-signal/5 px-3 py-2">
           <p id="invoice-modal-error-msg" class="font-mono text-xs text-signal"></p>
@@ -124,26 +133,106 @@ import PageHeader from "../components/PageHeader.astro";
       </div>
     </div>
   </div>
+
+  <!-- Detail invoice modal: ringkasan, payment ledger, view/print/download -->
+  <div id="detail-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
+    <div class="panel w-full max-w-lg bg-surface max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink sticky top-0 bg-surface">
+        <div>
+          <h3 id="detail-invoice-number" class="font-display text-lg text-ink leading-none">—</h3>
+          <p id="detail-invoice-client" class="font-mono text-[10px] text-smoke mt-1"></p>
+        </div>
+        <button id="detail-modal-close" type="button" class="text-steel hover:text-ink transition-colors" aria-label="Tutup">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <div class="grid grid-cols-3 gap-3 text-center">
+          <div class="border border-hairline p-2.5">
+            <p class="font-mono text-[9px] uppercase text-smoke">Total</p>
+            <p id="detail-amount" class="font-mono text-sm mt-1">-</p>
+          </div>
+          <div class="border border-hairline p-2.5">
+            <p class="font-mono text-[9px] uppercase text-smoke">Dibayar</p>
+            <p id="detail-paid" class="font-mono text-sm mt-1">-</p>
+          </div>
+          <div class="border border-hairline p-2.5">
+            <p class="font-mono text-[9px] uppercase text-smoke">Sisa</p>
+            <p id="detail-outstanding" class="font-mono text-sm mt-1">-</p>
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <button id="btn-view-print" type="button" class="btn-secondary text-xs flex-1">Print / Lihat</button>
+          <button id="btn-download-pdf" type="button" class="btn-secondary text-xs flex-1">Download PDF</button>
+        </div>
+
+        <!-- Record payment (manual ledger only — bukan payment gateway) -->
+        <div class="pt-3 border-t border-hairline space-y-2.5">
+          <p class="field-label">Catat Pembayaran</p>
+          <div class="grid grid-cols-2 gap-2.5">
+            <input id="payment-amount" type="text" inputmode="numeric" placeholder="Rp 0" class="field-input" />
+            <input id="payment-date" type="date" class="field-input" />
+          </div>
+          <select id="payment-method" class="field-input">
+            <option value="bank_transfer">Transfer Bank</option>
+            <option value="cash">Tunai</option>
+            <option value="cheque">Cek/Giro</option>
+            <option value="other">Lainnya</option>
+          </select>
+          <input id="payment-note" type="text" placeholder="Catatan (opsional)" class="field-input" />
+          <div id="payment-error" class="hidden border-2 border-signal bg-signal/5 px-3 py-2">
+            <p id="payment-error-msg" class="font-mono text-xs text-signal"></p>
+          </div>
+          <button id="btn-record-payment" type="button" class="btn-primary text-xs w-full">Simpan Pembayaran</button>
+        </div>
+
+        <div class="pt-3 border-t border-hairline">
+          <p class="field-label mb-2">Riwayat Pembayaran</p>
+          <div id="payment-history" class="space-y-1.5 max-h-40 overflow-y-auto"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </DashboardLayout>
 
 <script>
-  import { exportTableToPDF } from "../lib/export";
+  import { exportTableToPDF, exportInvoiceDocument, formatIDR } from "../lib/export";
   import { adminApiFetch } from "../lib/auth";
   import { escapeHtml } from "../lib/escapeHtml";
+  import { attachRupiahFormatting, setRupiahValue, getRupiahValue } from "../lib/rupiahInput";
 
   const apiUrl =
     document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
 
+  interface InvoicePayment {
+    id: number;
+    amount: number;
+    paidDate: string;
+    method: string;
+    note: string | null;
+  }
+
   interface AdminInvoice {
+    id: number;
     invoiceNumber: string | null;
     projectId: string;
     amount: number;
     status: string;
     issuedDate: string;
+    dueDate: string | null;
+    notes: string | null;
     clientName: string;
+    paidAmount: number;
+    outstandingAmount: number;
+    payments: InvoicePayment[];
   }
 
   let allInvoices: AdminInvoice[] = [];
+  let currentDetailInvoice: AdminInvoice | null = null;
 
   const tbody = document.getElementById("invoices-body") as HTMLTableSectionElement;
   const emptyState = document.getElementById("invoices-empty") as HTMLDivElement;
@@ -152,29 +241,40 @@ import PageHeader from "../components/PageHeader.astro";
   const skeletonEl_invoices = document.getElementById("invoices-skeleton") as HTMLDivElement;
 
   const STATUS_LABELS: Record<string, string> = {
-    pending: "Pending",
+    draft: "Draft",
+    issued: "Terbit",
+    unpaid: "Belum Dibayar",
+    partially_paid: "Dibayar Sebagian",
     paid: "Lunas",
-    failed: "Ditolak",
-    expired: "Jatuh Tempo",
+    overdue: "Jatuh Tempo",
     cancelled: "Dibatalkan",
   };
   const STATUS_CLASSES: Record<string, string> = {
-    pending: "border-ink text-ink",
+    draft: "border-smoke text-smoke",
+    issued: "border-ink text-ink",
+    unpaid: "border-amber text-amber",
+    partially_paid: "border-amber text-amber",
     paid: "border-armed bg-armed text-paper",
-    failed: "border-signal text-signal",
-    expired: "border-amber text-amber",
+    overdue: "border-signal text-signal",
     cancelled: "border-smoke text-smoke",
   };
+  const PAYMENT_METHOD_LABELS: Record<string, string> = {
+    cash: "Tunai",
+    bank_transfer: "Transfer Bank",
+    cheque: "Cek/Giro",
+    other: "Lainnya",
+  };
 
-  function formatRupiah(value: number): string {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency", currency: "IDR", minimumFractionDigits: 0,
-    }).format(value);
+  function formatDate(iso: string | null): string {
+    if (!iso) return "-";
+    return new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
   }
-  function formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString("id-ID", {
-      day: "2-digit", month: "short", year: "numeric",
-    });
+
+  function openModal(id: string): void {
+    document.getElementById(id)?.classList.replace("hidden", "flex");
+  }
+  function closeModal(id: string): void {
+    document.getElementById(id)?.classList.replace("flex", "hidden");
   }
 
   function renderTable(invoices: AdminInvoice[]): void {
@@ -191,17 +291,24 @@ import PageHeader from "../components/PageHeader.astro";
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td class="font-mono text-xs break-all">${escapeHtml(inv.invoiceNumber ?? "—")}</td>
-        <td class="hidden sm:table-cell font-mono text-xs text-smoke">${escapeHtml(inv.projectId)}</td>
-        <td class="font-mono text-xs text-smoke">Transfer Bank</td>
-        <td class="font-mono text-xs">${formatRupiah(inv.amount)}</td>
-        <td class="hidden md:table-cell font-mono text-xs text-smoke">${formatDate(inv.issuedDate)}</td>
+        <td class="hidden sm:table-cell text-xs">${escapeHtml(inv.clientName)}</td>
+        <td class="font-mono text-xs">${formatIDR(inv.amount)}</td>
+        <td class="hidden md:table-cell font-mono text-xs ${inv.outstandingAmount > 0 ? "text-signal" : ""}">${formatIDR(inv.outstandingAmount)}</td>
+        <td class="hidden md:table-cell font-mono text-xs text-smoke">${formatDate(inv.dueDate)}</td>
         <td>
           <span class="font-mono text-[10px] uppercase tracking-wide px-2 py-0.5 border-2 ${statusClass}">
             ${statusLabel}
           </span>
         </td>
+        <td class="text-right whitespace-nowrap">
+          <button type="button" class="btn-view-invoice text-xs px-2 py-1 hover:underline" data-id="${inv.id}">Lihat</button>
+        </td>
       `;
       tbody.appendChild(tr);
+    });
+
+    table.querySelectorAll<HTMLButtonElement>(".btn-view-invoice").forEach((btn) => {
+      btn.addEventListener("click", () => openDetailModal(Number(btn.dataset.id)));
     });
   }
 
@@ -212,7 +319,7 @@ import PageHeader from "../components/PageHeader.astro";
 
     const filtered = allInvoices.filter((inv) => {
       if (keyword && !(inv.invoiceNumber ?? "").toLowerCase().includes(keyword) &&
-          !inv.projectId.toLowerCase().includes(keyword)) return false;
+          !inv.clientName.toLowerCase().includes(keyword)) return false;
       if (status && inv.status !== status) return false;
       return true;
     });
@@ -241,6 +348,133 @@ import PageHeader from "../components/PageHeader.astro";
     exportTableToPDF("invoices-table", { title: "Rekap Invoice", subtitle: "Data tagihan proyek FIREPRO" });
   });
 
+  // ─── Detail modal: ringkasan + payment ledger + individual print/PDF ──
+  function renderPaymentHistory(payments: InvoicePayment[]): void {
+    const container = document.getElementById("payment-history") as HTMLDivElement;
+    if (!payments.length) {
+      container.innerHTML = '<p class="font-mono text-[10px] text-smoke">Belum ada pembayaran tercatat.</p>';
+      return;
+    }
+    container.innerHTML = payments
+      .map(
+        (p) => `
+        <div class="flex items-center justify-between text-xs border-b border-hairline pb-1.5">
+          <div class="min-w-0">
+            <p class="font-mono">${formatDate(p.paidDate)} · ${PAYMENT_METHOD_LABELS[p.method] ?? p.method}</p>
+            ${p.note ? `<p class="text-[10px] text-smoke truncate">${escapeHtml(p.note)}</p>` : ""}
+          </div>
+          <span class="font-mono shrink-0">${formatIDR(p.amount)}</span>
+        </div>
+      `,
+      )
+      .join("");
+  }
+
+  function toDocumentData(inv: AdminInvoice) {
+    return {
+      invoiceNumber: inv.invoiceNumber ?? "-",
+      clientName: inv.clientName,
+      projectName: inv.projectId !== "-" ? `Project #${inv.projectId}` : null,
+      issuedDate: inv.issuedDate,
+      dueDate: inv.dueDate,
+      amount: inv.amount,
+      paidAmount: inv.paidAmount,
+      outstandingAmount: inv.outstandingAmount,
+      status: inv.status,
+      statusLabel: STATUS_LABELS[inv.status] ?? inv.status,
+      notes: inv.notes,
+      payments: inv.payments,
+    };
+  }
+
+  function openDetailModal(id: number): void {
+    const inv = allInvoices.find((i) => i.id === id);
+    if (!inv) return;
+    currentDetailInvoice = inv;
+
+    (document.getElementById("detail-invoice-number") as HTMLElement).textContent = inv.invoiceNumber ?? "-";
+    (document.getElementById("detail-invoice-client") as HTMLElement).textContent = inv.clientName;
+    (document.getElementById("detail-amount") as HTMLElement).textContent = formatIDR(inv.amount);
+    (document.getElementById("detail-paid") as HTMLElement).textContent = formatIDR(inv.paidAmount);
+    (document.getElementById("detail-outstanding") as HTMLElement).textContent = formatIDR(inv.outstandingAmount);
+
+    setRupiahValue(document.getElementById("payment-amount") as HTMLInputElement, null);
+    (document.getElementById("payment-date") as HTMLInputElement).value = new Date().toISOString().split("T")[0];
+    (document.getElementById("payment-note") as HTMLInputElement).value = "";
+    document.getElementById("payment-error")?.classList.add("hidden");
+
+    const canPay = !["draft", "cancelled", "paid"].includes(inv.status);
+    (document.getElementById("btn-record-payment") as HTMLButtonElement).disabled = !canPay;
+    (document.getElementById("btn-record-payment") as HTMLButtonElement).style.opacity = canPay ? "1" : "0.5";
+
+    renderPaymentHistory(inv.payments);
+    openModal("detail-modal");
+  }
+
+  document.getElementById("detail-modal-close")?.addEventListener("click", () => closeModal("detail-modal"));
+
+  document.getElementById("btn-view-print")?.addEventListener("click", () => {
+    if (!currentDetailInvoice) return;
+    exportInvoiceDocument(toDocumentData(currentDetailInvoice), "print");
+  });
+  document.getElementById("btn-download-pdf")?.addEventListener("click", () => {
+    if (!currentDetailInvoice) return;
+    // Browser print dialog dengan tujuan "Save as PDF" — tidak ada
+    // dependency PDF generation server-side baru yang ditambahkan.
+    exportInvoiceDocument(toDocumentData(currentDetailInvoice), "download");
+  });
+
+  document.getElementById("btn-record-payment")?.addEventListener("click", async () => {
+    if (!currentDetailInvoice) return;
+    const errorBox = document.getElementById("payment-error") as HTMLDivElement;
+    const errorMsg = document.getElementById("payment-error-msg") as HTMLElement;
+    errorBox.classList.add("hidden");
+
+    const amount = getRupiahValue(document.getElementById("payment-amount") as HTMLInputElement);
+    const paidDate = (document.getElementById("payment-date") as HTMLInputElement).value;
+    const method = (document.getElementById("payment-method") as HTMLSelectElement).value;
+    const note = (document.getElementById("payment-note") as HTMLInputElement).value.trim();
+
+    if (!amount || Number(amount) <= 0) {
+      errorMsg.textContent = "Jumlah pembayaran wajib diisi dan lebih dari 0.";
+      errorBox.classList.remove("hidden");
+      return;
+    }
+    if (!paidDate) {
+      errorMsg.textContent = "Tanggal pembayaran wajib diisi.";
+      errorBox.classList.remove("hidden");
+      return;
+    }
+
+    const btn = document.getElementById("btn-record-payment") as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = "Menyimpan…";
+
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/invoices/${currentDetailInvoice.id}/payments`, {
+        method: "POST",
+        body: JSON.stringify({ amount: Number(amount), paidDate, method, note: note || null }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        errorMsg.textContent = json.error ?? "Gagal mencatat pembayaran.";
+        errorBox.classList.remove("hidden");
+        return;
+      }
+      window.showToast?.(json.message ?? "Pembayaran tersimpan");
+      await loadInvoices();
+      const updated = allInvoices.find((i) => i.id === currentDetailInvoice!.id);
+      if (updated) openDetailModal(updated.id);
+    } catch (err) {
+      console.error("[btn-record-payment] gagal fetch backend:", err);
+      errorMsg.textContent = "Tidak bisa terhubung ke server.";
+      errorBox.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Simpan Pembayaran";
+    }
+  });
+
   // ─── Create invoice modal ───────────────────────────────────────────
   interface ClientOption {
     id: number;
@@ -251,15 +485,16 @@ import PageHeader from "../components/PageHeader.astro";
     projectName: string;
     clientId: number;
   }
+  interface QuotationOption {
+    id: number;
+    number: string;
+    amount: number;
+    projectId: number | null;
+    status: string;
+  }
   let clientOptions: ClientOption[] = [];
   let allProjectOptions: ProjectOption[] = [];
-
-  function openModal(id: string): void {
-    document.getElementById(id)?.classList.replace("hidden", "flex");
-  }
-  function closeModal(id: string): void {
-    document.getElementById(id)?.classList.replace("flex", "hidden");
-  }
+  let allQuotationOptions: QuotationOption[] = [];
 
   async function loadClientOptions(): Promise<void> {
     const select = document.getElementById("if-client") as HTMLSelectElement;
@@ -287,26 +522,61 @@ import PageHeader from "../components/PageHeader.astro";
     }
   }
 
+  async function loadQuotationOptions(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/quotations`);
+      const json = await res.json();
+      if (!res.ok) return;
+      allQuotationOptions = (json.data ?? []).filter((q: QuotationOption) => q.status === "accepted");
+    } catch (err) {
+      console.error("[loadQuotationOptions] gagal fetch backend:", err);
+    }
+  }
+
+  function updateQuotationOptionsForProject(projectId: string): void {
+    const quotationSelect = document.getElementById("if-quotation") as HTMLSelectElement;
+    const filtered = projectId
+      ? allQuotationOptions.filter((q) => String(q.projectId) === projectId)
+      : allQuotationOptions;
+    quotationSelect.innerHTML =
+      `<option value="">Tanpa penawaran terkait</option>` +
+      filtered.map((q) => `<option value="${q.id}">${escapeHtml(q.number)} — ${formatIDR(q.amount)}</option>`).join("");
+  }
+
+  document.getElementById("if-quotation")?.addEventListener("change", (e) => {
+    const quotationId = (e.target as HTMLSelectElement).value;
+    const quotation = allQuotationOptions.find((q) => String(q.id) === quotationId);
+    if (quotation) {
+      setRupiahValue(document.getElementById("if-amount") as HTMLInputElement, quotation.amount);
+    }
+  });
+
   function updateProjectOptionsForClient(clientId: string): void {
     const projectSelect = document.getElementById("if-project") as HTMLSelectElement;
     if (!clientId) {
       projectSelect.innerHTML = `<option value="">Pilih klien dulu…</option>`;
+      updateQuotationOptionsForProject("");
       return;
     }
     const filtered = allProjectOptions.filter((p) => String(p.clientId) === clientId);
     projectSelect.innerHTML =
       `<option value="">Tanpa proyek terkait</option>` +
       filtered.map((p) => `<option value="${p.id}">${escapeHtml(p.projectName)}</option>`).join("");
+    updateQuotationOptionsForProject("");
   }
   document.getElementById("if-client")?.addEventListener("change", (e) => {
     updateProjectOptionsForClient((e.target as HTMLSelectElement).value);
+  });
+  document.getElementById("if-project")?.addEventListener("change", (e) => {
+    updateQuotationOptionsForProject((e.target as HTMLSelectElement).value);
   });
 
   function resetInvoiceForm(): void {
     (document.getElementById("if-client") as HTMLSelectElement).value = "";
     updateProjectOptionsForClient("");
-    (document.getElementById("if-amount") as HTMLInputElement).value = "0";
+    setRupiahValue(document.getElementById("if-amount") as HTMLInputElement, 0);
     (document.getElementById("if-issued-date") as HTMLInputElement).value = new Date().toISOString().split("T")[0];
+    (document.getElementById("if-due-date") as HTMLInputElement).value = "";
     document.getElementById("invoice-modal-error")?.classList.add("hidden");
   }
 
@@ -327,8 +597,10 @@ import PageHeader from "../components/PageHeader.astro";
   document.getElementById("invoice-modal-save")?.addEventListener("click", async () => {
     const clientId = (document.getElementById("if-client") as HTMLSelectElement).value;
     const projectId = (document.getElementById("if-project") as HTMLSelectElement).value;
-    const amount = Number((document.getElementById("if-amount") as HTMLInputElement).value || 0);
+    const quotationId = (document.getElementById("if-quotation") as HTMLSelectElement).value;
+    const amount = getRupiahValue(document.getElementById("if-amount") as HTMLInputElement);
     const issuedDate = (document.getElementById("if-issued-date") as HTMLInputElement).value;
+    const dueDate = (document.getElementById("if-due-date") as HTMLInputElement).value;
 
     if (!clientId) return showInvoiceFormError("Klien wajib dipilih.");
     if (!issuedDate) return showInvoiceFormError("Tanggal terbit wajib diisi.");
@@ -340,8 +612,10 @@ import PageHeader from "../components/PageHeader.astro";
         body: JSON.stringify({
           clientId: Number(clientId),
           projectId: projectId ? Number(projectId) : null,
+          quotationId: quotationId ? Number(quotationId) : null,
           amount,
           issuedDate,
+          dueDate: dueDate || null,
         }),
       });
       const json = await res.json();
@@ -360,5 +634,8 @@ import PageHeader from "../components/PageHeader.astro";
 
   loadClientOptions();
   loadProjectOptions();
+  loadQuotationOptions();
+  attachRupiahFormatting(document.getElementById("if-amount") as HTMLInputElement);
+  attachRupiahFormatting(document.getElementById("payment-amount") as HTMLInputElement);
   loadInvoices();
 </script>
