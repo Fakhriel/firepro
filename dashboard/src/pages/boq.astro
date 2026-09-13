@@ -46,7 +46,6 @@ import StatCard from "../components/StatCard.astro";
         <thead>
           <tr>
             <th>Item</th>
-            <th class="hidden sm:table-cell">Proyek</th>
             <th>Kategori</th>
             <th>Qty</th>
             <th class="hidden md:table-cell">Harga Satuan</th>
@@ -151,7 +150,7 @@ import StatCard from "../components/StatCard.astro";
         </div>
         <div>
           <label class="field-label">Harga Satuan (Rp)</label>
-          <input type="number" min="0" step="1" value="0" class="field-input row-unit-price" />
+          <input type="text" inputmode="numeric" placeholder="Rp 0" class="field-input row-unit-price" />
         </div>
       </div>
     </div>
@@ -177,6 +176,7 @@ import StatCard from "../components/StatCard.astro";
 <script>
   import { adminApiFetch } from "../lib/auth";
   import { escapeHtml } from "../lib/escapeHtml";
+  import { attachRupiahFormatting, setRupiahValue, getRupiahValue } from "../lib/rupiahInput";
   import { formatIDR } from "../lib/export";
 
   const apiUrl =
@@ -266,24 +266,44 @@ import StatCard from "../components/StatCard.astro";
     const grandTotal = allItems.reduce((sum, i) => sum + i.total, 0);
     if (grandTotalLabel) grandTotalLabel.textContent = `Total: ${formatIDR(grandTotal)}`;
 
+    // Kelompokkan per proyek — 1 BOQ biasanya 1 dokumen per proyek,
+    // bukan daftar rata semua proyek dicampur.
+    const groups = new Map<string, { projectName: string; items: BoqRow[] }>();
     allItems.forEach((item) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>
-          <p class="font-semibold text-ink">${escapeHtml(item.itemName)}</p>
-          ${item.specification ? `<p class="font-mono text-[10px] text-smoke">${escapeHtml(item.specification)}</p>` : ""}
-        </td>
-        <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${escapeHtml(item.projectName ?? "-")}</td>
-        <td><span class="font-mono text-[9px] uppercase tracking-widest border border-ink px-2 py-1">${CATEGORY_LABEL[item.category]}</span></td>
-        <td class="font-mono text-xs text-charcoal">${item.qty} ${escapeHtml(item.unit)}</td>
-        <td class="hidden md:table-cell font-mono text-xs text-charcoal">${formatIDR(item.unitPrice)}</td>
-        <td class="font-mono text-xs text-ink font-semibold">${formatIDR(item.total)}</td>
-        <td class="text-right whitespace-nowrap">
-          <button type="button" data-id="${item.id}" class="btn-edit-boq text-xs text-steel hover:text-ink font-mono underline-offset-2 hover:underline mr-3">Edit</button>
-          <button type="button" data-id="${item.id}" class="btn-delete-boq text-xs text-steel hover:text-signal font-mono underline-offset-2 hover:underline">Hapus</button>
-        </td>
+      const key = String(item.projectId);
+      if (!groups.has(key)) groups.set(key, { projectName: item.projectName ?? "-", items: [] });
+      groups.get(key)!.items.push(item);
+    });
+
+    groups.forEach(({ projectName, items }) => {
+      const subtotal = items.reduce((sum, i) => sum + i.total, 0);
+      const groupHeader = document.createElement("tr");
+      groupHeader.className = "bg-hairline/20";
+      groupHeader.innerHTML = `
+        <td colspan="4" class="font-display text-sm text-ink py-2">${escapeHtml(projectName)}</td>
+        <td class="font-mono text-xs text-ink font-semibold py-2">${formatIDR(subtotal)}</td>
+        <td></td>
       `;
-      tableBody.appendChild(tr);
+      tableBody.appendChild(groupHeader);
+
+      items.forEach((item) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>
+            <p class="font-semibold text-ink">${escapeHtml(item.itemName)}</p>
+            ${item.specification ? `<p class="font-mono text-[10px] text-smoke">${escapeHtml(item.specification)}</p>` : ""}
+          </td>
+          <td><span class="font-mono text-[9px] uppercase tracking-widest border border-ink px-2 py-1">${CATEGORY_LABEL[item.category]}</span></td>
+          <td class="font-mono text-xs text-charcoal">${item.qty} ${escapeHtml(item.unit)}</td>
+          <td class="hidden md:table-cell font-mono text-xs text-charcoal">${formatIDR(item.unitPrice)}</td>
+          <td class="font-mono text-xs text-ink font-semibold">${formatIDR(item.total)}</td>
+          <td class="text-right whitespace-nowrap">
+            <button type="button" data-id="${item.id}" class="btn-edit-boq text-xs text-steel hover:text-ink font-mono underline-offset-2 hover:underline mr-3">Edit</button>
+            <button type="button" data-id="${item.id}" class="btn-delete-boq text-xs text-steel hover:text-signal font-mono underline-offset-2 hover:underline">Hapus</button>
+          </td>
+        `;
+        tableBody.appendChild(tr);
+      });
     });
 
     tableBody.querySelectorAll<HTMLButtonElement>(".btn-edit-boq").forEach((btn) => {
@@ -422,13 +442,14 @@ import StatCard from "../components/StatCard.astro";
       (row.querySelector(".row-specification") as HTMLInputElement).value = data.specification ?? "";
       (row.querySelector(".row-qty") as HTMLInputElement).value = String(data.qty ?? 1);
       (row.querySelector(".row-unit") as HTMLInputElement).value = data.unit ?? "";
-      (row.querySelector(".row-unit-price") as HTMLInputElement).value = String(data.unitPrice ?? 0);
+      setRupiahValue(row.querySelector(".row-unit-price") as HTMLInputElement, data.unitPrice ?? 0);
     }
 
     row.querySelector(".row-category")?.addEventListener("change", () => applyRowCategoryVisibility(row));
     row.querySelector(".btn-remove-row")?.addEventListener("click", () => {
       if (document.querySelectorAll("#boq-rows .boq-row").length > 1) row.remove();
     });
+    attachRupiahFormatting(row.querySelector(".row-unit-price") as HTMLInputElement);
 
     applyRowCategoryVisibility(row);
     return row;
@@ -446,7 +467,7 @@ import StatCard from "../components/StatCard.astro";
       specification: (rowEl.querySelector(".row-specification") as HTMLInputElement).value.trim(),
       qty: Number((rowEl.querySelector(".row-qty") as HTMLInputElement).value || 0),
       unit: (rowEl.querySelector(".row-unit") as HTMLInputElement).value.trim(),
-      unitPrice: Number((rowEl.querySelector(".row-unit-price") as HTMLInputElement).value || 0),
+      unitPrice: getRupiahValue(rowEl.querySelector(".row-unit-price") as HTMLInputElement),
     };
   }
 
