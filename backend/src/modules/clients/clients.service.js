@@ -167,4 +167,4 @@ async function remove(id) {
   }
 }
 
-module.exports = { list, getById, create, update, remove };
+module.exports = { list, getById, create, update, remove, options };
