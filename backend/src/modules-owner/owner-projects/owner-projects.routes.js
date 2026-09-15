@@ -1,9 +1,7 @@
-// Reuse penuh projects.controller & projects.service dari modules/projects.
-// Owner butuh melihat SEMUA proyek + nilai kontrak (baseCost+additionalCost
-// dihitung di serializer service, bukan endpoint terpisah) — sudah otomatis
-// ikut karena reuse controller yang sama persis dengan admin.
+
 const express = require('express');
 const {
+  optionsHandler,
   listHandler,
   getByIdHandler,
   createHandler,
@@ -13,6 +11,10 @@ const {
 
 const router = express.Router();
 
+// GET /api/owner/projects/options?search= — dipakai combobox proyek di
+// form Quotation (Owner tidak bisa pakai /api/projects/options karena
+// itu di-guard role 'admin' saja — sama seperti kasus /api/clients/options).
+router.get('/options', optionsHandler);
 // GET /api/owner/projects/admin — samakan path dengan modules/projects
 // (frontend admin memanggil /api/projects/admin) supaya konsisten saat
 // dashboard/owner nanti di-wire ke endpoint ini.
