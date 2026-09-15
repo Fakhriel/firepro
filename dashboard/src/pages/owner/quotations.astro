@@ -113,8 +113,20 @@ import StatCard from "../../components/StatCard.astro";
           </p>
         </div>
         <div>
-          <label class="field-label" for="quotation-project">Nama Proyek</label>
+          <label class="field-label" for="quotation-project-search">Proyek Terdaftar</label>
+          <div class="relative flex gap-2">
+            <input id="quotation-project-search" type="text" class="field-input flex-1" placeholder="Ketik untuk cari proyek terdaftar…" autocomplete="off" />
+            <button type="button" id="quotation-project-clear" class="hidden btn-secondary px-2.5 text-xs shrink-0">✕</button>
+            <input type="hidden" id="quotation-project-select" />
+            <div id="quotation-project-results" class="hidden absolute z-10 left-0 right-0 top-full mt-1 max-h-48 overflow-y-auto bg-surface border-2 border-ink"></div>
+          </div>
+        </div>
+        <div>
+          <label class="field-label" for="quotation-project">Nama Proyek (manual)</label>
           <input id="quotation-project" type="text" class="field-input" placeholder="Nama proyek yang ditawarkan" />
+          <p id="quotation-project-manual-warning" class="font-mono text-[10px] text-signal mt-1 hidden">
+            Proyek manual tidak terhubung ke data proyek asli.
+          </p>
         </div>
         <div>
           <label class="field-label" for="quotation-description">Deskripsi</label>
@@ -164,6 +176,7 @@ import StatCard from "../../components/StatCard.astro";
     number: string;
     clientId: string | null;
     client: string;
+    projectId: string | null;
     project: string;
     description: string;
     amount: number;
@@ -272,6 +285,100 @@ import StatCard from "../../components/StatCard.astro";
   document.addEventListener("click", (e) => {
     if (!(e.target as HTMLElement).closest("#quotation-client-search, #quotation-client-results")) {
       clientResultsBox.classList.add("hidden");
+    }
+  });
+
+  // ─── Combobox proyek (pola sama dengan combobox klien di atas) ─────
+  interface ProjectOption {
+    id: string;
+    label: string;
+    clientId: string | null;
+  }
+  let projectSearchDebounce: ReturnType<typeof setTimeout>;
+
+  async function searchProjects(query: string): Promise<ProjectOption[]> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/owner/projects/options?search=${encodeURIComponent(query)}`);
+      const json = await res.json();
+      return res.ok ? json.data ?? [] : [];
+    } catch (err) {
+      console.error("[searchProjects] gagal fetch backend:", err);
+      return [];
+    }
+  }
+
+  function selectProject(id: string, name: string): void {
+    (document.getElementById("quotation-project-select") as HTMLInputElement).value = id;
+    const searchInput = document.getElementById("quotation-project-search") as HTMLInputElement;
+    searchInput.value = name;
+    searchInput.readOnly = true;
+    document.getElementById("quotation-project-clear")?.classList.remove("hidden");
+    document.getElementById("quotation-project-results")?.classList.add("hidden");
+    syncProjectFields();
+  }
+
+  function clearSelectedProject(): void {
+    (document.getElementById("quotation-project-select") as HTMLInputElement).value = "";
+    const searchInput = document.getElementById("quotation-project-search") as HTMLInputElement;
+    searchInput.value = "";
+    searchInput.readOnly = false;
+    document.getElementById("quotation-project-clear")?.classList.add("hidden");
+    document.getElementById("quotation-project-results")?.classList.add("hidden");
+    syncProjectFields();
+  }
+
+  function renderProjectSelect(currentProjectId?: string | null, currentProjectName?: string): void {
+    if (currentProjectId) {
+      selectProject(currentProjectId, currentProjectName ?? "(proyek saat ini)");
+    } else {
+      clearSelectedProject();
+    }
+  }
+
+  function syncProjectFields(): void {
+    const projectId = (document.getElementById("quotation-project-select") as HTMLInputElement).value;
+    const manualInput = document.getElementById("quotation-project") as HTMLInputElement;
+    const warning = document.getElementById("quotation-project-manual-warning") as HTMLElement;
+    const hasSelection = Boolean(projectId);
+    manualInput.disabled = hasSelection;
+    if (hasSelection) {
+      manualInput.value = (document.getElementById("quotation-project-search") as HTMLInputElement).value;
+      warning.classList.add("hidden");
+    } else {
+      warning.classList.toggle("hidden", !manualInput.value.trim());
+    }
+  }
+  document.getElementById("quotation-project")?.addEventListener("input", syncProjectFields);
+
+  const projectSearchInput = document.getElementById("quotation-project-search") as HTMLInputElement;
+  const projectResultsBox = document.getElementById("quotation-project-results") as HTMLDivElement;
+
+  projectSearchInput?.addEventListener("input", () => {
+    clearTimeout(projectSearchDebounce);
+    const query = projectSearchInput.value.trim();
+    if (!query) {
+      projectResultsBox.classList.add("hidden");
+      return;
+    }
+    projectSearchDebounce = setTimeout(async () => {
+      const results = await searchProjects(query);
+      if (!results.length) {
+        projectResultsBox.innerHTML = `<p class="font-mono text-[10px] text-smoke px-3 py-2">Tidak ada proyek ditemukan</p>`;
+      } else {
+        projectResultsBox.innerHTML = results
+          .map((p) => `<button type="button" data-project-id="${p.id}" data-project-name="${escapeHtml(p.label)}" class="w-full text-left px-3 py-2 text-sm hover:bg-hairline/30">${escapeHtml(p.label)}</button>`)
+          .join("");
+        projectResultsBox.querySelectorAll<HTMLButtonElement>("[data-project-id]").forEach((btn) => {
+          btn.addEventListener("click", () => selectProject(btn.dataset.projectId!, btn.dataset.projectName!));
+        });
+      }
+      projectResultsBox.classList.remove("hidden");
+    }, 250);
+  });
+  document.getElementById("quotation-project-clear")?.addEventListener("click", clearSelectedProject);
+  document.addEventListener("click", (e) => {
+    if (!(e.target as HTMLElement).closest("#quotation-project-search, #quotation-project-results")) {
+      projectResultsBox.classList.add("hidden");
     }
   });
 
@@ -440,7 +547,10 @@ import StatCard from "../../components/StatCard.astro";
     (document.getElementById("quotation-client") as HTMLInputElement).disabled = false;
     document.getElementById("quotation-client-manual-warning")?.classList.add("hidden");
     renderClientSelect(null);
+    renderProjectSelect(null);
     (document.getElementById("quotation-project") as HTMLInputElement).value = "";
+    (document.getElementById("quotation-project") as HTMLInputElement).disabled = false;
+    document.getElementById("quotation-project-manual-warning")?.classList.add("hidden");
     (document.getElementById("quotation-description") as HTMLTextAreaElement).value = "";
     setRupiahValue(document.getElementById("quotation-amount") as HTMLInputElement, null);
 
@@ -456,7 +566,9 @@ import StatCard from "../../components/StatCard.astro";
     renderClientSelect(q.clientId, q.client);
     (document.getElementById("quotation-client") as HTMLInputElement).value = q.client;
     syncClientFields();
+    renderProjectSelect(q.projectId, q.project);
     (document.getElementById("quotation-project") as HTMLInputElement).value = q.project;
+    syncProjectFields();
     (document.getElementById("quotation-description") as HTMLTextAreaElement).value = q.description ?? "";
     setRupiahValue(document.getElementById("quotation-amount") as HTMLInputElement, q.amount);
     (document.getElementById("quotation-valid-until") as HTMLInputElement).value = q.validUntil ?? "";
@@ -476,6 +588,7 @@ import StatCard from "../../components/StatCard.astro";
     const id = (document.getElementById("quotation-id") as HTMLInputElement).value;
     const clientSelectValue = (document.getElementById("quotation-client-select") as HTMLInputElement).value;
     const client = (document.getElementById("quotation-client") as HTMLInputElement).value.trim();
+    const projectSelectValue = (document.getElementById("quotation-project-select") as HTMLInputElement).value;
     const project = (document.getElementById("quotation-project") as HTMLInputElement).value.trim();
     const description = (document.getElementById("quotation-description") as HTMLTextAreaElement).value.trim();
     const amount = getRupiahValue(document.getElementById("quotation-amount") as HTMLInputElement);
@@ -488,6 +601,7 @@ import StatCard from "../../components/StatCard.astro";
     const body = {
       clientId: clientSelectValue || null,
       client,
+      projectId: projectSelectValue || null,
       project,
       description: description || null,
       amount,
