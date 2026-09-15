@@ -108,13 +108,6 @@ import StatCard from "../../components/StatCard.astro";
             <option value="">Pilih klien dulu…</option>
           </select>
         </div>
-        <div>
-          <label class="field-label" for="if-quotation">Dari Penawaran <span class="text-smoke normal-case">(opsional)</span></label>
-          <select id="if-quotation" class="field-input">
-            <option value="">Tanpa penawaran terkait</option>
-          </select>
-          <p class="font-mono text-[10px] text-smoke mt-1">Pilih penawaran yang sudah disetujui untuk otomatis isi nominal dari situ.</p>
-        </div>
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="field-label" for="if-amount">Jumlah (Rp)</label>
@@ -156,6 +149,17 @@ import StatCard from "../../components/StatCard.astro";
       </div>
 
       <div class="p-5 space-y-4">
+        <div class="flex items-center justify-between border border-hairline p-2.5">
+          <div>
+            <p class="font-mono text-[9px] uppercase text-smoke">Status</p>
+            <p id="detail-status-label" class="font-mono text-sm mt-1 font-semibold">-</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <select id="detail-status-select" class="field-input text-xs py-1.5"></select>
+            <button id="btn-save-status" type="button" class="btn-secondary text-xs">Simpan Status</button>
+          </div>
+        </div>
+
         <div class="grid grid-cols-3 gap-3 text-center">
           <div class="border border-hairline p-2.5">
             <p class="font-mono text-[9px] uppercase text-smoke">Total</p>
@@ -438,6 +442,17 @@ import StatCard from "../../components/StatCard.astro";
     (document.getElementById("detail-paid") as HTMLElement).textContent = formatIDR(inv.paidAmount);
     (document.getElementById("detail-outstanding") as HTMLElement).textContent = formatIDR(inv.outstandingAmount);
 
+    (document.getElementById("detail-status-label") as HTMLElement).textContent = inv.statusLabel;
+    const MANUAL_STATUSES = ["draft", "issued", "unpaid", "partially_paid", "paid", "cancelled"];
+    const statusSelect = document.getElementById("detail-status-select") as HTMLSelectElement;
+    const saveStatusBtn = document.getElementById("btn-save-status") as HTMLButtonElement;
+    const isLocked = ["paid", "cancelled"].includes(inv.status);
+    statusSelect.innerHTML = MANUAL_STATUSES.map((s) => `<option value="${s}">${STATUS_LABELS[s]}</option>`).join("");
+    statusSelect.value = MANUAL_STATUSES.includes(inv.status) ? inv.status : "draft";
+    statusSelect.disabled = isLocked;
+    saveStatusBtn.disabled = isLocked;
+    saveStatusBtn.title = isLocked ? "Status lunas/dibatalkan tidak bisa diubah lagi" : "";
+
     setRupiahValue(document.getElementById("payment-amount") as HTMLInputElement, null);
     (document.getElementById("payment-date") as HTMLInputElement).value = new Date().toISOString().split("T")[0];
     (document.getElementById("payment-note") as HTMLInputElement).value = "";
@@ -460,6 +475,32 @@ import StatCard from "../../components/StatCard.astro";
   document.getElementById("btn-download-pdf")?.addEventListener("click", () => {
     if (!currentDetailInvoice) return;
     exportInvoiceDocument(toDocumentData(currentDetailInvoice), "download");
+  });
+
+  document.getElementById("btn-save-status")?.addEventListener("click", async () => {
+    if (!currentDetailInvoice) return;
+    const newStatus = (document.getElementById("detail-status-select") as HTMLSelectElement).value;
+    const btn = document.getElementById("btn-save-status") as HTMLButtonElement;
+    btn.disabled = true;
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/owner/invoices/${currentDetailInvoice.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal mengubah status invoice", "error");
+        btn.disabled = false;
+        return;
+      }
+      window.showToast?.("Status invoice berhasil diubah");
+      await loadInvoices();
+      openDetailModal(currentDetailInvoice.id);
+    } catch (err) {
+      console.error("[btn-save-status] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+      btn.disabled = false;
+    }
   });
 
   document.getElementById("btn-record-payment")?.addEventListener("click", async () => {
@@ -522,16 +563,8 @@ import StatCard from "../../components/StatCard.astro";
     projectName: string;
     clientId: number;
   }
-  interface QuotationOption {
-    id: number;
-    number: string;
-    amount: number;
-    projectId: number | null;
-    status: string;
-  }
   let clientOptions: ClientOption[] = [];
   let allProjectOptions: ProjectOption[] = [];
-  let allQuotationOptions: QuotationOption[] = [];
 
   async function loadClientOptions(): Promise<void> {
     const select = document.getElementById("if-client") as HTMLSelectElement;
@@ -559,53 +592,19 @@ import StatCard from "../../components/StatCard.astro";
     }
   }
 
-  async function loadQuotationOptions(): Promise<void> {
-    try {
-      const res = await adminApiFetch(`${apiUrl}/api/owner/quotations`);
-      const json = await res.json();
-      if (!res.ok) return;
-      allQuotationOptions = (json.data ?? []).filter((q: QuotationOption) => q.status === "accepted");
-    } catch (err) {
-      console.error("[loadQuotationOptions] gagal fetch backend:", err);
-    }
-  }
-
-  function updateQuotationOptionsForProject(projectId: string): void {
-    const quotationSelect = document.getElementById("if-quotation") as HTMLSelectElement;
-    const filtered = projectId
-      ? allQuotationOptions.filter((q) => String(q.projectId) === projectId)
-      : allQuotationOptions;
-    quotationSelect.innerHTML =
-      `<option value="">Tanpa penawaran terkait</option>` +
-      filtered.map((q) => `<option value="${q.id}">${escapeHtml(q.number)} — ${formatIDR(q.amount)}</option>`).join("");
-  }
-
-  document.getElementById("if-quotation")?.addEventListener("change", (e) => {
-    const quotationId = (e.target as HTMLSelectElement).value;
-    const quotation = allQuotationOptions.find((q) => String(q.id) === quotationId);
-    if (quotation) {
-      setRupiahValue(document.getElementById("if-amount") as HTMLInputElement, quotation.amount);
-    }
-  });
-
   function updateProjectOptionsForClient(clientId: string): void {
     const projectSelect = document.getElementById("if-project") as HTMLSelectElement;
     if (!clientId) {
       projectSelect.innerHTML = `<option value="">Pilih klien dulu…</option>`;
-      updateQuotationOptionsForProject("");
       return;
     }
     const filtered = allProjectOptions.filter((p) => String(p.clientId) === clientId);
     projectSelect.innerHTML =
       `<option value="">Tanpa proyek terkait</option>` +
       filtered.map((p) => `<option value="${p.id}">${escapeHtml(p.projectName)}</option>`).join("");
-    updateQuotationOptionsForProject("");
   }
   document.getElementById("if-client")?.addEventListener("change", (e) => {
     updateProjectOptionsForClient((e.target as HTMLSelectElement).value);
-  });
-  document.getElementById("if-project")?.addEventListener("change", (e) => {
-    updateQuotationOptionsForProject((e.target as HTMLSelectElement).value);
   });
 
   function resetInvoiceForm(): void {
@@ -634,7 +633,6 @@ import StatCard from "../../components/StatCard.astro";
   document.getElementById("invoice-modal-save")?.addEventListener("click", async () => {
     const clientId = (document.getElementById("if-client") as HTMLSelectElement).value;
     const projectId = (document.getElementById("if-project") as HTMLSelectElement).value;
-    const quotationId = (document.getElementById("if-quotation") as HTMLSelectElement).value;
     const amount = getRupiahValue(document.getElementById("if-amount") as HTMLInputElement);
     const issuedDate = (document.getElementById("if-issued-date") as HTMLInputElement).value;
     const dueDate = (document.getElementById("if-due-date") as HTMLInputElement).value;
@@ -649,7 +647,6 @@ import StatCard from "../../components/StatCard.astro";
         body: JSON.stringify({
           clientId: Number(clientId),
           projectId: projectId ? Number(projectId) : null,
-          quotationId: quotationId ? Number(quotationId) : null,
           amount,
           issuedDate,
           dueDate: dueDate || null,
@@ -671,7 +668,6 @@ import StatCard from "../../components/StatCard.astro";
 
   loadClientOptions();
   loadProjectOptions();
-  loadQuotationOptions();
   attachRupiahFormatting(document.getElementById("if-amount") as HTMLInputElement);
   attachRupiahFormatting(document.getElementById("payment-amount") as HTMLInputElement);
   loadInvoices();
