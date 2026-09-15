@@ -1,4 +1,5 @@
 const { Op } = require('sequelize');
+const { sequelize } = require('../../config/db');
 const { Project } = require('./projects.model');
 const { Client } = require('../clients/clients.model');
 const { escapeLike } = require('../../utils/escapeLike');
@@ -53,9 +54,10 @@ const includeClient = [{ model: Client, as: 'client', attributes: ['id', 'name',
 async function options(search) {
   const where = {};
   if (search) {
+    const needle = `%${escapeLike(search).toLowerCase()}%`;
     where[Op.or] = [
-      { code: { [Op.like]: `%${escapeLike(search)}%` } },
-      { name: { [Op.like]: `%${escapeLike(search)}%` } },
+      sequelize.where(sequelize.fn('LOWER', sequelize.col('code')), { [Op.like]: needle }),
+      sequelize.where(sequelize.fn('LOWER', sequelize.col('name')), { [Op.like]: needle }),
     ];
   }
   const projects = await Project.findAll({
