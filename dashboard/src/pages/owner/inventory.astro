@@ -29,10 +29,16 @@ import PageHeader from "../../components/PageHeader.astro";
       placeholder="Cari nama barang…"
       class="field-input sm:max-w-xs"
     />
-    <select id="filter-type" class="field-input sm:w-36">
-      <option value="">Semua Tipe</option>
-      <option value="material">Material</option>
-      <option value="peralatan">Peralatan</option>
+    <select id="filter-category" class="field-input sm:w-44">
+      <option value="">Semua Kategori</option>
+      <option value="fire_alarm">Fire Alarm</option>
+      <option value="hydrant">Hydrant</option>
+      <option value="apar">APAR</option>
+      <option value="sprinkler">Sprinkler</option>
+      <option value="electrical">Elektrikal</option>
+      <option value="cable">Kabel</option>
+      <option value="tools">Peralatan</option>
+      <option value="other">Lainnya</option>
     </select>
     <select id="filter-status" class="field-input sm:w-36">
       <option value="">Semua Status</option>
@@ -51,7 +57,7 @@ import PageHeader from "../../components/PageHeader.astro";
             <th>Barang</th>
             <th class="hidden sm:table-cell">Kode</th>
             <th>Harga Satuan</th>
-            <th class="hidden md:table-cell">Tipe</th>
+            <th class="hidden md:table-cell">Kategori</th>
             <th class="hidden md:table-cell">Stok</th>
             <th>Status</th>
             <th class="text-right">Aksi</th>
@@ -117,31 +123,20 @@ import PageHeader from "../../components/PageHeader.astro";
           </div>
           <div>
             <label class="field-label" for="item-category">Kategori</label>
-            <input id="item-category" type="text" placeholder="Material, Alat Berat, dst" class="field-input" />
-          </div>
-          <div>
-            <label class="field-label" for="item-type">Tipe</label>
-            <select id="item-type" class="field-input">
-              <option value="material">Material</option>
-              <option value="peralatan">Peralatan</option>
+            <select id="item-category" class="field-input">
+              <option value="fire_alarm">Fire Alarm</option>
+              <option value="hydrant">Hydrant</option>
+              <option value="apar">APAR</option>
+              <option value="sprinkler">Sprinkler</option>
+              <option value="electrical">Elektrikal</option>
+              <option value="cable">Kabel</option>
+              <option value="tools">Peralatan</option>
+              <option value="other">Lainnya</option>
             </select>
           </div>
           <div>
             <label class="field-label" for="item-price">Harga Satuan (Rp)</label>
-            <input id="item-price" type="number" placeholder="85000" class="field-input" />
-          </div>
-          <div>
-            <label class="field-label" for="item-old-price">Harga Lama (Rp) <span class="text-smoke normal-case">— opsional</span></label>
-            <input id="item-old-price" type="number" placeholder="95000" class="field-input" />
-          </div>
-          <div class="sm:col-span-2">
-            <label class="field-label" for="item-badge">Badge <span class="text-smoke normal-case">— opsional</span></label>
-            <select id="item-badge" class="field-input">
-              <option value="">Tidak ada</option>
-              <option value="Baru">Baru</option>
-              <option value="Stok Menipis">Stok Menipis</option>
-              <option value="Sering Dipakai">Sering Dipakai</option>
-            </select>
+            <input id="item-price" type="text" inputmode="numeric" placeholder="Rp 0" class="field-input" />
           </div>
           <div class="sm:col-span-2">
             <label class="field-label" for="item-desc">Deskripsi</label>
@@ -163,15 +158,15 @@ import PageHeader from "../../components/PageHeader.astro";
             <div id="image-previews" class="grid grid-cols-4 gap-2 mt-3"></div>
           </div>
 
-          <!-- Varian & stok: dinamis, minimal 1 baris -->
+          <!-- Stok awal: cuma berlaku saat barang pertama dibuat.
+               Backend belum mendukung ubah stok lewat form edit — stok
+               setelahnya harus lewat pencatatan mutasi stok (in/out). -->
           <div class="sm:col-span-2">
-            <div class="flex items-center justify-between mb-1.5">
-              <label class="field-label" style="margin-bottom: 0;">Varian &amp; Stok</label>
-              <button id="btn-add-variant" type="button" class="text-[10px] font-mono uppercase tracking-wide text-signal hover:underline">
-                + Tambah Varian
-              </button>
-            </div>
-            <div id="variant-rows" class="space-y-2"></div>
+            <label class="field-label" for="item-initial-stock">Stok Awal</label>
+            <input id="item-initial-stock" type="number" min="0" step="1" placeholder="0" class="field-input" />
+            <p id="item-initial-stock-note" class="font-mono text-[9px] text-smoke mt-1 hidden">
+              Stok cuma bisa diatur saat barang pertama dibuat. Untuk barang yang sudah ada, penyesuaian stok butuh fitur pencatatan mutasi stok terpisah.
+            </p>
           </div>
 
           <div class="sm:col-span-2">
@@ -283,6 +278,8 @@ import PageHeader from "../../components/PageHeader.astro";
   import { exportTableToPDF } from "../../lib/export";
   import { adminApiFetch } from "../../lib/auth";
   import { escapeHtml } from "../../lib/escapeHtml";
+  import { attachRupiahFormatting, setRupiahValue, getRupiahValue } from "../../lib/rupiahInput";
+  import { resolveUploadUrl } from "../../lib/resolveUploadUrl";
 
   const apiUrl =
     document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
@@ -292,19 +289,15 @@ import PageHeader from "../../components/PageHeader.astro";
     code: string;
     name: string;
     category: string;
-    type: "material" | "peralatan";
-    price: number;
-    oldPrice: number | null;
-    badge: "Baru" | "Stok Menipis" | "Sering Dipakai" | null;
+    purchasePrice: number | null;
     isActive: number | boolean;
-    image: string | null;
-    totalStock: number;
+    coverImage: string | null;
+    stock: number;
   }
 
   interface InventoryItemDetail extends AdminInventoryItem {
     description: string;
     images: string[];
-    variants: { variant: string; stock: number }[];
   }
 
   let allItems: AdminInventoryItem[] = [];
@@ -319,6 +312,17 @@ import PageHeader from "../../components/PageHeader.astro";
   function formatRupiah(value: number): string {
     return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(value);
   }
+
+  const CATEGORY_LABEL: Record<string, string> = {
+    fire_alarm: "Fire Alarm",
+    hydrant: "Hydrant",
+    apar: "APAR",
+    sprinkler: "Sprinkler",
+    electrical: "Elektrikal",
+    cable: "Kabel",
+    tools: "Peralatan",
+    other: "Lainnya",
+  };
 
   // ─── Render tabel ───────────────────────────────────────────────
   function renderTable(items: AdminInventoryItem[]): void {
@@ -337,17 +341,17 @@ import PageHeader from "../../components/PageHeader.astro";
         <td class="font-mono text-xs text-smoke">${index + 1}</td>
         <td>
           <div class="flex items-center gap-2.5">
-            <img src="${escapeHtml(it.image ?? "/favicon.svg")}" alt="${escapeHtml(it.name)}" class="w-9 h-9 object-cover border border-hairline shrink-0" />
+            <img src="${escapeHtml(resolveUploadUrl(it.coverImage) || "/favicon.svg")}" alt="${escapeHtml(it.name)}" class="w-9 h-9 object-cover border border-hairline shrink-0" />
             <div class="min-w-0">
               <p class="font-semibold text-ink truncate">${escapeHtml(it.name)}</p>
-              <p class="font-mono text-[10px] text-smoke truncate">${escapeHtml(it.category)}</p>
+              <p class="font-mono text-[10px] text-smoke truncate">${escapeHtml(CATEGORY_LABEL[it.category] ?? it.category)}</p>
             </div>
           </div>
         </td>
         <td class="hidden sm:table-cell font-mono text-xs text-smoke">${escapeHtml(it.code)}</td>
-        <td class="font-mono text-xs">${formatRupiah(it.price)}</td>
-        <td class="hidden md:table-cell capitalize text-xs">${escapeHtml(it.type)}</td>
-        <td class="hidden md:table-cell font-mono text-xs">${Number(it.totalStock)}</td>
+        <td class="font-mono text-xs">${it.purchasePrice != null ? formatRupiah(it.purchasePrice) : "-"}</td>
+        <td class="hidden md:table-cell text-xs">${escapeHtml(CATEGORY_LABEL[it.category] ?? it.category)}</td>
+        <td class="hidden md:table-cell font-mono text-xs">${Number(it.stock)}</td>
         <td>
           <span class="px-2 py-0.5 text-[10px] font-mono uppercase tracking-wide border ${isActive ? "border-ink text-ink" : "border-smoke text-smoke"}">
             ${isActive ? "Aktif" : "Nonaktif"}
@@ -375,12 +379,12 @@ import PageHeader from "../../components/PageHeader.astro";
 
   function applyFilters(): void {
     const keyword = (document.getElementById("search-item") as HTMLInputElement).value.trim().toLowerCase();
-    const type = (document.getElementById("filter-type") as HTMLSelectElement).value;
+    const category = (document.getElementById("filter-category") as HTMLSelectElement).value;
     const status = (document.getElementById("filter-status") as HTMLSelectElement).value;
 
     const filtered = allItems.filter((it) => {
       if (keyword && !it.name.toLowerCase().includes(keyword)) return false;
-      if (type && it.type !== type) return false;
+      if (category && it.category !== category) return false;
       if (status === "active" && !it.isActive) return false;
       if (status === "inactive" && it.isActive) return false;
       return true;
@@ -406,7 +410,7 @@ import PageHeader from "../../components/PageHeader.astro";
   }
 
   document.getElementById("search-item")?.addEventListener("input", applyFilters);
-  document.getElementById("filter-type")?.addEventListener("change", applyFilters);
+  document.getElementById("filter-category")?.addEventListener("change", applyFilters);
   document.getElementById("filter-status")?.addEventListener("change", applyFilters);
 
   // ─── Modal helpers ────────────────────────────────────────────────
@@ -422,36 +426,6 @@ import PageHeader from "../../components/PageHeader.astro";
   }
 
   // ─── Baris dinamis: Varian & Stok ──────────────────────────────────
-  const variantRowsContainer = document.getElementById("variant-rows") as HTMLDivElement;
-
-  function addVariantRow(variant = "", stock = ""): void {
-    const row = document.createElement("div");
-    row.className = "flex gap-2 variant-row";
-    row.innerHTML = `
-      <input type="text" placeholder="Varian (mis. 50kg)" class="field-input variant-input flex-1" value="${escapeHtml(variant)}" />
-      <input type="number" placeholder="Stok" min="0" class="field-input stock-input w-24" value="${escapeHtml(stock)}" />
-      <button type="button" class="btn-remove-row btn-secondary px-2.5" aria-label="Hapus varian">×</button>
-    `;
-    row.querySelector(".btn-remove-row")?.addEventListener("click", () => {
-      // Selalu sisakan minimal 1 baris supaya form tidak pernah
-      // ke-submit tanpa varian sama sekali.
-      if (variantRowsContainer.children.length > 1) row.remove();
-    });
-    variantRowsContainer.appendChild(row);
-  }
-
-  document.getElementById("btn-add-variant")?.addEventListener("click", () => addVariantRow());
-
-  function getVariantsFromForm(): { variant: string; stock: number }[] {
-    return Array.from(variantRowsContainer.querySelectorAll(".variant-row"))
-      .map((row) => {
-        const variant = (row.querySelector(".variant-input") as HTMLInputElement).value.trim();
-        const stock = Number((row.querySelector(".stock-input") as HTMLInputElement).value) || 0;
-        return { variant, stock };
-      })
-      .filter((v) => v.variant);
-  }
-
   // ─── Foto: drag & drop upload ─────────────────────────────────────
   const dropzone = document.getElementById("image-dropzone") as HTMLDivElement;
   const fileInput = document.getElementById("image-file-input") as HTMLInputElement;
@@ -463,7 +437,7 @@ import PageHeader from "../../components/PageHeader.astro";
       .map(
         (url, i) => `
         <div class="relative group">
-          <img src="${escapeHtml(url)}" class="w-full aspect-square object-cover border-2 ${i === 0 ? "border-signal" : "border-hairline"}" />
+          <img src="${escapeHtml(resolveUploadUrl(url))}" class="w-full aspect-square object-cover border-2 ${i === 0 ? "border-signal" : "border-hairline"}" />
           ${i === 0 ? `<span class="absolute top-1 left-1 bg-signal text-paper font-mono text-[8px] px-1.5 py-0.5">COVER</span>` : ""}
           <button type="button" data-remove-image="${i}" class="absolute top-1 right-1 bg-ink/70 text-paper w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">×</button>
         </div>
@@ -543,15 +517,13 @@ import PageHeader from "../../components/PageHeader.astro";
   function resetForm(): void {
     (document.getElementById("item-id") as HTMLInputElement).value = "";
     (document.getElementById("item-name") as HTMLInputElement).value = "";
-    (document.getElementById("item-category") as HTMLInputElement).value = "";
-    (document.getElementById("item-type") as HTMLSelectElement).value = "material";
-    (document.getElementById("item-price") as HTMLInputElement).value = "";
-    (document.getElementById("item-old-price") as HTMLInputElement).value = "";
-    (document.getElementById("item-badge") as HTMLSelectElement).value = "";
+    (document.getElementById("item-category") as HTMLSelectElement).value = "fire_alarm";
+    setRupiahValue(document.getElementById("item-price") as HTMLInputElement, null);
     (document.getElementById("item-desc") as HTMLTextAreaElement).value = "";
     (document.getElementById("item-status") as HTMLSelectElement).value = "active";
-    variantRowsContainer.innerHTML = "";
-    addVariantRow();
+    (document.getElementById("item-initial-stock") as HTMLInputElement).value = "";
+    (document.getElementById("item-initial-stock") as HTMLInputElement).disabled = false;
+    document.getElementById("item-initial-stock-note")?.classList.add("hidden");
     resetImages();
     hideFormError();
   }
@@ -578,21 +550,19 @@ import PageHeader from "../../components/PageHeader.astro";
 
       (document.getElementById("item-id") as HTMLInputElement).value = item.id;
       (document.getElementById("item-name") as HTMLInputElement).value = item.name;
-      (document.getElementById("item-category") as HTMLInputElement).value = item.category;
-      (document.getElementById("item-type") as HTMLSelectElement).value = item.type;
-      (document.getElementById("item-price") as HTMLInputElement).value = String(item.price);
-      (document.getElementById("item-old-price") as HTMLInputElement).value =
-        item.oldPrice != null ? String(item.oldPrice) : "";
-      (document.getElementById("item-badge") as HTMLSelectElement).value = item.badge ?? "";
+      (document.getElementById("item-category") as HTMLSelectElement).value = item.category;
+      setRupiahValue(document.getElementById("item-price") as HTMLInputElement, item.purchasePrice);
       (document.getElementById("item-desc") as HTMLTextAreaElement).value = item.description;
       (document.getElementById("item-status") as HTMLSelectElement).value = item.isActive ? "active" : "inactive";
 
       resetImages(item.images);
 
-      variantRowsContainer.innerHTML = "";
-      (item.variants.length ? item.variants : [{ variant: "", stock: 0 }]).forEach((v) =>
-        addVariantRow(v.variant, String(v.stock))
-      );
+      // Stok cuma bisa diatur saat barang pertama dibuat — tampilkan
+      // stok saat ini sebagai info, tapi input dikunci saat edit.
+      const stockInput = document.getElementById("item-initial-stock") as HTMLInputElement;
+      stockInput.value = String(item.stock);
+      stockInput.disabled = true;
+      document.getElementById("item-initial-stock-note")?.classList.remove("hidden");
 
       (document.getElementById("modal-title") as HTMLElement).textContent = "Edit Barang";
       (document.getElementById("modal-save") as HTMLButtonElement).textContent = "Simpan Perubahan";
@@ -612,45 +582,39 @@ import PageHeader from "../../components/PageHeader.astro";
 
     const id = (document.getElementById("item-id") as HTMLInputElement).value;
     const name = (document.getElementById("item-name") as HTMLInputElement).value.trim();
-    const category = (document.getElementById("item-category") as HTMLInputElement).value.trim();
-    const type = (document.getElementById("item-type") as HTMLSelectElement).value;
-    const price = (document.getElementById("item-price") as HTMLInputElement).value;
-    const oldPrice = (document.getElementById("item-old-price") as HTMLInputElement).value;
-    const badge = (document.getElementById("item-badge") as HTMLSelectElement).value;
+    const category = (document.getElementById("item-category") as HTMLSelectElement).value;
+    const price = getRupiahValue(document.getElementById("item-price") as HTMLInputElement);
     const description = (document.getElementById("item-desc") as HTMLTextAreaElement).value.trim();
     const isActive = (document.getElementById("item-status") as HTMLSelectElement).value === "active";
     const images = getImagesFromForm();
-    const variants = getVariantsFromForm();
+    const initialStock = (document.getElementById("item-initial-stock") as HTMLInputElement).value;
 
     // Validasi dasar di client — validasi penuh & otoritatif tetap di
-    // backend (lihat validateInventoryInput di inventoryController.js),
-    // ini cuma supaya admin tidak perlu menunggu round-trip network
-    // untuk kesalahan yang jelas-jelas terlihat dari form.
-    if (!name || !category || !price || !description) {
-      showFormError("Nama, kategori, harga, dan deskripsi wajib diisi.");
+    // backend (lihat validateInput di inventory.service.js), ini cuma
+    // supaya tidak perlu menunggu round-trip network untuk kesalahan
+    // yang jelas-jelas terlihat dari form.
+    if (!name || !category || !description) {
+      showFormError("Nama, kategori, dan deskripsi wajib diisi.");
       return;
     }
     if (images.length === 0) {
-      showFormError("Minimal 1 foto (URL) wajib diisi.");
-      return;
-    }
-    if (variants.length === 0) {
-      showFormError("Minimal 1 varian wajib diisi.");
+      showFormError("Minimal 1 foto wajib diupload.");
       return;
     }
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       name,
       category,
-      type,
-      price: Number(price),
-      oldPrice: oldPrice ? Number(oldPrice) : null,
-      badge: badge || null,
+      purchasePrice: price || null,
       description,
       isActive,
       images,
-      variants,
     };
+    // initialStock cuma dikirim & berlaku saat barang BARU dibuat —
+    // backend tidak menerima ini saat update (lihat inventory.service.js).
+    if (!id && initialStock) {
+      payload.initialStock = Number(initialStock);
+    }
 
     const saveBtn = document.getElementById("modal-save") as HTMLButtonElement;
     const originalLabel = saveBtn.textContent;
@@ -843,5 +807,6 @@ import PageHeader from "../../components/PageHeader.astro";
 
   loadPurchaseRequests();
 
+  attachRupiahFormatting(document.getElementById("item-price") as HTMLInputElement);
   loadInventory();
 </script>
