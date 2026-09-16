@@ -14,6 +14,7 @@ const navItems = [
   { id: "quotations",  href: "/owner/quotations",    label: "Quotations",  icon: "file-text", group: "ops" },
   { id: "invoices",    href: "/owner/invoices",      label: "Invoices",    icon: "receipt",   group: "ops" },
   { id: "documents",   href: "/owner/documents",     label: "Documents",   icon: "folder",    group: "ops" },
+  { id: "announcements", href: "/owner/announcements", label: "Announcements", icon: "megaphone", group: "ops" },
   { id: "maintenance", href: "/owner/maintenance",   label: "Maintenance", icon: "tool",      group: "ops" },
   { id: "inventory",   href: "/owner/inventory",     label: "Inventory",   icon: "box",       group: "gudang" },
   { id: "reports",     href: "/owner/reports",       label: "Reports",     icon: "chart",     group: "gudang" },
@@ -106,6 +107,13 @@ const groups: { key: string; label: string }[] = [
                   {item.icon === "folder" && (
                     <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4 shrink-0" stroke="currentColor" stroke-width="1.75">
                       <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                  )}
+                  {item.icon === "megaphone" && (
+                    <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4 shrink-0" stroke="currentColor" stroke-width="1.75">
+                      <path d="M3 11v2a1 1 0 0 0 1 1h2l3.5 5V5L6 10H4a1 1 0 0 0-1 1z"/>
+                      <path d="M15 8a3 3 0 0 1 0 8"/>
+                      <path d="M17.5 5a7 7 0 0 1 0 14"/>
                     </svg>
                   )}
                   {item.icon === "receipt" && (
