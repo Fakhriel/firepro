@@ -1,10 +1,10 @@
 ---
-import OwnerLayout from "../../layouts/OwnerLayout.astro";
-import PageHeader from "../../components/PageHeader.astro";
-import StatCard from "../../components/StatCard.astro";
+import DashboardLayout from "../layouts/DashboardLayout.astro";
+import PageHeader from "../components/PageHeader.astro";
+import StatCard from "../components/StatCard.astro";
 ---
 
-<OwnerLayout title="Projects" activeNav="projects">
+<DashboardLayout title="Projects" activeNav="projects">
   <PageHeader heading="Projects" sub="Semua proyek lintas tim & supervisor" crumbs={[{ label: "Operasional" }, { label: "Projects" }]}>
     <button id="btn-export-projects" type="button" class="btn-secondary text-xs gap-1.5">
       <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="1.75">
@@ -200,13 +200,13 @@ import StatCard from "../../components/StatCard.astro";
       </div>
     </div>
   </div>
-</OwnerLayout>
+</DashboardLayout>
 
 <script>
-  import { adminApiFetch } from "../../lib/auth";
-  import { escapeHtml } from "../../lib/escapeHtml";
-  import { exportTableToPDF, formatIDR } from "../../lib/export";
-  import { attachRupiahFormatting, setRupiahValue, getRupiahValue } from "../../lib/rupiahInput";
+  import { adminApiFetch } from "../lib/auth";
+  import { escapeHtml } from "../lib/escapeHtml";
+  import { attachRupiahFormatting, setRupiahValue, getRupiahValue } from "../lib/rupiahInput";
+  import { exportTableToPDF, formatIDR } from "../lib/export";
 
   const apiUrl =
     document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
@@ -375,7 +375,7 @@ import StatCard from "../../components/StatCard.astro";
       if (searchInput?.value) params.set("search", searchInput.value);
       if (statusFilter?.value) params.set("status", statusFilter.value);
 
-      const res = await adminApiFetch(`${apiUrl}/api/owner/projects/admin?${params.toString()}`);
+      const res = await adminApiFetch(`${apiUrl}/api/projects/admin?${params.toString()}`);
       const json = await res.json();
       if (!res.ok) {
         window.showToast?.(json.error ?? "Gagal memuat data proyek", "error");
@@ -419,7 +419,7 @@ import StatCard from "../../components/StatCard.astro";
   async function loadClientOptions(): Promise<void> {
     const select = document.getElementById("pf-client") as HTMLSelectElement;
     try {
-      const res = await adminApiFetch(`${apiUrl}/api/owner/clients`);
+      const res = await adminApiFetch(`${apiUrl}/api/clients`);
       const json = await res.json();
       if (!res.ok) return;
       clientOptions = json.data ?? [];
@@ -510,7 +510,7 @@ import StatCard from "../../components/StatCard.astro";
     };
 
     try {
-      const url = editingProjectId ? `${apiUrl}/api/owner/projects/${editingProjectId}` : `${apiUrl}/api/owner/projects`;
+      const url = editingProjectId ? `${apiUrl}/api/projects/${editingProjectId}` : `${apiUrl}/api/projects`;
       const res = await adminApiFetch(url, {
         method: editingProjectId ? "PATCH" : "POST",
         body: JSON.stringify(payload),
@@ -541,7 +541,7 @@ import StatCard from "../../components/StatCard.astro";
   document.getElementById("project-delete-confirm")?.addEventListener("click", async () => {
     if (!projectPendingDelete) return;
     try {
-      const res = await adminApiFetch(`${apiUrl}/api/owner/projects/${projectPendingDelete.id}`, { method: "DELETE" });
+      const res = await adminApiFetch(`${apiUrl}/api/projects/${projectPendingDelete.id}`, { method: "DELETE" });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         window.showToast?.(json.error ?? "Gagal menghapus proyek", "error");
