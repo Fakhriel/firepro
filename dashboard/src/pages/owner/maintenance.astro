@@ -37,7 +37,7 @@ import StatCard from "../../components/StatCard.astro";
   <!-- Table -->
   <div class="panel overflow-hidden">
     <div class="overflow-x-auto">
-      <table id="maintenance-table" class="data-table">
+      <table id="maintenance-table" class="data-table hidden">
         <thead>
           <tr>
             <th>Klien / Lokasi</th>
@@ -51,7 +51,19 @@ import StatCard from "../../components/StatCard.astro";
         <tbody id="maintenance-body"></tbody>
       </table>
     </div>
-    <div id="maintenance-empty" class="empty-state min-h-56">
+    <div id="maintenance-skeleton">
+      {Array.from({ length: 5 }).map(() => (
+        <div class="skeleton-row">
+          <div class="skeleton w-9 h-9 shrink-0"></div>
+          <div class="flex-1 space-y-2">
+            <div class="skeleton h-3 w-1/3"></div>
+            <div class="skeleton h-2.5 w-1/5"></div>
+          </div>
+          <div class="skeleton h-5 w-16 shrink-0"></div>
+        </div>
+      ))}
+    </div>
+    <div id="maintenance-empty" class="empty-state min-h-56 hidden">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
       </svg>
@@ -66,11 +78,327 @@ import StatCard from "../../components/StatCard.astro";
       </div>
     </div>
   </div>
+  <!-- Add / edit maintenance modal -->
+  <div id="maintenance-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
+    <div class="panel w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink sticky top-0 bg-surface">
+        <h3 id="maintenance-modal-title" class="font-display text-lg text-ink leading-none">Jadwalkan Maintenance</h3>
+        <button id="maintenance-modal-close" type="button" class="text-steel hover:text-ink transition-colors" aria-label="Tutup">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <input type="hidden" id="maintenance-id" />
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="field-label" for="maintenance-client">Klien</label>
+            <input id="maintenance-client" type="text" class="field-input" placeholder="Nama klien" />
+          </div>
+          <div>
+            <label class="field-label" for="maintenance-location">Lokasi</label>
+            <input id="maintenance-location" type="text" class="field-input" placeholder="Lokasi / alamat" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="field-label" for="maintenance-equipment">Peralatan</label>
+            <input id="maintenance-equipment" type="text" class="field-input" placeholder="Mis. APAR, Sprinkler, Hydrant" />
+          </div>
+          <div>
+            <label class="field-label" for="maintenance-next-service">Jadwal Berikutnya</label>
+            <input id="maintenance-next-service" type="date" class="field-input" />
+          </div>
+          <div>
+            <label class="field-label" for="maintenance-technician">Teknisi</label>
+            <input id="maintenance-technician" type="text" class="field-input" placeholder="Nama teknisi (opsional)" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="field-label" for="maintenance-status-field">Status</label>
+            <select id="maintenance-status-field" class="field-input">
+              <option value="scheduled">Terjadwal</option>
+              <option value="due_soon">Segera Jatuh Tempo</option>
+              <option value="overdue">Terlambat</option>
+              <option value="completed">Selesai</option>
+            </select>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="field-label" for="maintenance-notes">Catatan</label>
+            <textarea id="maintenance-notes" rows="2" class="field-input" placeholder="Catatan tambahan (opsional)"></textarea>
+          </div>
+        </div>
+        <div id="maintenance-modal-error" class="hidden border-2 border-signal bg-signal-dim px-3 py-2">
+          <p id="maintenance-modal-error-msg" class="font-mono text-xs text-signal"></p>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline sticky bottom-0 bg-surface">
+        <button type="button" id="maintenance-modal-cancel" class="btn-secondary text-xs">Batal</button>
+        <button type="button" id="maintenance-modal-save" class="btn-primary text-xs">Simpan</button>
+      </div>
+    </div>
+  </div>
 </OwnerLayout>
 
 <script>
-  // Prototype UI only — belum terhubung ke endpoint maintenance.
+  import { adminApiFetch } from "../../lib/auth";
+  import { escapeHtml } from "../../lib/escapeHtml";
+  import { badgeHtml, type BadgeVariant } from "../../lib/badge";
+  import { confirmDialog } from "../../lib/confirmDialog";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface MaintenanceRow {
+    id: string;
+    client: string;
+    location: string;
+    equipment: string;
+    lastService: string;
+    nextService: string;
+    technician: string;
+    notes: string;
+    status: "scheduled" | "due_soon" | "overdue" | "completed";
+  }
+
+  const STATUS_LABEL: Record<string, string> = {
+    scheduled: "Terjadwal",
+    due_soon: "Segera Jatuh Tempo",
+    overdue: "Terlambat",
+    completed: "Selesai",
+  };
+
+  let allSchedules: MaintenanceRow[] = [];
+
+  const tableBody = document.getElementById("maintenance-body") as HTMLTableSectionElement;
+  const emptyState = document.getElementById("maintenance-empty") as HTMLDivElement;
+  const table = document.getElementById("maintenance-table") as HTMLTableElement;
+  const skeletonEl_maintenance = document.getElementById("maintenance-skeleton") as HTMLDivElement;
+  const countLabel = document.querySelector("[data-maintenance-count]") as HTMLElement | null;
+  const searchInput = document.getElementById("search-maintenance") as HTMLInputElement | null;
+  const statusFilter = document.getElementById("filter-maintenance-status") as HTMLSelectElement | null;
+
+  function openModal(id: string): void {
+    document.getElementById(id)?.classList.replace("hidden", "flex");
+  }
+  function closeModal(id: string): void {
+    document.getElementById(id)?.classList.replace("flex", "hidden");
+  }
+
+  const STATUS_VARIANT: Record<string, BadgeVariant> = {
+    scheduled: "info",
+    due_soon: "warning",
+    overdue: "danger",
+    completed: "success",
+  };
+
+  function setStatValue(cardId: string, value: string): void {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
+    if (!valueEl) {
+      const skeleton = card.querySelector(".skeleton")?.parentElement;
+      valueEl = document.createElement("p");
+      const isAccent = card.classList.contains("bg-ink");
+      valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
+      if (skeleton) {
+        skeleton.replaceWith(valueEl);
+      } else {
+        card.appendChild(valueEl);
+      }
+    }
+    valueEl.textContent = value;
+  }
+
+  function renderTable(schedules: MaintenanceRow[]): void {
+    tableBody.innerHTML = "";
+
+    const isEmpty = schedules.length === 0;
+    skeletonEl_maintenance.classList.add("hidden");
+    table.classList.toggle("hidden", isEmpty);
+    emptyState.classList.toggle("hidden", !isEmpty);
+    if (countLabel) countLabel.textContent = `${schedules.length} jadwal`;
+
+    schedules.forEach((m) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>
+          <p class="font-semibold text-ink">${escapeHtml(m.client)}</p>
+          <p class="font-mono text-[10px] text-smoke">${escapeHtml(m.location)}</p>
+        </td>
+        <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${escapeHtml(m.equipment)}</td>
+        <td class="hidden md:table-cell font-mono text-xs text-charcoal">${m.nextService ? new Date(m.nextService).toLocaleDateString("id-ID") : "-"}</td>
+        <td class="hidden md:table-cell font-mono text-xs text-charcoal">${escapeHtml(m.technician || "-")}</td>
+        <td>${badgeHtml(STATUS_LABEL[m.status] ?? m.status, STATUS_VARIANT[m.status] ?? "neutral")}</td>
+        <td class="text-right whitespace-nowrap">
+          <button type="button" data-id="${m.id}" class="btn-edit-maintenance text-xs text-steel hover:text-ink font-mono underline-offset-2 hover:underline mr-3">Edit</button>
+          <button type="button" data-id="${m.id}" data-client="${escapeHtml(m.client)}" class="btn-delete-maintenance text-xs text-steel hover:text-signal font-mono underline-offset-2 hover:underline">Hapus</button>
+        </td>
+      `;
+      tableBody.appendChild(tr);
+    });
+
+    tableBody.querySelectorAll<HTMLButtonElement>(".btn-edit-maintenance").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const m = allSchedules.find((x) => x.id === btn.dataset.id);
+        if (m) openEditModal(m);
+      });
+    });
+
+    tableBody.querySelectorAll<HTMLButtonElement>(".btn-delete-maintenance").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id;
+        const client = btn.dataset.client ?? "";
+        if (!(await confirmDialog(`Hapus jadwal maintenance untuk "${client}"? Aksi ini tidak bisa dibatalkan.`, { title: "Hapus Jadwal Maintenance", confirmLabel: "Hapus", danger: true }))) return;
+        try {
+          const res = await adminApiFetch(`${apiUrl}/api/owner/maintenance/${id}`, { method: "DELETE" });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            window.showToast?.(json.error ?? "Gagal menghapus jadwal", "error");
+            return;
+          }
+          window.showToast?.("Jadwal maintenance berhasil dihapus");
+          await loadSchedules();
+        } catch {
+          window.showToast?.("Tidak bisa terhubung ke server", "error");
+        }
+      });
+    });
+  }
+
+  function updateStats(schedules: MaintenanceRow[]): void {
+    const active = schedules.filter((m) => m.status !== "completed").length;
+    const dueSoon = schedules.filter((m) => m.status === "due_soon").length;
+    const overdue = schedules.filter((m) => m.status === "overdue").length;
+    const now = new Date();
+    const completedThisMonth = schedules.filter((m) => {
+      if (m.status !== "completed" || !m.lastService) return false;
+      const d = new Date(m.lastService);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }).length;
+
+    setStatValue("stat-maintenance-active", String(active));
+    setStatValue("stat-maintenance-due-soon", String(dueSoon));
+    setStatValue("stat-maintenance-overdue", String(overdue));
+    setStatValue("stat-maintenance-completed", String(completedThisMonth));
+  }
+
+  async function loadSchedules(): Promise<void> {
+    try {
+      const params = new URLSearchParams();
+      if (searchInput?.value) params.set("search", searchInput.value);
+      if (statusFilter?.value) params.set("status", statusFilter.value);
+
+      const res = await adminApiFetch(`${apiUrl}/api/owner/maintenance/admin?${params.toString()}`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat jadwal maintenance", "error");
+        return;
+      }
+      allSchedules = json.data ?? [];
+      renderTable(allSchedules);
+      updateStats(allSchedules);
+    } catch (err) {
+      console.error("[loadSchedules] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  function resetForm(): void {
+    (document.getElementById("maintenance-id") as HTMLInputElement).value = "";
+    (document.getElementById("maintenance-client") as HTMLInputElement).value = "";
+    (document.getElementById("maintenance-location") as HTMLInputElement).value = "";
+    (document.getElementById("maintenance-equipment") as HTMLInputElement).value = "";
+    (document.getElementById("maintenance-next-service") as HTMLInputElement).value = "";
+    (document.getElementById("maintenance-technician") as HTMLInputElement).value = "";
+    (document.getElementById("maintenance-status-field") as HTMLSelectElement).value = "scheduled";
+    (document.getElementById("maintenance-notes") as HTMLTextAreaElement).value = "";
+    document.getElementById("maintenance-modal-error")?.classList.add("hidden");
+  }
+
+  function openEditModal(m: MaintenanceRow): void {
+    resetForm();
+    (document.getElementById("maintenance-modal-title") as HTMLElement).textContent = "Edit Jadwal Maintenance";
+    (document.getElementById("maintenance-id") as HTMLInputElement).value = m.id;
+    (document.getElementById("maintenance-client") as HTMLInputElement).value = m.client;
+    (document.getElementById("maintenance-location") as HTMLInputElement).value = m.location;
+    (document.getElementById("maintenance-equipment") as HTMLInputElement).value = m.equipment;
+    (document.getElementById("maintenance-next-service") as HTMLInputElement).value = m.nextService ?? "";
+    (document.getElementById("maintenance-technician") as HTMLInputElement).value = m.technician ?? "";
+    (document.getElementById("maintenance-status-field") as HTMLSelectElement).value = m.status;
+    (document.getElementById("maintenance-notes") as HTMLTextAreaElement).value = m.notes ?? "";
+    openModal("maintenance-modal");
+  }
+
   document.getElementById("btn-add-maintenance")?.addEventListener("click", () => {
-    window.showToast?.("Form jadwalkan maintenance (prototype)", "info");
+    resetForm();
+    (document.getElementById("maintenance-modal-title") as HTMLElement).textContent = "Jadwalkan Maintenance";
+    openModal("maintenance-modal");
   });
+  document.getElementById("maintenance-modal-close")?.addEventListener("click", () => closeModal("maintenance-modal"));
+  document.getElementById("maintenance-modal-cancel")?.addEventListener("click", () => closeModal("maintenance-modal"));
+
+  document.getElementById("maintenance-modal-save")?.addEventListener("click", async () => {
+    const id = (document.getElementById("maintenance-id") as HTMLInputElement).value;
+    const client = (document.getElementById("maintenance-client") as HTMLInputElement).value.trim();
+    const location = (document.getElementById("maintenance-location") as HTMLInputElement).value.trim();
+    const equipment = (document.getElementById("maintenance-equipment") as HTMLInputElement).value.trim();
+    const nextService = (document.getElementById("maintenance-next-service") as HTMLInputElement).value;
+    const technician = (document.getElementById("maintenance-technician") as HTMLInputElement).value.trim();
+    const status = (document.getElementById("maintenance-status-field") as HTMLSelectElement).value;
+    const notes = (document.getElementById("maintenance-notes") as HTMLTextAreaElement).value.trim();
+
+    const errorBox = document.getElementById("maintenance-modal-error");
+    const errorMsg = document.getElementById("maintenance-modal-error-msg");
+
+    if (!client || !location || !equipment || !nextService) {
+      if (errorMsg) errorMsg.textContent = "Klien, lokasi, alat, dan tanggal servis berikutnya wajib diisi.";
+      errorBox?.classList.remove("hidden");
+      return;
+    }
+
+    const body = {
+      client,
+      location,
+      equipment,
+      nextService,
+      technician: technician || null,
+      status,
+      notes: notes || null,
+    };
+
+    const btn = document.getElementById("maintenance-modal-save") as HTMLButtonElement;
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Menyimpan…";
+
+    try {
+      const res = await adminApiFetch(
+        id ? `${apiUrl}/api/owner/maintenance/${id}` : `${apiUrl}/api/owner/maintenance`,
+        { method: id ? "PATCH" : "POST", body: JSON.stringify(body) }
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        if (errorMsg) errorMsg.textContent = json.error ?? "Gagal menyimpan jadwal";
+        errorBox?.classList.remove("hidden");
+        return;
+      }
+      window.showToast?.(id ? "Jadwal berhasil diperbarui" : "Jadwal maintenance berhasil dibuat");
+      closeModal("maintenance-modal");
+      await loadSchedules();
+    } catch {
+      if (errorMsg) errorMsg.textContent = "Tidak bisa terhubung ke server";
+      errorBox?.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  });
+
+  let searchDebounce: ReturnType<typeof setTimeout>;
+  searchInput?.addEventListener("input", () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(loadSchedules, 300);
+  });
+  statusFilter?.addEventListener("change", loadSchedules);
+
+  loadSchedules();
 </script>
