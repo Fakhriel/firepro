@@ -2,89 +2,164 @@
 import Base from "../layouts/Base.astro";
 ---
 
-<Base title="Login — FIREPRO Admin">
-  <div class="min-h-screen bg-paper flex items-center justify-center px-4">
-    <div class="w-full max-w-sm">
+<Base title="Login — FIREPRO">
+  <div class="min-h-screen bg-paper flex">
 
-      <!-- Brand -->
-      <div class="mb-8 text-center">
-        <a href="/" class="font-display text-4xl text-ink">FIREPRO</a>
-        <p class="font-mono text-[10px] uppercase tracking-widest text-smoke mt-1">Admin Dashboard</p>
-      </div>
+    <!-- Left: technical / brand panel (desktop only) -->
+    <div class="hidden lg:flex lg:w-[42%] xl:w-[38%] bg-ink text-paper flex-col justify-between relative overflow-hidden border-r-2 border-ink">
+      <div class="hazard-edge absolute top-0 left-0 right-0 h-1.5"></div>
 
-      <!-- Card -->
-      <div class="panel brutal-shadow p-7">
-        <h1 class="font-display text-2xl text-ink mb-1">Masuk</h1>
-        <p class="font-mono text-[10px] text-smoke uppercase tracking-wide mb-6">Akses terbatas — admin only</p>
-
-        <!-- Error alert -->
-        <div id="login-error" class="hidden mb-4 border-2 border-signal bg-signal/5 px-3 py-2.5">
-          <p class="font-mono text-xs text-signal" id="login-error-msg">Username atau password salah.</p>
-        </div>
-
-        <div class="space-y-4">
-          <div>
-            <label class="field-label" for="username">Username</label>
-            <input
-              id="username"
-              type="text"
-              placeholder="superadmin"
-              autocomplete="username"
-              class="field-input"
-            />
-          </div>
-
-          <div>
-            <label class="field-label" for="password">Password</label>
-            <div class="relative">
-              <input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                autocomplete="current-password"
-                class="field-input pr-10"
-              />
-              <button
-                id="toggle-pw"
-                type="button"
-                aria-label="Tampilkan password"
-                class="absolute right-3 top-1/2 -translate-y-1/2 text-smoke hover:text-ink transition-colors"
-              >
-                <svg id="eye-icon" viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                  <circle cx="12" cy="12" r="3"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <button
-            id="login-btn"
-            type="button"
-            class="btn-primary w-full mt-2"
-          >
-            <span id="login-btn-text">Masuk</span>
-            <svg id="login-spinner" class="hidden w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" stroke-opacity=".25"/>
-              <path d="M21 12a9 9 0 0 0-9-9" />
+      <div class="px-10 xl:px-14 pt-14">
+        <div class="flex items-center gap-3 mb-16">
+          <span class="w-9 h-9 shrink-0 flex items-center justify-center bg-signal">
+            <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5 text-paper" stroke="currentColor" stroke-width="2">
+              <path d="M12 2c1.5 3 4 4.5 4 8a4 4 0 0 1-8 0c0-1 .3-1.8.8-2.6.3.9 1 1.6 1.7 1.6-.4-2 .3-4 1.5-7z"/>
+              <path d="M8.5 14.5A3.5 3.5 0 0 0 12 18a3.5 3.5 0 0 0 3.5-3.5"/>
             </svg>
-          </button>
+          </span>
+          <span class="font-display text-2xl tracking-tight">FIREPRO</span>
         </div>
+
+        <h2 class="font-display text-4xl xl:text-5xl leading-[1.05] mb-5">
+          Sistem Manajemen<br/>Proteksi Kebakaran
+        </h2>
+        <p class="font-body text-sm text-paper/60 max-w-sm leading-relaxed">
+          Kelola proyek, inventory, invoice, dan operasional kontraktor fire protection dalam satu panel kontrol terpadu.
+        </p>
       </div>
 
-      <p class="text-center font-mono text-[9px] text-smoke/60 mt-5 uppercase tracking-widest">
-        © 2026 FIREPRO — Fire Alarm Control
-      </p>
+      <div class="px-10 xl:px-14 pb-10 grid grid-cols-3 gap-4 border-t border-paper/10 pt-6">
+        <div>
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5 text-signal mb-2" stroke="currentColor" stroke-width="1.75">
+            <path d="M5.5 8H18.5L19.5 21H4.5L5.5 8Z"/><path d="M8.5 8V6C8.5 4.067 9.567 3 12 3C14.433 3 15.5 4.067 15.5 6V8"/>
+          </svg>
+          <p class="font-mono text-[9px] text-paper/40 uppercase tracking-widest">Proyek</p>
+        </div>
+        <div>
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5 text-signal mb-2" stroke="currentColor" stroke-width="1.75">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+          </svg>
+          <p class="font-mono text-[9px] text-paper/40 uppercase tracking-widest">Inventory</p>
+        </div>
+        <div>
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5 text-signal mb-2" stroke="currentColor" stroke-width="1.75">
+            <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+          </svg>
+          <p class="font-mono text-[9px] text-paper/40 uppercase tracking-widest">Invoice</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: form -->
+    <div class="flex-1 flex items-center justify-center px-4 py-12">
+      <div class="w-full max-w-sm">
+
+        <!-- Brand (mobile only) -->
+        <div class="mb-8 text-center lg:hidden">
+          <div class="inline-flex items-center gap-2.5 mb-1">
+            <span class="w-8 h-8 shrink-0 flex items-center justify-center bg-signal">
+              <svg viewBox="0 0 24 24" fill="none" class="w-4.5 h-4.5 text-paper" stroke="currentColor" stroke-width="2">
+                <path d="M12 2c1.5 3 4 4.5 4 8a4 4 0 0 1-8 0c0-1 .3-1.8.8-2.6.3.9 1 1.6 1.7 1.6-.4-2 .3-4 1.5-7z"/>
+                <path d="M8.5 14.5A3.5 3.5 0 0 0 12 18a3.5 3.5 0 0 0 3.5-3.5"/>
+              </svg>
+            </span>
+            <span class="font-display text-3xl text-ink">FIREPRO</span>
+          </div>
+          <p class="font-mono text-[10px] uppercase tracking-widest text-smoke mt-1">Dashboard Internal</p>
+        </div>
+
+        <!-- Card -->
+        <div class="panel brutal-shadow p-7">
+          <h1 class="font-display text-2xl text-ink mb-1">Masuk</h1>
+          <p class="font-mono text-[10px] text-steel uppercase tracking-wide mb-6">Untuk Admin, Owner, Supervisor &amp; Teknisi</p>
+
+          <!-- Error alert -->
+          <div id="login-error" class="hidden mb-4 border-2 border-signal bg-signal-dim px-3 py-2.5 flex items-start gap-2">
+            <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4 text-signal shrink-0 mt-0.5" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <p class="font-mono text-xs text-signal" id="login-error-msg">Username atau password salah.</p>
+          </div>
+
+          <div class="space-y-4">
+            <div>
+              <label class="field-label" for="username">Username</label>
+              <div class="relative">
+                <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4 text-smoke absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" stroke="currentColor" stroke-width="1.75">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+                <input
+                  id="username"
+                  type="text"
+                  placeholder="Masukkan username kamu"
+                  autocomplete="username"
+                  class="field-input pl-10"
+                />
+              </div>
+              <p id="username-hint" class="hidden font-mono text-[10px] text-signal mt-1.5">Username wajib diisi.</p>
+            </div>
+
+            <div>
+              <label class="field-label" for="password">Password</label>
+              <div class="relative">
+                <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4 text-smoke absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" stroke="currentColor" stroke-width="1.75">
+                  <rect x="4" y="10" width="16" height="10" rx="1.5"/>
+                  <path d="M7.5 10V7a4.5 4.5 0 0 1 9 0v3"/>
+                </svg>
+                <input
+                  id="password"
+                  type="password"
+                  placeholder="Masukkan password kamu"
+                  autocomplete="current-password"
+                  class="field-input pl-10 pr-10"
+                />
+                <button
+                  id="toggle-pw"
+                  type="button"
+                  aria-label="Tampilkan password"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-smoke hover:text-ink transition-colors"
+                >
+                  <svg id="eye-icon" viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="1.75">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                </button>
+              </div>
+              <p id="password-hint" class="hidden font-mono text-[10px] text-signal mt-1.5">Password wajib diisi.</p>
+            </div>
+
+            <button
+              id="login-btn"
+              type="button"
+              class="btn-primary w-full mt-2"
+            >
+              <span id="login-btn-text">Masuk</span>
+              <svg id="login-spinner" class="hidden w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" stroke-opacity=".25"/>
+                <path d="M21 12a9 9 0 0 0-9-9" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <p class="text-center font-mono text-[9px] text-smoke/60 mt-5 uppercase tracking-widest">
+          © 2026 FIREPRO — Fire Alarm Control
+        </p>
+      </div>
     </div>
   </div>
 </Base>
 
 <script>
-  import { loginAdmin, getAdminAuth } from "../lib/auth";
+  import { loginAdmin, getAdminAuth, getDashboardByRole } from "../lib/auth";
+  import type { AdminUser } from "../lib/auth";
 
-  // Kalau sudah login, redirect ke dashboard
-  if (getAdminAuth().isAuthenticated) {
-    window.location.replace("/");
+  // Kalau sudah login, redirect sesuai role
+  const existingAuth = getAdminAuth();
+  if (existingAuth.isAuthenticated && existingAuth.admin) {
+    window.location.replace(getDashboardByRole(existingAuth.admin.role));
   }
 
   const usernameEl  = document.getElementById("username") as HTMLInputElement;
@@ -96,6 +171,20 @@ import Base from "../layouts/Base.astro";
   const errorMsg    = document.getElementById("login-error-msg") as HTMLParagraphElement;
   const togglePw    = document.getElementById("toggle-pw") as HTMLButtonElement;
   const eyeIcon     = document.querySelector<SVGSVGElement>("#eye-icon");
+  const usernameHint = document.getElementById("username-hint") as HTMLParagraphElement;
+  const passwordHint = document.getElementById("password-hint") as HTMLParagraphElement;
+
+  function setFieldInvalid(input: HTMLInputElement, hint: HTMLParagraphElement, invalid: boolean): void {
+    input.classList.toggle("border-signal", invalid);
+    hint.classList.toggle("hidden", !invalid);
+  }
+
+  [usernameEl, passwordEl].forEach((el) => {
+    el.addEventListener("input", () => {
+      const hint = el === usernameEl ? usernameHint : passwordHint;
+      if (el.value.trim()) setFieldInvalid(el, hint, false);
+    });
+  });
 
   // Toggle password visibility
   togglePw.addEventListener("click", () => {
@@ -120,10 +209,14 @@ import Base from "../layouts/Base.astro";
   }
 
   async function doLogin(): Promise<void> {
+    if (loginBtn.disabled) return;
+
     const username = usernameEl.value.trim();
     const password = passwordEl.value;
 
     errorBox.classList.add("hidden");
+    setFieldInvalid(usernameEl, usernameHint, !username);
+    setFieldInvalid(passwordEl, passwordHint, !password);
 
     if (!username || !password) {
       showError("Username dan password wajib diisi.");
@@ -133,10 +226,11 @@ import Base from "../layouts/Base.astro";
     setLoading(true);
 
     try {
-      await loginAdmin(username, password);
-      window.location.replace("/");
+      const admin = await loginAdmin(username, password);
+      window.location.replace(getDashboardByRole(admin.role));
     } catch (err) {
       showError(err instanceof Error ? err.message : "Username atau password salah.");
+      passwordEl.classList.add("border-signal");
       passwordEl.value = "";
       passwordEl.focus();
     } finally {
