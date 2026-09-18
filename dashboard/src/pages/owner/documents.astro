@@ -47,8 +47,8 @@ import PageHeader from "../../components/PageHeader.astro";
 
   <!-- Upload modal -->
   <div id="doc-upload-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
-    <div class="panel w-full max-w-md bg-surface">
-      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+    <div class="panel w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink sticky top-0 bg-surface">
         <h3 class="font-display text-lg text-ink leading-none">Upload Dokumen</h3>
         <button id="doc-upload-close" type="button" class="text-steel hover:text-ink transition-colors" aria-label="Tutup">
           <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
@@ -341,6 +341,11 @@ import PageHeader from "../../components/PageHeader.astro";
     formData.append("category", category);
     formData.append("file", file);
 
+    const btn = document.getElementById("doc-upload-save") as HTMLButtonElement;
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Mengunggah…";
+
     try {
       const res = await adminApiFetch(`${apiUrl}/api/documents`, {
         method: "POST",
@@ -357,6 +362,9 @@ import PageHeader from "../../components/PageHeader.astro";
     } catch (err) {
       console.error("[doc-upload-save] gagal fetch backend:", err);
       showUploadError("Tidak bisa terhubung ke server");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
     }
   });
 
@@ -369,6 +377,8 @@ import PageHeader from "../../components/PageHeader.astro";
   document.getElementById("doc-delete-cancel")?.addEventListener("click", () => closeModal("doc-delete-modal"));
   document.getElementById("doc-delete-confirm")?.addEventListener("click", async () => {
     if (!docPendingDelete) return;
+    const btn = document.getElementById("doc-delete-confirm") as HTMLButtonElement;
+    btn.disabled = true;
     try {
       const res = await adminApiFetch(`${apiUrl}/api/documents/${docPendingDelete.id}`, { method: "DELETE" });
       const json = await res.json().catch(() => ({}));
@@ -383,6 +393,8 @@ import PageHeader from "../../components/PageHeader.astro";
     } catch (err) {
       console.error("[doc-delete-confirm] gagal fetch backend:", err);
       window.showToast?.("Tidak bisa terhubung ke server", "error");
+    } finally {
+      btn.disabled = false;
     }
   });
 
