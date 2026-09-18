@@ -86,8 +86,8 @@ import StatCard from "../../components/StatCard.astro";
 
   <!-- Create invoice modal -->
   <div id="invoice-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
-    <div class="panel w-full max-w-md bg-surface">
-      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+    <div class="panel w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink sticky top-0 bg-surface">
         <h3 class="font-display text-lg text-ink leading-none">Tambah Invoice</h3>
         <button id="invoice-modal-close" type="button" class="text-steel hover:text-ink transition-colors" aria-label="Tutup">
           <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
@@ -212,6 +212,7 @@ import StatCard from "../../components/StatCard.astro";
   import { exportTableToPDF, exportInvoiceDocument, formatIDR } from "../../lib/export";
   import { adminApiFetch } from "../../lib/auth";
   import { escapeHtml } from "../../lib/escapeHtml";
+  import { badgeHtml, type BadgeVariant } from "../../lib/badge";
   import { attachRupiahFormatting, setRupiahValue, getRupiahValue } from "../../lib/rupiahInput";
 
   const apiUrl =
@@ -260,14 +261,14 @@ import StatCard from "../../components/StatCard.astro";
     overdue: "Jatuh Tempo",
     cancelled: "Dibatalkan",
   };
-  const STATUS_CLASSES: Record<string, string> = {
-    draft: "border-smoke text-smoke",
-    issued: "border-ink text-ink",
-    unpaid: "border-amber text-amber",
-    partially_paid: "border-amber text-amber",
-    paid: "border-armed bg-armed text-paper",
-    overdue: "border-signal text-signal",
-    cancelled: "border-smoke text-smoke",
+  const STATUS_VARIANT: Record<string, BadgeVariant> = {
+    draft: "neutral",
+    issued: "info",
+    unpaid: "warning",
+    partially_paid: "warning",
+    paid: "success",
+    overdue: "danger",
+    cancelled: "neutral",
   };
   const PAYMENT_METHOD_LABELS: Record<string, string> = {
     cash: "Tunai",
@@ -328,7 +329,7 @@ import StatCard from "../../components/StatCard.astro";
 
     invoices.forEach((inv) => {
       const statusLabel = STATUS_LABELS[inv.status] ?? inv.status;
-      const statusClass = STATUS_CLASSES[inv.status] ?? "border-smoke text-smoke";
+      const statusVariant = STATUS_VARIANT[inv.status] ?? "neutral";
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td class="font-mono text-xs break-all">${escapeHtml(inv.invoiceNumber ?? "—")}</td>
@@ -336,11 +337,7 @@ import StatCard from "../../components/StatCard.astro";
         <td class="font-mono text-xs">${formatIDR(inv.amount)}</td>
         <td class="hidden md:table-cell font-mono text-xs ${inv.outstandingAmount > 0 ? "text-signal" : ""}">${formatIDR(inv.outstandingAmount)}</td>
         <td class="hidden md:table-cell font-mono text-xs text-smoke">${formatDate(inv.dueDate)}</td>
-        <td>
-          <span class="font-mono text-[10px] uppercase tracking-wide px-2 py-0.5 border-2 ${statusClass}">
-            ${statusLabel}
-          </span>
-        </td>
+        <td>${badgeHtml(statusLabel, statusVariant)}</td>
         <td class="text-right whitespace-nowrap">
           <button type="button" class="btn-view-invoice text-xs px-2 py-1 hover:underline" data-id="${inv.id}">Lihat</button>
         </td>
@@ -442,7 +439,7 @@ import StatCard from "../../components/StatCard.astro";
     (document.getElementById("detail-paid") as HTMLElement).textContent = formatIDR(inv.paidAmount);
     (document.getElementById("detail-outstanding") as HTMLElement).textContent = formatIDR(inv.outstandingAmount);
 
-    (document.getElementById("detail-status-label") as HTMLElement).textContent = inv.statusLabel;
+    (document.getElementById("detail-status-label") as HTMLElement).textContent = STATUS_LABELS[inv.status] ?? inv.status;
     const MANUAL_STATUSES = ["draft", "issued", "unpaid", "partially_paid", "paid", "cancelled"];
     const statusSelect = document.getElementById("detail-status-select") as HTMLSelectElement;
     const saveStatusBtn = document.getElementById("btn-save-status") as HTMLButtonElement;
