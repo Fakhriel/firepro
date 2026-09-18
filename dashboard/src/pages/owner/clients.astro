@@ -35,7 +35,7 @@ import StatCard from "../../components/StatCard.astro";
   <!-- Table -->
   <div class="panel overflow-hidden">
     <div class="overflow-x-auto">
-      <table id="clients-table" class="data-table">
+      <table id="clients-table" class="data-table hidden">
         <thead>
           <tr>
             <th>Nama</th>
@@ -49,7 +49,19 @@ import StatCard from "../../components/StatCard.astro";
         <tbody id="clients-body"></tbody>
       </table>
     </div>
-    <div id="clients-empty" class="empty-state min-h-56">
+    <div id="clients-skeleton">
+      {Array.from({ length: 6 }).map(() => (
+        <div class="skeleton-row">
+          <div class="skeleton w-9 h-9 shrink-0"></div>
+          <div class="flex-1 space-y-2">
+            <div class="skeleton h-3 w-1/3"></div>
+            <div class="skeleton h-2.5 w-1/5"></div>
+          </div>
+          <div class="skeleton h-5 w-16 shrink-0"></div>
+        </div>
+      ))}
+    </div>
+    <div id="clients-empty" class="empty-state min-h-56 hidden">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
       </svg>
@@ -66,10 +78,10 @@ import StatCard from "../../components/StatCard.astro";
   </div>
   <!-- Add / edit client modal -->
   <div id="client-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
-    <div class="panel w-full max-w-md bg-paper">
-      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+    <div class="panel w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink sticky top-0 bg-surface">
         <h3 id="client-modal-title" class="font-display text-lg text-ink leading-none">Tambah Klien</h3>
-        <button id="client-modal-close" type="button" class="text-smoke hover:text-ink transition-colors" aria-label="Tutup">
+        <button id="client-modal-close" type="button" class="text-steel hover:text-ink transition-colors" aria-label="Tutup">
           <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
@@ -100,7 +112,7 @@ import StatCard from "../../components/StatCard.astro";
             <option value="inactive">Nonaktif</option>
           </select>
         </div>
-        <div id="client-modal-error" class="hidden border-2 border-signal bg-signal/5 px-3 py-2">
+        <div id="client-modal-error" class="hidden border-2 border-signal bg-signal-dim px-3 py-2">
           <p id="client-modal-error-msg" class="font-mono text-xs text-signal"></p>
         </div>
       </div>
@@ -115,6 +127,8 @@ import StatCard from "../../components/StatCard.astro";
 <script>
   import { adminApiFetch } from "../../lib/auth";
   import { escapeHtml } from "../../lib/escapeHtml";
+  import { badgeHtml, type BadgeVariant } from "../../lib/badge";
+  import { confirmDialog } from "../../lib/confirmDialog";
 
   const apiUrl =
     document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
@@ -135,6 +149,7 @@ import StatCard from "../../components/StatCard.astro";
   const tableBody = document.getElementById("clients-body") as HTMLTableSectionElement;
   const emptyState = document.getElementById("clients-empty") as HTMLDivElement;
   const table = document.getElementById("clients-table") as HTMLTableElement;
+  const skeletonEl_clients = document.getElementById("clients-skeleton") as HTMLDivElement;
   const countLabel = document.querySelector("[data-clients-count]") as HTMLElement | null;
   const searchInput = document.getElementById("search-clients") as HTMLInputElement | null;
   const statusFilter = document.getElementById("filter-client-status") as HTMLSelectElement | null;
@@ -146,16 +161,16 @@ import StatCard from "../../components/StatCard.astro";
     document.getElementById(id)?.classList.replace("flex", "hidden");
   }
 
-  function statusBadge(status: string): string {
-    return status === "active"
-      ? "bg-ink/5 text-ink border-ink"
-      : "bg-hairline/30 text-smoke border-hairline";
-  }
+  const CLIENT_STATUS_VARIANT: Record<string, BadgeVariant> = {
+    active: "success",
+    inactive: "neutral",
+  };
 
   function renderTable(clients: ClientRow[]): void {
     tableBody.innerHTML = "";
 
     const isEmpty = clients.length === 0;
+    skeletonEl_clients.classList.add("hidden");
     table.classList.toggle("hidden", isEmpty);
     emptyState.classList.toggle("hidden", !isEmpty);
     if (countLabel) countLabel.textContent = `${clients.length} klien`;
@@ -167,10 +182,10 @@ import StatCard from "../../components/StatCard.astro";
         <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${escapeHtml(c.email ?? "-")}</td>
         <td class="hidden md:table-cell font-mono text-xs text-charcoal">${escapeHtml(c.phone ?? "-")}</td>
         <td class="hidden md:table-cell font-mono text-xs text-charcoal">${c.totalProjects}</td>
-        <td><span class="font-mono text-[9px] uppercase tracking-widest border px-2 py-1 ${statusBadge(c.status)}">${escapeHtml(c.status)}</span></td>
+        <td>${badgeHtml(c.status, CLIENT_STATUS_VARIANT[c.status] ?? "neutral")}</td>
         <td class="text-right whitespace-nowrap">
-          <button type="button" data-id="${c.id}" class="btn-edit-client text-xs text-smoke hover:text-ink font-mono underline-offset-2 hover:underline mr-3">Edit</button>
-          <button type="button" data-id="${c.id}" data-name="${escapeHtml(c.name)}" class="btn-delete-client text-xs text-smoke hover:text-signal font-mono underline-offset-2 hover:underline">Hapus</button>
+          <button type="button" data-id="${c.id}" class="btn-edit-client text-xs text-steel hover:text-ink font-mono underline-offset-2 hover:underline mr-3">Edit</button>
+          <button type="button" data-id="${c.id}" data-name="${escapeHtml(c.name)}" class="btn-delete-client text-xs text-steel hover:text-signal font-mono underline-offset-2 hover:underline">Hapus</button>
         </td>
       `;
       tableBody.appendChild(tr);
@@ -187,7 +202,7 @@ import StatCard from "../../components/StatCard.astro";
       btn.addEventListener("click", async () => {
         const id = btn.dataset.id;
         const name = btn.dataset.name ?? "";
-        if (!window.confirm(`Hapus klien "${name}"? Aksi ini tidak bisa dibatalkan.`)) return;
+        if (!(await confirmDialog(`Hapus klien "${name}"? Aksi ini tidak bisa dibatalkan.`, { title: "Hapus Klien", confirmLabel: "Hapus", danger: true }))) return;
         try {
           const res = await adminApiFetch(`${apiUrl}/api/owner/clients/${id}`, { method: "DELETE" });
           const json = await res.json().catch(() => ({}));
@@ -225,7 +240,7 @@ import StatCard from "../../components/StatCard.astro";
     if (!card) return;
     let valueEl = card.querySelector<HTMLParagraphElement>(".stat-value");
     if (!valueEl) {
-      const skeleton = card.querySelector(".animate-pulse")?.parentElement;
+      const skeleton = card.querySelector(".skeleton")?.parentElement;
       valueEl = document.createElement("p");
       const isAccent = card.classList.contains("bg-ink");
       valueEl.className = `stat-value font-display text-3xl sm:text-4xl leading-none ${isAccent ? "text-paper" : "text-ink"}`;
@@ -303,6 +318,17 @@ import StatCard from "../../components/StatCard.astro";
 
     const body = { name, email: email || null, phone: phone || null, address: address || null, status };
 
+    if (!name) {
+      if (errorMsg) errorMsg.textContent = "Nama klien wajib diisi.";
+      errorBox?.classList.remove("hidden");
+      return;
+    }
+
+    const btn = document.getElementById("client-modal-save") as HTMLButtonElement;
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Menyimpan…";
+
     try {
       const res = await adminApiFetch(
         id ? `${apiUrl}/api/owner/clients/${id}` : `${apiUrl}/api/owner/clients`,
@@ -320,6 +346,9 @@ import StatCard from "../../components/StatCard.astro";
     } catch {
       if (errorMsg) errorMsg.textContent = "Tidak bisa terhubung ke server";
       errorBox?.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
     }
   });
 
