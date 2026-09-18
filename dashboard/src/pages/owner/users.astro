@@ -87,8 +87,8 @@ import StatCard from "../../components/StatCard.astro";
 
   <!-- Add / edit user modal -->
   <div id="user-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/50 p-4">
-    <div class="panel w-full max-w-md bg-surface">
-      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+    <div class="panel w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface">
+      <div class="flex items-center justify-between px-5 py-4 border-b-2 border-ink sticky top-0 bg-surface">
         <h3 id="user-modal-title" class="font-display text-lg text-ink leading-none">Tambah User</h3>
         <button id="user-modal-close" type="button" class="text-steel hover:text-ink transition-colors" aria-label="Tutup">
           <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" stroke="currentColor" stroke-width="1.75">
@@ -142,6 +142,7 @@ import StatCard from "../../components/StatCard.astro";
 <script>
   import { adminApiFetch, getAdminAuth } from "../../lib/auth";
   import { escapeHtml } from "../../lib/escapeHtml";
+  import { confirmDialog } from "../../lib/confirmDialog";
 
   const apiUrl =
     document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
@@ -264,7 +265,7 @@ import StatCard from "../../components/StatCard.astro";
         const name = btn.dataset.name ?? "";
         const currentlyActive = btn.dataset.active === "true";
         const action = currentlyActive ? "menonaktifkan" : "mengaktifkan";
-        if (!window.confirm(`Yakin ${action} akun "${name}"?`)) return;
+        if (!(await confirmDialog(`Yakin ${action} akun "${name}"?`, { title: "Ubah Status Akun", confirmLabel: "Ya, Lanjutkan" }))) return;
         try {
           const res = await adminApiFetch(`${apiUrl}/api/owner/users/${id}/active`, {
             method: "PATCH",
@@ -295,7 +296,7 @@ import StatCard from "../../components/StatCard.astro";
       btn.addEventListener("click", async () => {
         const id = btn.dataset.id;
         const name = btn.dataset.name ?? "";
-        if (!window.confirm(`Hapus akun "${name}"? Aksi ini tidak bisa dibatalkan.`)) return;
+        if (!(await confirmDialog(`Hapus akun "${name}"? Aksi ini tidak bisa dibatalkan.`, { title: "Hapus Akun", confirmLabel: "Hapus", danger: true }))) return;
         try {
           const res = await adminApiFetch(`${apiUrl}/api/owner/users/${id}`, { method: "DELETE" });
           const json = await res.json().catch(() => ({}));
@@ -397,6 +398,22 @@ import StatCard from "../../components/StatCard.astro";
       body.password = password;
     }
 
+    if (!name) {
+      if (errorMsg) errorMsg.textContent = "Nama wajib diisi.";
+      errorBox?.classList.remove("hidden");
+      return;
+    }
+    if (!editId && (!username || !password)) {
+      if (errorMsg) errorMsg.textContent = "Username dan password wajib diisi untuk user baru.";
+      errorBox?.classList.remove("hidden");
+      return;
+    }
+
+    const btn = document.getElementById("user-modal-save") as HTMLButtonElement;
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Menyimpan…";
+
     try {
       const res = await adminApiFetch(
         editId ? `${apiUrl}/api/owner/users/${editId}` : `${apiUrl}/api/owner/users`,
@@ -414,6 +431,9 @@ import StatCard from "../../components/StatCard.astro";
     } catch {
       if (errorMsg) errorMsg.textContent = "Tidak bisa terhubung ke server";
       errorBox?.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
     }
   });
 
