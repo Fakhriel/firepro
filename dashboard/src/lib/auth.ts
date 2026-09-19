@@ -6,6 +6,8 @@ export interface AdminUser {
   username: string;
   name: string;
   role: "admin" | "owner" | "supervisor" | "karyawan";
+  email?: string | null;
+  phone?: string | null;
 }
 
 export interface AdminAuthState {
@@ -66,6 +68,37 @@ export function clearAdminAuth(): void {
 export function getAdminToken(): string | null {
   if (typeof window === "undefined") return null;
   return window.sessionStorage.getItem(TOKEN_KEY);
+}
+
+const IDLE_TIMEOUT_MINUTES = 30;
+const IDLE_ACTIVITY_EVENTS = ["mousedown", "mousemove", "keydown", "scroll", "touchstart", "click"] as const;
+let idleTimer: ReturnType<typeof setTimeout> | undefined;
+let idleWatcherStarted = false;
+
+/**
+ * Auto-logout setelah tidak ada aktivitas selama `timeoutMinutes`.
+ * Dipanggil sekali oleh tiap layout (Owner/Supervisor/Employee/Dashboard)
+ * setelah guard role lolos. Tidak butuh perubahan backend — murni jaga-jaga
+ * kalau tab dibiarkan terbuka lama tanpa dipakai.
+ */
+export function startIdleWatcher(timeoutMinutes: number = IDLE_TIMEOUT_MINUTES): void {
+  if (typeof window === "undefined" || idleWatcherStarted) return;
+  idleWatcherStarted = true;
+  const timeoutMs = timeoutMinutes * 60 * 1000;
+
+  function resetTimer(): void {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      clearAdminAuth();
+      window.location.replace("/login?reason=idle");
+    }, timeoutMs);
+  }
+
+  IDLE_ACTIVITY_EVENTS.forEach((evt) => {
+    window.addEventListener(evt, resetTimer, { passive: true });
+  });
+
+  resetTimer();
 }
 
 export async function loginAdmin(username: string, password: string): Promise<AdminUser> {
