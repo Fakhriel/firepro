@@ -42,7 +42,7 @@ const { title = "Dashboard", activeNav = "" } = Astro.props;
 </Base>
 
 <script>
-  import { getAdminAuth, clearAdminAuth, getDashboardByRole } from "../lib/auth";
+  import { getAdminAuth, clearAdminAuth, getDashboardByRole, startIdleWatcher } from "../lib/auth";
 
   // Guard client-side: hanya role 'supervisor' yang boleh melihat layout ini.
   // Role lain / belum login -> redirect ke /login.
@@ -54,11 +54,14 @@ const { title = "Dashboard", activeNav = "" } = Astro.props;
       return;
     }
     if (admin.role !== "supervisor") {
-   
+      // Sesi VALID tapi bukan role supervisor — arahkan ke dashboard
+      // milik role dia sendiri, JANGAN logout paksa dan JANGAN redirect
+      // ke Admin/Owner (sesuai aturan di master brief).
       window.location.replace(getDashboardByRole(admin.role));
       return;
     }
     document.getElementById("dashboard-root")?.classList.remove("hidden");
+    startIdleWatcher();
   }
 
   guardSupervisorRole();
