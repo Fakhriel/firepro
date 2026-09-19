@@ -162,6 +162,14 @@ import Base from "../layouts/Base.astro";
     window.location.replace(getDashboardByRole(existingAuth.admin.role));
   }
 
+  // Sesi berakhir karena idle (lihat startIdleWatcher di lib/auth.ts)
+  if (new URLSearchParams(window.location.search).get("reason") === "idle") {
+    const idleBox = document.getElementById("login-error") as HTMLDivElement;
+    const idleMsg = document.getElementById("login-error-msg") as HTMLParagraphElement;
+    idleMsg.textContent = "Sesi kamu berakhir karena tidak ada aktivitas. Silakan masuk lagi.";
+    idleBox.classList.remove("hidden");
+  }
+
   const usernameEl  = document.getElementById("username") as HTMLInputElement;
   const passwordEl  = document.getElementById("password") as HTMLInputElement;
   const loginBtn    = document.getElementById("login-btn") as HTMLButtonElement;
