@@ -4,7 +4,9 @@ An internal dashboard for managing fire protection service operations.
 
 This project manages clients, projects, quotations, invoices, maintenance schedules, inventory, and basic business reports from a single dashboard — with role-based access for **Owner, Admin, Supervisor, and Technical Employee (Field Technician)**.
 
-> **Status:** Role model executed and live-tested. The `export.ts` blocker, the full Manual QA Round 1 list, and Phase 1 backend gaps are all fixed and verified end-to-end against a real database — not just read from source. Two more bugs surfaced only during that live testing (`invoices.project_id` NOT NULL mismatch, and a security-verification middleware that was defined but never wired in) and are fixed too. Remaining open items are scoped below under Roadmap.
+> **Status:** Role model executed and live-tested. The `export.ts` blocker, the full Manual QA Round 1 list, and Phase 1 backend gaps are all fixed and verified end-to-end against a real database — not just read from source. Two more bugs surfaced only during that live testing (`invoices.project_id` NOT NULL mismatch, and a security-verification middleware that was defined but never wired in) and are fixed too.
+>
+> A subsequent **Frontend Consistency & Hardening Pass** (see below) fixed a round of type-check regressions introduced by a frontend rewrite, closed an Owner-role responsive-layout bug, and added session hardening, a modernized dropdown treatment, and Tier 1 PWA installability — all frontend-only, no backend/database changes. Remaining open items are scoped below under Roadmap.
 
 ---
 
@@ -60,7 +62,7 @@ The `admins` table is used for two purposes:
 Because the second purpose is used across multiple modules, there are **8 different foreign key column names** that all reference `admins.id`:
 
 | FK Column           | Table                                                           | Meaning                             |
-| ------------------- | --------------------------------------------------------------- | ----------------------------------- |
+| ------------------- | --------------------------------------------------------------- | ------------------------------------ |
 | `adminId`           | `attendance`                                                    | Who performed the attendance action |
 | `technicianId`      | `daily_reports`, `maintenance_schedules`, `project_assignments` | Assigned/relevant technician        |
 | `uploadedBy`        | `documents`, `project_documentation`                            | Who uploaded the file               |
@@ -101,11 +103,11 @@ clients
 
 projects
   ├─ invoices              (projectId)
-  ├─ quotations            (projectId)
-  ├─ boq_items             (projectId)
-  ├─ cost_entries          (projectId)
-  ├─ documents             (projectId)
-  └─ project_assignments   (projectId)
+  ├─ quotations             (projectId)
+  ├─ boq_items              (projectId)
+  ├─ cost_entries           (projectId)
+  ├─ documents              (projectId)
+  └─ project_assignments    (projectId)
 
 quotations
   ├─ invoices              (quotationId — one quotation can generate one invoice)
@@ -177,12 +179,12 @@ This approach has already been partially implemented. For example, `invoices.ser
 ### Existing Naming Patterns
 
 | Relationship Meaning                  | Preferred FK        |
-| ------------------------------------- | ------------------- |
+| ------------------------------------- | -------------------- |
 | Person performing technical work      | `technicianId`      |
-| Person uploading a file               | `uploadedBy`        |
-| Person submitting a request           | `requestedBy`       |
-| Person creating a record/announcement | `createdBy`         |
-| Person recording a payment            | `recordedByAdminId` |
+| Person uploading a file               | `uploadedBy`         |
+| Person submitting a request           | `requestedBy`        |
+| Person creating a record/announcement | `createdBy`          |
+| Person recording a payment            | `recordedByAdminId`  |
 
 The goal is not to make every FK column literally identical, but to keep the naming **semantically meaningful and predictable within its domain**.
 
@@ -191,7 +193,7 @@ The goal is not to make every FK column literally identical, but to keep the nam
 ## 🛠 Tech Stack
 
 | Layer          | Technology                       |
-| -------------- | -------------------------------- |
+| -------------- | --------------------------------- |
 | Backend        | Node.js, Express 5               |
 | Database       | MySQL, Sequelize                 |
 | Authentication | JWT, bcryptjs                    |
@@ -243,6 +245,41 @@ The goal is not to make every FK column literally identical, but to keep the nam
 
 ---
 
+## ✅ Frontend Consistency & Hardening Pass — All Fixed and Verified
+
+A frontend-only pass (no backend or database changes) following a UI consistency rewrite that had introduced a round of type-check regressions.
+
+### Type-check regressions (introduced by the consistency rewrite)
+
+* `AdminUser` (`dashboard/src/lib/auth.ts`) was missing `email`/`phone`, even though the backend has returned both for some time — broke `employee-technical/profile.astro` and `owner/settings.astro`.
+* `ProjectRow` (`dashboard/src/pages/projects.astro`, `owner/projects.astro`) was missing `clientId`, used when prefilling the edit form — the backend already returns it.
+* `owner/invoices.astro` referenced a non-existent `OwnerInvoice.statusLabel`; replaced with the existing `STATUS_LABELS[status]` lookup instead of widening the type with a field the API never sends.
+* `quotations.astro` was missing the `confirmDialog` import and the `clientSearchDebounce` declaration — both dropped during the rewrite, present in the sibling `owner/quotations.astro`.
+* Tailwind arbitrary value `sm:w-[420px]` → canonical `sm:w-105` across the four drawer components that used it.
+* `tsconfig.json`: added `ignoreDeprecations: "6.0"` to silence the TS 7.0 `baseUrl` deprecation warning.
+
+### Owner-role responsive bug
+
+* The "Jadwalkan" (schedule) modal on `owner/maintenance.astro` had no `max-h`/`overflow-y-auto`, unlike the Admin-role equivalent — tall viewports were fine, but the form overflowed off-screen on shorter ones (the Save/Cancel buttons became unreachable). Fixed, and ported the same treatment (capped height, sticky header, 2-column field layout on `sm+`) to bring it to parity with Admin.
+* The same missing cap was present on four other Owner modals without an explicit report — fixed for consistency: `clients.astro`, `documents.astro`, `invoices.astro`, `users.astro`.
+
+### Session hardening
+
+* Added `startIdleWatcher()` in `lib/auth.ts` — auto-logout after 30 minutes of no interaction (mouse/keyboard/touch/scroll), wired into all four role layouts (`DashboardLayout`, `OwnerLayout`, `SupervisorLayout`, `EmployeeLayout`). Login page shows a "session ended due to inactivity" message on the resulting redirect. Frontend-only; `sessionStorage` remains the storage mechanism, still backed by the existing 8h JWT expiry.
+
+### UI polish
+
+* `select.field-input` restyled globally in `global.css` — every dropdown across every role now uses a custom chevron instead of the native browser affordance, since every `<select>` in the codebase already shares the `field-input` class.
+* `login.astro` — added leading icons to both fields, friendlier placeholder copy, and per-field inline validation (red border + inline message) instead of only a top-level alert box.
+
+### PWA — Tier 1 (installable shell)
+
+* Added `public/manifest.webmanifest`, `public/sw.js`, and real brand icons (`public/icons/icon-192.png`, `icon-512.png`, replacing a leftover template favicon that was never customized) wired through `layouts/Base.astro`.
+* Service worker deliberately caches **static assets only** (script/style/font/image, same-origin). API calls and HTML navigations are always network-only — project/invoice/inventory data is never served stale, and auth state is never cached.
+* This covers installability and shell-load speed only. Offline data entry (Tier 2 — relevant for Supervisor/Technical Employee in the field) is not implemented yet; it needs the auth token moved off `sessionStorage` into something a service worker can read (see Roadmap).
+
+---
+
 ## 🧪 Testing Performed
 
 This pass went beyond static code reading: a real MySQL instance was provisioned, the full migration chain was run against an empty database, an Owner account was seeded, and the backend was exercised with live HTTP requests for every fix above.
@@ -257,6 +294,8 @@ Tested areas include:
 * File upload rejection/acceptance
 * Database-level verification where relevant
 
+The Frontend Consistency & Hardening Pass above was verified by direct source comparison against the pre-rewrite version and manual inspection of the affected pages; it has not yet had a full in-browser click-through (see Roadmap).
+
 **Still to do:** a full manual click-through across all four roles in the actual browser UI and a checked-in automated test suite.
 
 ---
@@ -268,6 +307,14 @@ Tested areas include:
 * [ ] Wire task-assignment and purchase-request-review notifications (`project-assignments.service.js` / `purchase-requests.service.js` currently make zero calls to the notification service despite a comment claiming otherwise)
 * [ ] Finish attendance GPS + photo capture — the migration added the DB columns, but the model doesn't declare them and the service/controller don't forward them
 * [ ] Automated test suite (checked in to the repo, not ad-hoc scripts)
+
+### Phase 3 — Frontend / Product Polish (post-consistency-pass)
+
+* [ ] **Dark/light mode** — not a simple CSS-variable swap: `--color-ink`/`--color-paper` are used both as semantic text/background tokens (should invert) and as literal brand-panel colors (e.g. the login page's dark left panel, hazard stripes — should not invert). Needs a separate dark-specific token set, not a naive override.
+* [ ] **i18n (ID/EN) switcher** — infrastructure is cheap; the actual work is extracting and translating the hardcoded Indonesian strings across every page, including domain-specific terms (BOQ, Jadwalkan, etc.) that need correct technical translation, not literal.
+* [ ] **Excel export** for report-related roles — frontend-only, same pattern as the existing `exportTableToPDF` in `lib/export.ts`; blocked on column/format spec per role.
+* [ ] **Profile photo upload**, all roles — **not frontend-only**: needs a backend upload endpoint, a new column on the admin model, and file storage.
+* [ ] **PWA Tier 2 — offline data entry** for Supervisor/Technical Employee (daily reports, attendance): requires moving the auth token off `sessionStorage` into IndexedDB (or similar) so the service worker can read it, plus an offline write-queue with retry/sync and conflict handling.
 
 ### Final Milestone
 
@@ -324,6 +371,8 @@ Owner, Supervisor, and Technical Employee pages are present and wired.
 
 The `export.ts` blocker and the Technical Employee all-404 regression are both fixed and verified.
 
+Type-check regressions from the most recent UI consistency rewrite are fixed (see Frontend Consistency & Hardening Pass above). The app is now Tier-1 PWA-installable (static-asset caching only, no offline data yet), has a 30-minute idle auto-logout, and every dropdown across every role shares one modernized style.
+
 ---
 
 ## 🚀 Running Locally
@@ -377,11 +426,18 @@ backend/
 └── scripts/                 # seedOwner.js is the only seed script
 
 dashboard/
+├── public/
+│   ├── manifest.webmanifest # PWA manifest (Tier 1)
+│   ├── sw.js                # Service worker — static assets only, no API/HTML caching
+│   ├── favicon.svg          # Brand flame icon (replaces old template placeholder)
+│   └── icons/                # icon-192.png, icon-512.png, icon-source.svg
 ├── src/
 │   ├── components/
-│   ├── layouts/
-│   ├── lib/                 # export.ts
+│   ├── layouts/               # startIdleWatcher() wired into all four role layouts
+│   ├── lib/                   # export.ts, auth.ts (AdminUser, startIdleWatcher)
+│   ├── styles/                 # global.css — modernized select.field-input
 │   └── pages/
+│       ├── login.astro         # idle-timeout message, per-field validation
 │       ├── announcements.astro
 │       ├── item-categories.astro
 │       ├── owner/
