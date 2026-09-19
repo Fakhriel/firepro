@@ -44,7 +44,7 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:4000";
 </Base>
 
 <script>
-  import { getAdminAuth, adminApiFetch, clearAdminAuth, setAdminAuth, API_URL, getDashboardByRole } from "../lib/auth";
+  import { getAdminAuth, adminApiFetch, clearAdminAuth, setAdminAuth, API_URL, getDashboardByRole, startIdleWatcher } from "../lib/auth";
 
   async function guardAuth(): Promise<void> {
     const { isAuthenticated, admin } = getAdminAuth();
@@ -52,7 +52,7 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:4000";
       window.location.replace("/login");
       return;
     }
-    if (admin.role !== "admin" && admin.role !== "superadmin") {
+    if (admin.role !== "admin") {
       window.location.replace(getDashboardByRole(admin.role));
       return;
     }
@@ -80,6 +80,7 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:4000";
     }
 
     document.getElementById("dashboard-root")?.classList.remove("hidden");
+    startIdleWatcher();
   }
 
   // Mobile sidebar toggle
