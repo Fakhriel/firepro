@@ -157,6 +157,62 @@ export function exportTableToPDF(tableId: string, opts: ExportOptions): void {
   printWindow.document.close();
 }
 
+// Export Excel — trik lama-tapi-ampuh: HTML table dibungkus namespace Excel
+// dan disajikan sebagai .xls. Dibuka native di Excel/Google Sheets/LibreOffice
+// tanpa perlu nambah dependency baru (konsisten dengan exportTableToPDF di atas
+// yang juga zero-dependency). Kalau nanti butuh styling/formula lebih canggih,
+// baru worth pertimbangkan SheetJS — untuk kebutuhan sekarang (rekap tabel
+// laporan) ini cukup dan jauh lebih ringan.
+export function exportTableToExcel(tableId: string, opts: ExportOptions): void {
+  const table = document.getElementById(tableId);
+  if (!table) {
+    console.error(`[exportTableToExcel] element #${tableId} not found`);
+    return;
+  }
+
+  const filename = opts.filename ?? opts.title.toLowerCase().replace(/\s+/g, "-");
+  const tableHTML = table.outerHTML;
+
+  const workbookHTML = `
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="UTF-8"/>
+  <!--[if gte mso 9]>
+  <xml>
+    <x:ExcelWorkbook>
+      <x:ExcelWorksheets>
+        <x:ExcelWorksheet>
+          <x:Name>${opts.title}</x:Name>
+          <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+        </x:ExcelWorksheet>
+      </x:ExcelWorksheets>
+    </x:ExcelWorkbook>
+  </xml>
+  <![endif]-->
+  <style>
+    table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 12px; }
+    th { background:#14181c; color:#ffffff; font-weight:bold; padding:6px 10px; border:1px solid #999; text-align:left; }
+    td { padding:6px 10px; border:1px solid #ccc; }
+  </style>
+</head>
+<body>
+  <h2>${opts.title}</h2>
+  ${opts.subtitle ? `<p>${opts.subtitle}</p>` : ""}
+  ${tableHTML}
+</body>
+</html>`;
+
+  const blob = new Blob(["\ufeff" + workbookHTML], { type: "application/vnd.ms-excel" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${filename}.xls`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 // Format currency IDR
 export function formatIDR(value: number): string {
   return new Intl.NumberFormat("id-ID", {
