@@ -1,0 +1,199 @@
+---
+import OwnerLayout from "../../layouts/OwnerLayout.astro";
+import PageHeader from "../../components/PageHeader.astro";
+---
+
+<OwnerLayout title="Activity Log" activeNav="activity-log">
+  <PageHeader
+    heading="Activity Log"
+    sub="Jejak aksi yang berdampak finansial atau keamanan — dicatat otomatis, tidak bisa diedit/dihapus"
+    crumbs={[{ label: "Sistem" }, { label: "Activity Log" }]}
+  />
+
+  <!-- Filter -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-5">
+    <input id="search-activity" type="search" placeholder="Cari deskripsi / nama pelaku…" class="field-input sm:max-w-xs" />
+    <select id="filter-activity-action" class="field-input sm:w-56">
+      <option value="">Semua Jenis Aksi</option>
+      <option value="invoice.create">Buat Invoice</option>
+      <option value="invoice.payment.record">Catat Pembayaran</option>
+      <option value="invoice.payment.delete">Hapus Pembayaran</option>
+      <option value="quotation.status.change">Ubah Status Penawaran</option>
+      <option value="quotation.to_invoice">Penawaran → Invoice</option>
+      <option value="user.create">Buat Akun</option>
+      <option value="user.role.change">Ubah Role</option>
+      <option value="user.password.reset">Reset Password</option>
+      <option value="user.deactivate">Nonaktifkan Akun</option>
+      <option value="user.reactivate">Aktifkan Kembali Akun</option>
+    </select>
+    <input id="filter-activity-date" type="date" class="field-input sm:w-44" />
+  </div>
+
+  <!-- Table -->
+  <div class="panel overflow-hidden">
+    <div class="overflow-x-auto">
+      <table id="activity-table" class="data-table hidden">
+        <thead>
+          <tr>
+            <th>Waktu</th>
+            <th>Pelaku</th>
+            <th class="hidden sm:table-cell">Role</th>
+            <th>Aksi</th>
+            <th>Deskripsi</th>
+          </tr>
+        </thead>
+        <tbody id="activity-body"></tbody>
+      </table>
+    </div>
+    <div id="activity-skeleton">
+      {Array.from({ length: 6 }).map(() => (
+        <div class="skeleton-row">
+          <div class="skeleton w-9 h-9 shrink-0"></div>
+          <div class="flex-1 space-y-2">
+            <div class="skeleton h-3 w-1/2"></div>
+            <div class="skeleton h-2.5 w-1/4"></div>
+          </div>
+        </div>
+      ))}
+    </div>
+    <div id="activity-empty" class="empty-state min-h-56 hidden">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+        <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+      </svg>
+      <p>Belum ada aktivitas tercatat untuk filter ini</p>
+    </div>
+    <div class="flex items-center justify-between px-4 py-3 border-t border-hairline">
+      <span data-activity-count class="font-mono text-[10px] text-smoke">0 entri</span>
+      <span class="font-mono text-[10px] text-smoke">Menampilkan maksimum 200 entri terbaru</span>
+    </div>
+  </div>
+</OwnerLayout>
+
+<script>
+  import { adminApiFetch } from "../../lib/auth";
+  import { escapeHtml } from "../../lib/escapeHtml";
+  import { badgeHtml, type BadgeVariant } from "../../lib/badge";
+
+  const apiUrl =
+    document.getElementById("dashboard-root")?.dataset.apiUrl || "http://localhost:4000";
+
+  interface ActivityLogRow {
+    id: number;
+    actorId: number | null;
+    actorName: string;
+    actorRole: string;
+    action: string;
+    entityType: string | null;
+    entityId: number | null;
+    description: string;
+    createdAt: string;
+  }
+
+  const ACTION_LABEL: Record<string, string> = {
+    "invoice.create": "Buat Invoice",
+    "invoice.payment.record": "Catat Pembayaran",
+    "invoice.payment.delete": "Hapus Pembayaran",
+    "quotation.status.change": "Ubah Status Penawaran",
+    "quotation.to_invoice": "Penawaran → Invoice",
+    "user.create": "Buat Akun",
+    "user.role.change": "Ubah Role",
+    "user.password.reset": "Reset Password",
+    "user.deactivate": "Nonaktifkan Akun",
+    "user.reactivate": "Aktifkan Kembali Akun",
+  };
+  const ACTION_VARIANT: Record<string, BadgeVariant> = {
+    "invoice.create": "info",
+    "invoice.payment.record": "success",
+    "invoice.payment.delete": "danger",
+    "quotation.status.change": "info",
+    "quotation.to_invoice": "success",
+    "user.create": "info",
+    "user.role.change": "warning",
+    "user.password.reset": "warning",
+    "user.deactivate": "danger",
+    "user.reactivate": "success",
+  };
+  const ROLE_LABEL: Record<string, string> = {
+    owner: "Owner",
+    admin: "Admin",
+    supervisor: "Supervisor",
+    karyawan: "Teknisi Lapangan",
+    system: "Sistem",
+  };
+
+  const searchInput = document.getElementById("search-activity") as HTMLInputElement | null;
+  const actionFilter = document.getElementById("filter-activity-action") as HTMLSelectElement | null;
+  const dateInput = document.getElementById("filter-activity-date") as HTMLInputElement | null;
+  const tableBody = document.getElementById("activity-body") as HTMLTableSectionElement;
+  const emptyState = document.getElementById("activity-empty") as HTMLDivElement;
+  const table = document.getElementById("activity-table") as HTMLTableElement;
+  const skeletonEl = document.getElementById("activity-skeleton") as HTMLDivElement;
+  const countLabel = document.querySelector("[data-activity-count]") as HTMLElement | null;
+
+  let allLogs: ActivityLogRow[] = [];
+
+  function formatDateTime(iso: string): string {
+    try {
+      return new Date(iso).toLocaleString("id-ID", {
+        day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+      });
+    } catch {
+      return iso;
+    }
+  }
+
+  function applyFiltersAndRender(): void {
+    const keyword = (searchInput?.value ?? "").trim().toLowerCase();
+    const action = actionFilter?.value ?? "";
+    const date = dateInput?.value ?? "";
+
+    const filtered = allLogs.filter((log) => {
+      if (keyword && !(`${log.description} ${log.actorName}`).toLowerCase().includes(keyword)) return false;
+      if (action && log.action !== action) return false;
+      if (date && !log.createdAt.startsWith(date)) return false;
+      return true;
+    });
+
+    tableBody.innerHTML = "";
+    const isEmpty = filtered.length === 0;
+    skeletonEl.classList.add("hidden");
+    table.classList.toggle("hidden", isEmpty);
+    emptyState.classList.toggle("hidden", !isEmpty);
+    if (countLabel) countLabel.textContent = `${filtered.length} entri`;
+
+    filtered.forEach((log) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="font-mono text-xs text-charcoal whitespace-nowrap">${formatDateTime(log.createdAt)}</td>
+        <td class="font-semibold text-ink">${escapeHtml(log.actorName)}</td>
+        <td class="hidden sm:table-cell font-mono text-xs text-charcoal">${escapeHtml(ROLE_LABEL[log.actorRole] ?? log.actorRole)}</td>
+        <td>${badgeHtml(ACTION_LABEL[log.action] ?? log.action, ACTION_VARIANT[log.action] ?? "neutral")}</td>
+        <td class="font-mono text-xs text-charcoal">${escapeHtml(log.description)}</td>
+      `;
+      tableBody.appendChild(tr);
+    });
+  }
+
+  async function loadActivity(): Promise<void> {
+    try {
+      const res = await adminApiFetch(`${apiUrl}/api/admin/activity-log`);
+      const json = await res.json();
+      if (!res.ok) {
+        window.showToast?.(json.error ?? "Gagal memuat activity log", "error");
+        return;
+      }
+      allLogs = json.data ?? [];
+      applyFiltersAndRender();
+    } catch (err) {
+      console.error("[loadActivity] gagal fetch backend:", err);
+      window.showToast?.("Tidak bisa terhubung ke server", "error");
+    }
+  }
+
+  searchInput?.addEventListener("input", applyFiltersAndRender);
+  actionFilter?.addEventListener("change", applyFiltersAndRender);
+  dateInput?.addEventListener("change", applyFiltersAndRender);
+
+  loadActivity();
+</script>
