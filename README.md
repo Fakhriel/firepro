@@ -7,6 +7,8 @@ This project manages clients, projects, quotations, invoices, maintenance schedu
 > **Status:** Role model executed and live-tested. The `export.ts` blocker, the full Manual QA Round 1 list, and Phase 1 backend gaps are all fixed and verified end-to-end against a real database — not just read from source. Two more bugs surfaced only during that live testing (`invoices.project_id` NOT NULL mismatch, and a security-verification middleware that was defined but never wired in) and are fixed too.
 >
 > A subsequent **Frontend Consistency & Hardening Pass** (see below) fixed a round of type-check regressions introduced by a frontend rewrite, closed an Owner-role responsive-layout bug, and added session hardening, a modernized dropdown treatment, and Tier 1 PWA installability — all frontend-only, no backend/database changes. Remaining open items are scoped below under Roadmap.
+>
+> An **Automated Testing pass** (see below) has since been started on the backend: unit tests mocking Sequelize models, plus integration tests against a real MySQL database. This surfaced several confirmed, not-yet-fixed bugs — including a real race condition in inventory stock movements — listed under Roadmap.
 
 ---
 
@@ -199,6 +201,7 @@ The goal is not to make every FK column literally identical, but to keep the nam
 | Authentication | JWT, bcryptjs                    |
 | Frontend       | Astro, Tailwind CSS, GSAP        |
 | Security       | Helmet, CORS, express-rate-limit |
+| Testing        | Jest, Supertest                  |
 
 ---
 
@@ -296,7 +299,17 @@ Tested areas include:
 
 The Frontend Consistency & Hardening Pass above was verified by direct source comparison against the pre-rewrite version and manual inspection of the affected pages; it has not yet had a full in-browser click-through (see Roadmap).
 
-**Still to do:** a full manual click-through across all four roles in the actual browser UI and a checked-in automated test suite.
+### Automated Testing (new)
+
+A checked-in automated test suite now exists on the backend, covering both mocked unit tests and real-database integration tests. Full setup instructions, coverage breakdown, and the list of bugs each test confirms live in **[`backend/TESTING.md`](./backend/TESTING.md)**.
+
+Summary:
+
+* **Unit tests (Jest, mocked models):** 8 modules covered, 34 tests passing — `attendance`, `daily-reports`, `maintenance`, `quotations`, `invoices`, `inventory`, `purchase-requests`, `clients`.
+* **Integration tests (Jest + Supertest, real MySQL):** login flow, anti user-enumeration, RBAC enforcement on a real protected route, immediate token invalidation on account deactivation, and a concurrency test against the inventory stock-movement endpoint.
+* This pass **found bugs, it did not fix them.** Several tests are intentionally named `BUG:`/`GAP:` and currently pass because they pin the *current, incorrect* behavior as a documented baseline — see Roadmap below for the fix list, and `TESTING.md` for details on this convention.
+
+**Still to do:** unit/integration coverage for the remaining backend modules, fixing the bugs this pass confirmed, wiring the suite into CI, and a full manual click-through across all four roles in the actual browser UI.
 
 ---
 
@@ -306,7 +319,22 @@ The Frontend Consistency & Hardening Pass above was verified by direct source co
 
 * [ ] Wire task-assignment and purchase-request-review notifications (`project-assignments.service.js` / `purchase-requests.service.js` currently make zero calls to the notification service despite a comment claiming otherwise)
 * [ ] Finish attendance GPS + photo capture — the migration added the DB columns, but the model doesn't declare them and the service/controller don't forward them
-* [ ] Automated test suite (checked in to the repo, not ad-hoc scripts)
+* [x] Automated test suite (checked in to the repo — see [`backend/TESTING.md`](./backend/TESTING.md)). Coverage is partial (8 of ~16 core modules); extending it to the rest is tracked below.
+
+### Phase 2b — Bugs Confirmed by Automated Testing (not yet fixed)
+
+Found and confirmed via the automated test suite above — see `backend/TESTING.md` for full detail and reproduction. Listed roughly in order of impact:
+
+* [ ] **Inventory stock-out has no transaction/row locking** — confirmed via integration test against a real database: two concurrent stock-out requests on the same item both succeeded, driving stock negative. Needs `sequelize.transaction()` with row locking in `inventory.service.js#recordMovement` before this is safe with more than one concurrent user.
+* [ ] **Invoice `amount` is not validated against `paidAmount`** — lowering an invoice's amount below what's already been paid leaves `outstandingAmount: 0` while `status` stays stuck at `partially_paid`.
+* [ ] **Quotation status is not locked once `accepted`** — can still be reverted to `draft`/other statuses, and `syncAmountFromBoq()` silently overwrites `amount` post-acceptance with no check against an already-issued invoice.
+* [ ] **Attendance / daily reports timezone bug** — `workDate`/`reportDate` use `toISOString()` (UTC); any check-in or report before 07:00 local time (WIB) is recorded under the previous calendar day.
+* [ ] **Maintenance status (`due_soon`/`overdue`) is not derived automatically** from `nextService`, unlike the equivalent `deriveDisplayStatus` pattern already used for invoices.
+* [ ] **Daily report `create()` doesn't validate `projectId` against the database** — a technician can submit a report against a non-existent project.
+* [ ] **Daily report `markReviewed()` has no state-machine guard** — an already-reviewed report can be reviewed again, silently overwriting `reviewedBy`/`reviewNote` with no audit trail.
+* [ ] **Purchase request approval never triggers a stock movement** — needs a product decision on whether approval should auto-create stock-in, or whether that's intentionally manual (and if so, document it).
+* [ ] **Client email format is not validated** — any non-empty string is accepted.
+* [ ] **Admin role changes only take effect after the JWT expires (8h) or re-login** — `requireAdminAuth` re-checks `isActive` live against the database on every request, but reads `role` only from the token payload. Confirmed by code review; not yet covered by a runnable test.
 
 ### Phase 3 — Frontend / Product Polish (post-consistency-pass)
 
@@ -409,6 +437,16 @@ npm run dev
 
 Configure `PUBLIC_API_URL` to point to your backend server.
 
+### Running Tests
+
+```bash
+cd backend
+npm test                  # unit tests (mocked, no database needed)
+npm run test:integration  # integration tests (needs a running local MySQL — see backend/TESTING.md)
+```
+
+See **[`backend/TESTING.md`](./backend/TESTING.md)** for full setup instructions, coverage breakdown, and known issues confirmed by these tests.
+
 ---
 
 ## 📁 Project Structure
@@ -423,7 +461,9 @@ backend/
 ├── config/
 ├── migrations/              # Clean end-to-end migration chain
 ├── utils/                   # Upload/storage utilities
-└── scripts/                 # seedOwner.js is the only seed script
+├── scripts/                 # seedOwner.js is the only seed script
+├── tests/integration/       # Supertest integration tests (real MySQL)
+└── TESTING.md                # Test setup, coverage, and known issues
 
 dashboard/
 ├── public/
